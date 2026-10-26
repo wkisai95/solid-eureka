@@ -299,7 +299,8 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
             return (v.get("usd", 0.0) - base) if curve else 0.0
 
         hrs = v.get("hours", 0.0)
-        day_rate = v.get("usd", 0.0) / (hrs / 24) if hrs >= 1 else None
+        # fees reach the pools in lumps (many pools get them in a few hours a day): a daily rate needs a full day
+        day_rate = v.get("usd", 0.0) / (hrs / 24) if hrs >= 24 else None
         closed = [c for c in tr["closed"].get(s, []) if c[0] >= now - 7 * DAY]
         ratio = [c[2] / c[1] for c in closed if c[1] > 0]
         reco = latest.get(s) or {}

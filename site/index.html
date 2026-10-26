@@ -623,6 +623,7 @@ details.more[open] summary { margin-bottom: 3px; }
   const holdRows = (s, size) => s.hold ||
     (s.holding || []).map(h => ({ n: h[0], c: "", p: h[2] != null ? h[2] : Math.round(h[1] / size * 100) }));
   const pctOf = (r, size) => r[2] != null ? r[2] : Math.round(r[1] / size * 100);
+  const usdCents = x => x == null ? "—" : x < 100 ? "$" + x.toFixed(2).replace(".", ",") : fmtUsd(x);
   function recoList(rows) {
     const ol = el("ol", "reco");
     for (const r of rows) {
@@ -643,15 +644,18 @@ details.more[open] summary { margin-bottom: 3px; }
     t.strategies.forEach((s, i) => {
       const c = el("div", "card");
       const h = el("h3"); const sw = el("i"); sw.style.background = SCOL[i]; h.append(sw, s.label); c.append(h);
-      const big = el("div", "big", s.usd_day != null ? fmtUsd(s.usd_day) : "—");
-      big.append(el("small", null, s.usd_day != null ? "al giorno, reale" : "in raccolta"));
+      // before a full day the real figure is the total so far: a daily rate from a few hours of lumpy fees misleads
+      const daily = s.usd_day != null && s.hours >= 24;
+      const big = el("div", "big", daily ? fmtUsd(s.usd_day) : usdCents(s.usd_total));
+      big.append(el("small", null, daily ? "al giorno, reale" : `finora, in ${Math.max(0, Math.round(s.hours))} h`));
       c.append(big);
       const kv = el("div", "kv");
       const add = (k, v) => kv.append(el("span", null, k), el("span", null, v));
-      add("APR reale", s.apr != null ? fmtPct(s.apr) : "—");
-      add("Ultime 24 ore", s.usd_24h != null ? fmtUsd(s.usd_24h) : "—");
-      add("Totale", `${fmtUsd(s.usd_total)} in ${Math.round(s.hours)} h`);
-      add("Previsione adesso", s.now.apr != null ? "APR " + fmtPct(s.now.apr) : "—");
+      add("APR reale", daily && s.apr != null ? fmtPct(s.apr) : "dopo 24 h");
+      add("Ultime 24 ore", s.usd_24h != null ? usdCents(s.usd_24h) : "—");
+      add("Totale", `${usdCents(s.usd_total)} in ${Math.round(s.hours)} h`);
+      const perDay = s.now.pred_47h != null ? s.now.pred_47h / ((t.cooldown_h || 47) / 24) : null;
+      add("Previsione adesso", s.now.apr != null ? `${fmtUsd(perDay)}/g · APR ${fmtPct(s.now.apr)}` : "—");
       add("Reale / previsto 7g", s.real_vs_pred != null ? (s.real_vs_pred * 100).toFixed(0) + "%" : "dopo 47 h");
       add("Prossimo spostamento", s.until ? (s.until * 1000 > Date.now() ? when(s.until) : "ora") : "—");
       c.append(kv);
