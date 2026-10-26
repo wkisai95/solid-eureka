@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from eth_abi import decode, encode
 
 from . import chain as C
+from .rpc import RpcError
 
 HOUR = 3600
 FEE_WINDOW = 72 * HOUR
@@ -97,29 +98,33 @@ def fetch_voter_events(rpc, state, head, log):
     return events
 
 
-def fetch_reward_events(rpc, state, head, log, batch=250, workers=4):
-    """Fee transfers, read only from the rewards managers of known Aero gauges."""
-    vrms = sorted(state["vrm_map"])
-    if not vrms:
-        return []
-    prev = state.get("vrm_block") or 0
-    known_before = set(state.get("vrm_scanned", []))
-    backfill_from = max(C.START_BLOCK, head - (49 * HOUR) // 2)
-    jobs = []
-    if not prev:
-        jobs += [(backfill_from, head, vrms[i:i + batch]) for i in range(0, len(vrms), batch)]
-    else:
-        jobs += [(prev + 1, head, vrms[i:i + batch]) for i in range(0, len(vrms), batch)]
-        fresh = [v for v in vrms if v not in known_before]
-        # rewards managers found in this run: read their recent history too
-        jobs += [(backfill_from, prev, fresh[i:i + batch]) for i in range(0, len(fresh), batch) if backfill_from <= prev]
+def fetch_reward_events(rpc, state, head, log, deadline, chunk=2000):
+    """Fee transfers to the rewards managers of Aero gauges.
+
+    New blocks are read every run. The history needed for the 48-hour figures is filled in backwards a slice
+    at a time, within a time budget, so the first runs stay short and public endpoints are not overloaded.
+    """
     t0 = time.time()
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        parts = list(ex.map(lambda j: list(rpc.get_logs(j[0], j[1], address=j[2], topics=[[C.T["fees"]]],
-                                                        chunk=10000)), jobs))
-    raw = [lg for p in parts for lg in p]
-    state["vrm_scanned"] = vrms
+    raw = []
+    prev = state.get("vrm_block") or 0
+    if not prev:
+        state["fee_back"] = head + 1
+        state["fee_back_target"] = max(C.START_BLOCK, head - (49 * HOUR) // 2)
+    else:
+        raw += list(rpc.get_logs(prev + 1, head, topics=[[C.T["fees"]]], chunk=chunk, max_chunk=4 * chunk))
     state["vrm_block"] = head
+    back, target, filled = state.get("fee_back"), state.get("fee_back_target"), 0
+    while back and target and back > target:
+        lo = max(target, back - chunk)
+        try:
+            raw += list(rpc.get_logs(lo, back - 1, topics=[[C.T["fees"]]], chunk=chunk, max_chunk=chunk,
+                                     deadline=deadline))
+        except RpcError as e:
+            log(f"fee history paused at block {back}: {str(e)[:160]}")
+            break
+        filled += back - lo
+        back = lo
+        state["fee_back"] = back
     seen, events = set(), []
     for lg in raw:
         key = (lg.get("transactionHash"), lg.get("logIndex"), lg["address"].lower())
@@ -129,8 +134,9 @@ def fetch_reward_events(rpc, state, head, log, batch=250, workers=4):
         e = C.decode_log(lg)
         if e:
             events.append(e)
-    log(f"fee events: {len(raw)} logs from {len(vrms)} rewards managers in {len(jobs)} queries, "
-        f"{time.time() - t0:.1f}s")
+    left = max(0, (back or 0) - (target or 0)) if back and target else 0
+    log(f"fee events: {len(events)} from {len(raw)} logs, {time.time() - t0:.1f}s, history filled "
+        f"{filled} blocks, {left} blocks still to read ({left * 2 / 3600:.1f} h)")
     return events
 
 
@@ -179,14 +185,6 @@ def _vrm_gauges(rpc, vrms):
 
 def refresh_metadata(rpc, state, log):
     gauges = state["gauges"]
-    # emitters of fee / incentive events whose gauge we do not know yet
-    known_vrms = set(state["vrm_map"])
-    rejected = set(state.get("rejected_emitters", []))
-    candidates = sorted({p[4] for p in state["fees_pending"]} | {p["vrm"] for p in state["incentives_pending"]})
-    candidates = [v for v in candidates if v not in known_vrms and v not in rejected]
-    if candidates:
-        for v, g in _vrm_gauges(rpc, candidates).items():
-            gauges.setdefault(gkey(C.BASE_CHAIN, g), {})
     todo = [k for k, m in gauges.items() if k.startswith("8453:") and "vrm" not in m]
     if todo:
         meta = C.read_gauge_meta(rpc, [k.split(":", 1)[1] for k in todo])
@@ -194,10 +192,6 @@ def refresh_metadata(rpc, state, log):
             gauges[k] = meta.get(k.split(":", 1)[1], {"vrm": None})
         log(f"metadata: read {len(todo)} new gauges")
     state["vrm_map"] = {m["vrm"]: k for k, m in gauges.items() if m.get("vrm")}
-    for v in candidates:
-        if v not in state["vrm_map"]:
-            rejected.add(v)
-    state["rejected_emitters"] = sorted(rejected)[-5000:]
     toks = set()
     for m in gauges.values():
         for t in (m.get("t0"), m.get("t1")):
@@ -305,11 +299,7 @@ def settle_rewards(state, prices, now, log):
             continue
         key = gkey(C.BASE_CHAIN, gauge)
         if vrm_map.get(emitter) != key:
-            if emitter in state.get("rejected_emitters", []) or key in state["gauges"] and \
-                    state["gauges"][key].get("vrm") and state["gauges"][key]["vrm"] != emitter:
-                rejected += 1
-                continue
-            keep.append([ts, gauge, tok, amount, emitter])
+            rejected += 1      # same event signature emitted by a contract that is not an Aero rewards manager
             continue
         p = prices.get(tok)
         dec = (state["erc20"].get(tok) or {}).get("dec", 18)

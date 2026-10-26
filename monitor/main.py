@@ -10,6 +10,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
+from time import time as wall_clock
 from zoneinfo import ZoneInfo
 
 from . import aero as A
@@ -86,6 +87,7 @@ def run(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     now = int(time.time())
+    budget_end = wall_clock() + 8 * 60
     state = load_json(out / "state.json.gz")
     first_run = not state
     if first_run:
@@ -107,7 +109,7 @@ def run(args):
     A.refresh_metadata(rpc, state, log)
     A.refresh_tokens(rpc, state, cfg, log)
     A.refresh_metadata(rpc, state, log)   # gauges found while rebuilding positions
-    A.apply_events(state, A.fetch_reward_events(rpc, state, head, log), params["cooldown"])
+    A.apply_events(state, A.fetch_reward_events(rpc, state, head, log, deadline=budget_end), params["cooldown"])
     new_programs = A.refresh_incentives(rpc, state, now, log)
     A.refresh_metadata(rpc, state, log)   # symbols of reward tokens
     A.refresh_allocation_power(rpc, state, now, log)

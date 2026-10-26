@@ -31,6 +31,10 @@ class RangeTooLarge(RpcError):
     pass
 
 
+class TimeBudget(RpcError):
+    pass
+
+
 def http_json(url, payload=None, headers=None, timeout=25):
     h = {"user-agent": UA, "accept": "application/json"}
     if headers:
@@ -77,6 +81,12 @@ class Rpc:
 
     def call(self, method, params):
         errors, range_errors = [], 0
+        span = None
+        if method == "eth_getLogs":
+            try:
+                span = int(params[0]["toBlock"], 16) - int(params[0]["fromBlock"], 16) + 1
+            except Exception:
+                span = None
         for url in self._order(method):
             h = host(url)
             try:
@@ -85,8 +95,13 @@ class Rpc:
             except urllib.error.HTTPError as e:
                 errors.append(f"{h}: HTTP {e.code}")
                 self.stats[f"err:{method}:{h}"] += 1
-                if method == "eth_getLogs" and e.code in (400, 413):
-                    range_errors += 1
+                if e.code == 429:
+                    self.cooldown[url] = time.time() + 20      # rate limited: try the others for a while
+                elif method == "eth_getLogs" and e.code in (400, 413):
+                    if span is not None and span <= 2000:
+                        self.no_logs[url] = f"HTTP {e.code} on {span} blocks"
+                    else:
+                        range_errors += 1
                 else:
                     self._fail(method, url, 90)
                 continue
@@ -110,7 +125,10 @@ class Rpc:
                         self.no_logs[url] = msg[:120]
                         continue
                     if any(k in low for k in RANGE_HINTS):
-                        range_errors += 1
+                        if span is not None and span <= 200:
+                            self.no_logs[url] = msg[:120]
+                        else:
+                            range_errors += 1
                         continue
                 self._fail(method, url, 60)
                 continue
@@ -131,10 +149,13 @@ class Rpc:
     def eth_call(self, to, data, block="latest"):
         return self.call("eth_call", [{"to": to, "data": "0x" + data.hex()}, block])
 
-    def get_logs(self, from_block, to_block, address=None, topics=None, chunk=5000, max_chunk=20000, min_chunk=100):
+    def get_logs(self, from_block, to_block, address=None, topics=None, chunk=5000, max_chunk=20000, min_chunk=100,
+                 deadline=None):
         """Yields logs between from_block and to_block (inclusive), shrinking ranges on provider limits."""
         start, size, failures = from_block, chunk, 0
         while start <= to_block:
+            if deadline and time.time() > deadline:
+                raise TimeBudget(f"time budget reached at block {start}")
             end = min(to_block, start + size - 1)
             flt = {"fromBlock": hex(start), "toBlock": hex(end)}
             if address:
