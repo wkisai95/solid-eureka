@@ -3,6 +3,7 @@ import statistics
 
 from . import aero as A
 from . import chain as C
+from . import marketdata as MD
 
 HOUR = 3600
 
@@ -39,6 +40,10 @@ def record_routing(state, routing, now):
                     series.append([hour, sp, sa])
                 cutoff = now - 8 * 24 * HOUR
                 hist[key][f"{agg}:{size}"] = [p for p in series if p[0] >= cutoff]
+
+
+def _r4(x):
+    return round(x, 4) if x is not None else None
 
 
 def chain_cooldown(state, cid, default):
@@ -106,6 +111,9 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
 
     # pools
     rows = []
+    mkt = state.get("market") or {}
+    mkt_pools = mkt.get("pools") or {}
+    universe, new_ok = MD.new_chain_universe(state, (cfg.get("strategies") or {}).get("nuove"))
 
     def pool_row(key, ap):
         m = state["gauges"].get(key) or {}
@@ -113,8 +121,18 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
         fees48 = A.fees_usd(state, key, now - 48 * HOUR, now + HOUR)
         inc48 = A.incentive_usd(state, prices, key, now - 48 * HOUR, now)
         inc_next = A.incentive_usd(state, prices, key, now, now + 48 * HOUR)
-        return m, {"key": key, "name": A.gauge_name(state, key), "chain": C.chain_short(cid), "cid": cid,
-                   "kind": m.get("kind", "?"), "pool": m.get("pool"), "ap": round(ap)}, fees48, inc48, inc_next
+        r = {"key": key, "name": A.gauge_name(state, key), "chain": C.chain_short(cid), "cid": cid,
+             "kind": m.get("kind", "?"), "pool": m.get("pool"), "ap": round(ap)}
+        mv = mkt_pools.get(key)
+        if mv:
+            # this pool's volume and liquidity, and the same pair on every DEX of the chain
+            r["vol24h"], r["liq"] = mv[2], mv[3]
+            if mv[4]:
+                r["pair_vol24h"] = mv[4]
+                r["pair_share"] = round(min(1.0, mv[2] / mv[4]), 4)
+        if key in universe:
+            r["new_chain_pair"] = True
+        return m, r, fees48, inc48, inc_next
 
     for key, ap in sorted(state["ap"].items(), key=lambda kv: -kv[1])[:500]:
         m, r, fees48, inc48, inc_next = pool_row(key, ap)
@@ -185,6 +203,12 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             "synced": bool(cs.get("synced")), "fee_hours": cs.get("fee_hours"),
             "ok": st.get("ok", False), "error": st.get("error"), "checked": st.get("at"),
             "head": cs.get("head"), "cooldown_h": round(chain_cooldown(state, cid, cooldown) / HOUR, 2),
+            "aero_vol24h": ((mkt.get("chains") or {}).get(cid_s) or [None, None])[0],
+            "dex_vol24h": ((mkt.get("chains") or {}).get(cid_s) or [None, None])[1],
+            "share": _r4(MD.chain_share(mkt, cid)),
+            "share_24h": _r4(MD.chain_share(mkt, cid, ago=24 * HOUR, now=now)),
+            "share_7d": _r4(MD.chain_share(mkt, cid, ago=7 * 24 * HOUR, now=now)),
+            "new": cid in new_ok,
         })
     for cid in params.get("chains", []):
         if str(cid) not in state["chains"]:

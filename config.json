@@ -139,5 +139,16 @@
   "repo": "wkisai95/solid-eureka",
   "tracker": {
     "size": 235000
+  },
+  "strategies": {
+    "nuove": {
+      "home_chains": [
+        8453,
+        10
+      ],
+      "max_chain_share": 0.15,
+      "pairs_per_chain": 10,
+      "min_pair_volume_usd": 250000
+    }
   }
 }

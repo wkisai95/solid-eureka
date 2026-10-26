@@ -31,6 +31,7 @@
   --s1: #2a78d6;
   --s2: #eb6834;
   --s3: #1baf7a;
+  --s4: #eda100;
   --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --f-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -40,13 +41,13 @@
   :root:not([data-theme="light"]) {
     --bg: #0d1517; --panel: #142023; --ink: #e4ecea; --ink-2: #9db0ad; --line: #26383b;
     --accent: #3cc2b4; --accent-soft: #163c3a; --passive: #3b4f51; --good: #58c27a; --warn: #e3a34a;
-    --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
+    --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0d1517; --panel: #142023; --ink: #e4ecea; --ink-2: #9db0ad; --line: #26383b;
   --accent: #3cc2b4; --accent-soft: #163c3a; --passive: #3b4f51; --good: #58c27a; --warn: #e3a34a;
-  --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
+  --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -141,7 +142,7 @@ button:disabled { opacity: .55; cursor: default; filter: none; }
 .tag { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font-size: 11px;
   color: var(--ink-2); margin-left: 6px; vertical-align: 1px; white-space: nowrap; }
 .bad-text { color: var(--bad); }
-.chainsplit { font-size: 12px; color: var(--ink-2); }
+.chainsplit, .method { font-size: 12px; color: var(--ink-2); }
 input[type=password] { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
   border-radius: 10px; padding: 7px 10px; min-width: 0; flex: 1 1 220px; }
 .reco-h { font: 600 13px/1.3 var(--f-body); margin-top: 4px; }
@@ -255,7 +256,7 @@ details.more[open] summary { margin-bottom: 3px; }
 
   <section class="panel">
     <div class="panel-head"><h2>Pool</h2><span class="sub" id="pool-count"></span></div>
-    <p class="note">APR 48h: fee e incentivi delle ultime 48 ore sull'allocazione attuale. APR atteso: fee delle ultime 48 ore più gli incentivi programmati nelle prossime 48. Routing: quota di uno swap da $10.000 che KyberSwap e Velora fanno passare dal pool Aero.</p>
+    <p class="note">APR 48h: fee e incentivi delle ultime 48 ore sull'allocazione attuale. APR atteso: fee delle ultime 48 ore più gli incentivi programmati nelle prossime 48. Volume 24h: scambi passati dal pool Aero. Quota coppia: parte del volume della stessa coppia su tutti i DEX della chain che passa da Aero. Routing: quota di uno swap da $10.000 che KyberSwap e Velora fanno passare dal pool Aero.</p>
     <div class="controls">
       <input type="search" id="q" placeholder="Cerca un pool o un token" aria-label="Cerca un pool">
       <select id="chain-f" aria-label="Chain"><option value="">Tutte le chain</option></select>
@@ -266,6 +267,8 @@ details.more[open] summary { margin-bottom: 3px; }
         <option value="d6h">Variazione 6 ore</option>
         <option value="free_24h_active">Liberi entro 24 ore</option>
         <option value="rev48h">Revenue 48h</option>
+        <option value="vol24h">Volume 24h</option>
+        <option value="pair_vol24h">Volume della coppia su tutti i DEX</option>
         <option value="route">Routing</option>
       </select>
       <label class="toggle"><input type="checkbox" id="big" checked> Solo sopra 100k</label>
@@ -275,7 +278,7 @@ details.more[open] summary { margin-bottom: 3px; }
         <thead><tr>
           <th data-k="name">Pool</th><th data-k="chain">Chain</th><th data-k="ap">Allocazione</th><th data-k="d6h">6 ore</th><th data-k="d24h">24 ore</th>
           <th data-k="apr">APR 48h</th><th data-k="apr_next">APR atteso</th><th data-k="free_24h_active">Liberi 24h</th>
-          <th data-k="rev48h">Revenue 48h</th><th data-k="inc_next48h">Incentivi 48h</th><th data-k="route">Routing K / V</th>
+          <th data-k="rev48h">Revenue 48h</th><th data-k="inc_next48h">Incentivi 48h</th><th data-k="vol24h">Volume 24h</th><th data-k="pair_share">Quota coppia</th><th data-k="route">Routing K / V</th>
         </tr></thead>
         <tbody id="pools"></tbody>
       </table>
@@ -538,6 +541,7 @@ details.more[open] summary { margin-bottom: 3px; }
       c0.append(el("span", "nm", p.name), el("span", "kd", p.kind && p.kind !== "?" ? p.kind : ""));
       if (p.unallocated) c0.append(el("span", "kd", "nessuna allocazione"));
       if (p.blocked) c0.append(el("span", "kd", "non votabile"));
+      if (p.new_chain_pair) c0.append(el("span", "tag", "chain nuova"));
       tr.append(c0);
       tr.append(el("td", "ch muted", p.chain || "Base"));
       const cAp = el("td", "num", fmtN(p.ap));
@@ -549,6 +553,13 @@ details.more[open] summary { margin-bottom: 3px; }
       tr.append(el("td", "num", fmtN(p.free_24h_active)));
       tr.append(el("td", "num", p.rev48h ? fmtUsd(p.rev48h) : "—"));
       tr.append(el("td", "num", p.inc_next48h ? fmtUsd(p.inc_next48h) : "—"));
+      tr.append(el("td", "num", p.vol24h != null ? fmtUsd(p.vol24h) : "—"));
+      const cShare = el("td", "num", p.pair_share != null ? sharePct(p.pair_share) : "—");
+      if (p.pair_vol24h) {
+        cShare.append(el("span", "kd", "di " + fmtUsd(p.pair_vol24h)));
+        cShare.title = "Volume del pool Aero sul volume della stessa coppia su tutti i DEX della chain, ultime 24 ore";
+      }
+      tr.append(cShare);
       const r = p.routing || {};
       const f = x => x == null ? "—" : Math.round(x * 100) + "%";
       const k = r["kyber:10000"], v = r["velora:10000"];
@@ -561,7 +572,7 @@ details.more[open] summary { margin-bottom: 3px; }
       tb.append(tr);
     }
     if (!rows.length) {
-      const tr = document.createElement("tr"); const td = el("td", "muted", "Nessun pool corrisponde alla ricerca."); td.colSpan = 11; tr.append(td); tb.append(tr);
+      const tr = document.createElement("tr"); const td = el("td", "muted", "Nessun pool corrisponde alla ricerca."); td.colSpan = 13; tr.append(td); tb.append(tr);
     }
   }
 
@@ -576,6 +587,12 @@ details.more[open] summary { margin-bottom: 3px; }
       if (c.positions) parts.push(c.positions.toLocaleString("it-IT") + " posizioni");
       if (c.fees48h) parts.push("fee 48h " + fmtUsd(c.fees48h));
       if (c.median_apr != null) parts.push("APR mediano " + fmtPct(c.median_apr));
+      if (c.share != null) {
+        const was = c.share_7d != null ? c.share_7d : c.share_24h;
+        parts.push(`quota Aero del volume DEX ${sharePct(c.share)}` +
+          (was != null ? ` (${c.share_7d != null ? "7 giorni fa" : "ieri"} ${sharePct(was)})` : ""));
+      }
+      if (c.new) parts.push("chain nuova per la simulazione");
       let st = "";
       if (!c.ok) st = c.error === "chain non configurata" ? "Non ancora monitorata." : "Ultima lettura non riuscita" + (c.checked ? ": dati del " + when(c.checked) : "") + ".";
       else if (!c.synced) st = "Sto ancora leggendo lo storico delle allocazioni.";
@@ -614,7 +631,7 @@ details.more[open] summary { margin-bottom: 3px; }
 
   // ---------------------------------------------------------------- simulation
   let SIM = null, ySort = "m1000_7d", yDir = -1;
-  const SCOL = ["var(--s1)", "var(--s2)", "var(--s3)"];
+  const SCOL = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
   const kSize = n => n >= 1000 ? fmtN(n) : String(n);
 
   // percent of the position per pool; tracker.json written before percentages had only sAERO amounts
@@ -623,6 +640,7 @@ details.more[open] summary { margin-bottom: 3px; }
   const holdRows = (s, size) => s.hold ||
     (s.holding || []).map(h => ({ n: h[0], c: "", p: h[2] != null ? h[2] : Math.round(h[1] / size * 100) }));
   const pctOf = (r, size) => r[2] != null ? r[2] : Math.round(r[1] / size * 100);
+  const sharePct = x => x == null ? "—" : (x * 100 >= 10 ? Math.round(x * 100) : (x * 100).toFixed(1).replace(".", ",")) + "%";
   const usdCents = x => x == null ? "—" : x < 100 ? "$" + x.toFixed(2).replace(".", ",") : fmtUsd(x);
   function recoList(rows) {
     const ol = el("ol", "reco");
@@ -644,6 +662,12 @@ details.more[open] summary { margin-bottom: 3px; }
     t.strategies.forEach((s, i) => {
       const c = el("div", "card");
       const h = el("h3"); const sw = el("i"); sw.style.background = SCOL[i]; h.append(sw, s.label); c.append(h);
+      if (s.id === "nuove" && t.new_chains) {
+        const nc = t.new_chains;
+        c.append(el("div", "method", nc.chains.length
+          ? `Solo le ${nc.pairs_per_chain} coppie più grosse (volume su tutti i DEX) di ${nc.chains.join(", ")}: chain dove Aero ha meno del ${Math.round(nc.max_share * 100)}% del volume DEX.`
+          : "Nessuna chain sotto la soglia di quota di Aero per ora."));
+      }
       // before a full day the real figure is the total so far: a daily rate from a few hours of lumpy fees misleads
       const daily = s.usd_day != null && s.hours >= 24;
       const big = el("div", "big", daily ? fmtUsd(s.usd_day) : usdCents(s.usd_total));
@@ -683,7 +707,8 @@ details.more[open] summary { margin-bottom: 3px; }
     const host = $("sim-chart");
     const series = t.strategies.map(s => (s.curve || []).map(([h, c]) => [h, c]));
     const pts = series.flat();
-    if (pts.length < 4) { host.replaceChildren(el("div", "empty", "Il grafico compare dopo qualche ora di raccolta.")); return; }
+    // a line needs points at different times: until then the axis labels would all sit on one spot
+    if (pts.length < 4 || new Set(pts.map(p => p[0])).size < 3) { host.replaceChildren(el("div", "empty", "Il grafico compare dopo qualche ora di raccolta.")); return; }
     const w = Math.max(520, Math.round(host.clientWidth || 720)), h = 200, padL = 52, padR = 70, padB = 26, padT = 10;
     const x0 = Math.min(...pts.map(p => p[0])), x1 = Math.max(...pts.map(p => p[0]));
     const ymax = Math.max(1, ...pts.map(p => p[1]));

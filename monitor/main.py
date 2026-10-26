@@ -18,6 +18,7 @@ from . import aero as A
 from . import alerts as N
 from . import chain as C
 from . import market as M
+from . import marketdata as MD
 from . import report as R
 from . import tracker as T
 from .rpc import Rpc
@@ -223,7 +224,17 @@ def run(args):
     new_inc, fresh_fees = A.settle_rewards(state, prices, now, log)
     new_inc = list(dict.fromkeys(new_inc + new_programs))
 
+    # hourly market snapshot (pool volumes, pair volume on every DEX, Aero share per chain), kept as history
+    if not args.no_market:
+        try:
+            MD.refresh(state, chains_cfg, now, log)
+        except Exception as e:
+            status["errors"].append(f"market: {e}")
+            log(f"market data failed: {traceback.format_exc()[-400:]}")
+
     # paper allocation of a fixed size, followed through every cooldown
+    T.RULES.clear()
+    T.RULES.update(cfg.get("strategies") or {})
     size, restart = tracker_settings(state, cfg, log)
     if restart:
         state["tracker"] = T.new_tracker(size, now)
@@ -323,6 +334,7 @@ def main():
     ap.add_argument("--out", default="out")
     ap.add_argument("--max-blocks", type=int, default=0, help="limit the first backfill (testing)")
     ap.add_argument("--no-routing", action="store_true")
+    ap.add_argument("--no-market", action="store_true")
     args = ap.parse_args()
     try:
         run(args)
