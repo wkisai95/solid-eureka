@@ -127,10 +127,12 @@
       "velora": null,
       "rpc": [
         "https://rpc.mainnet.arc.io",
+        "https://rpc.quicknode.mainnet.arc.io",
+        "https://rpc.blockdaemon.mainnet.arc.io",
         "https://arc.drpc.org",
-        "https://rpc.drpc.mainnet.arc.io",
-        "https://rpc.quicknode.mainnet.arc.io"
-      ]
+        "https://rpc.drpc.mainnet.arc.io"
+      ],
+      "pace_s": 1.0
     }
   },
   "page_url": "https://wkisai95.github.io/solid-eureka/",

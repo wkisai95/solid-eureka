@@ -145,7 +145,8 @@ def run(args):
 
     def rpc_for(cid):
         if cid not in RPC:
-            RPC[cid] = Rpc(chains_cfg[str(cid)]["rpc"], name=C.chain_short(cid), log=log)
+            ccfg = chains_cfg[str(cid)]
+            RPC[cid] = Rpc(ccfg["rpc"], name=C.chain_short(cid), log=log, pace=float(ccfg.get("pace_s", 0)))
         return RPC[cid]
 
     base_rpc = rpc_for(C.BASE_CHAIN)
@@ -171,11 +172,15 @@ def run(args):
             lp = C.read_leaf_params(rpc)
             cs["params"] = {k: v for k, v in lp.items() if v is not None} or cs.get("params", {})
             events = A.fetch_voter_events(rpc, cid, cs, head, ccfg, log, deadline=read_deadline)
-            events += A.fetch_reward_events(rpc, cid, cs, head, log, deadline=read_deadline, now=now)
-            return {"ok": True, "events": events, "head": head}
         except Exception as e:
             log(f"{C.chain_short(cid)}: read failed: {type(e).__name__}: {str(e)[:300]}")
             return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+        try:
+            # the voter events above are already counted as read: a fee failure must not drop them
+            events += A.fetch_reward_events(rpc, cid, cs, head, log, deadline=read_deadline, now=now)
+        except Exception as e:
+            log(f"{C.chain_short(cid)}: fee read failed: {type(e).__name__}: {str(e)[:300]}")
+        return {"ok": True, "events": events, "head": head}
 
     with ThreadPoolExecutor(max_workers=len(chain_ids)) as ex:
         results = dict(zip(chain_ids, ex.map(read_chain, chain_ids)))

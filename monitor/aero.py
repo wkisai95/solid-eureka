@@ -232,20 +232,26 @@ def fetch_voter_events(rpc, cid, cs, head, ccfg, log, deadline):
         cs["synced"] = True
         return []
     bt = cs.get("bt") or 2.0
-    window = _blocks(24 * HOUR, bt, 2000, 5_000_000)
-    chunk = cs.get("leaf_chunk") or _blocks(12 * HOUR, bt, 1000, 2_000_000)
+    # windows of a few hours: progress is kept window by window, so a slow or rate-limited chain resumes next run
+    window = _blocks(6 * HOUR, bt, 2000, 2_000_000)
+    chunk = min(cs.get("leaf_chunk") or window, window)
     ts_of = ts_fn(cid, cs)
     events, scanned, raw_n = [], start - 1, 0
     while scanned < head:
         hi = min(head, scanned + window)
         try:
             raw = list(rpc.get_logs(scanned + 1, hi, address=C.LEAF, topics=[C.LEAF_TOPICS], chunk=chunk,
-                                    max_chunk=max(chunk, window), deadline=deadline))
+                                    max_chunk=window, deadline=deadline))
             if cid == C.BASE_CHAIN:
                 raw += list(rpc.get_logs(scanned + 1, hi, address=C.ROOT, topics=[C.ROOT_TOPICS], chunk=chunk,
-                                         max_chunk=max(chunk, window), deadline=deadline))
+                                         max_chunk=window, deadline=deadline))
         except TimeBudget:
             log(f"{C.chain_short(cid)}: voter history paused at block {scanned} (time budget)")
+            break
+        except RpcError as e:
+            if scanned < start:
+                raise          # nothing read at all: report the chain as failing
+            log(f"{C.chain_short(cid)}: voter history paused at block {scanned}: {str(e)[:160]}")
             break
         chunk = rpc.last_chunk or chunk
         raw_n += len(raw)
@@ -284,9 +290,15 @@ def fetch_reward_events(rpc, cid, cs, head, log, deadline, now):
         cs["fee_back"] = head + 1
         cs["fee_back_target"] = target
     elif prev < head:
-        raw += list(rpc.get_logs(prev + 1, head, topics=[[C.T["fees"]]], chunk=chunk, max_chunk=4 * hour_blocks))
-        chunk = rpc.last_chunk or chunk
-    cs["vrm_block"] = head
+        try:
+            raw += list(rpc.get_logs(prev + 1, head, topics=[[C.T["fees"]]], chunk=chunk, max_chunk=4 * hour_blocks,
+                                     deadline=deadline))
+            chunk = rpc.last_chunk or chunk
+        except RpcError as e:
+            # keep vrm_block: the same blocks are read again next run
+            log(f"{C.chain_short(cid)}: new fee events not read: {str(e)[:160]}")
+            head = prev
+    cs["vrm_block"] = max(prev, head)
     back, target, filled = cs.get("fee_back"), cs.get("fee_back_target"), 0
     while back and target and back > target:
         lo = max(target, back - chunk)

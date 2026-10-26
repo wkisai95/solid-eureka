@@ -761,7 +761,8 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
   try { ghToken = localStorage.getItem("radar-gh-token") || ""; } catch (e) {}
 
   function gh(path, opts = {}) {
-    const headers = { "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+    // only headers GitHub's CORS policy has always allowed: the page runs on github.io and in the app's WebView
+    const headers = { "Accept": "application/vnd.github+json" };
     if (ghToken) headers.Authorization = "Bearer " + ghToken;
     if (opts.body) headers["Content-Type"] = "application/json";
     return fetch("https://api.github.com" + path, { ...opts, headers, cache: "no-store" });

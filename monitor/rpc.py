@@ -19,6 +19,8 @@ RANGE_HINTS = (
     "-32005", "block range", "max results", "results", "timeout", "10000", "returned more",
 )
 UNSUPPORTED_HINTS = ("not supported", "method not found", "not available", "-32601", "unsupported", "not allowed")
+RATE_HINTS = ("rate limit", "rate-limit", "ratelimit", "too many requests", "-32029", "throttl", "request limit",
+              "exceeded the rate", "capacity exceeded", "try again later")
 TINY_RANGE = re.compile(r"(?:limited to|up to|maximum of|max(?:imum)? range(?: is)?)\D{0,12}(?:0\s*-\s*)?(\d+)\s*blocks?",
                         re.I)
 
@@ -33,6 +35,19 @@ class RangeTooLarge(RpcError):
 
 class TimeBudget(RpcError):
     pass
+
+
+class RateLimited(RpcError):
+    pass
+
+
+def retry_after(err, default=20):
+    """Seconds a rate-limited endpoint asks us to wait (Retry-After), kept between 5 and 60."""
+    try:
+        v = float((err.headers or {}).get("Retry-After") or default)
+    except (TypeError, ValueError):
+        v = default
+    return max(5.0, min(60.0, v))
 
 
 def http_json(url, payload=None, headers=None, timeout=25):
@@ -53,11 +68,13 @@ def host(url):
 
 
 class Rpc:
-    def __init__(self, urls, name="base", log=print, timeout=20):
+    def __init__(self, urls, name="base", log=print, timeout=20, pace=0.0):
         self.urls = list(urls)
         self.name = name
         self.log = log
         self.timeout = timeout
+        self.pace = float(pace or 0)          # minimum seconds between two requests to the same endpoint
+        self.last_req = {}
         self.cooldown = {}
         self.no_logs = {}          # endpoint -> reason it cannot serve eth_getLogs
         self.stats = collections.Counter()
@@ -82,15 +99,29 @@ class Rpc:
         self.cooldown[url] = time.time() + cool
 
     def call(self, method, params):
-        errors, range_errors = [], 0
+        errors, range_errors, rate_limited = [], 0, 0
         span = None
         if method == "eth_getLogs":
             try:
                 span = int(params[0]["toBlock"], 16) - int(params[0]["fromBlock"], 16) + 1
             except Exception:
                 span = None
-        for url in self._order(method):
+        order = self._order(method)
+        if not order:
+            raise RpcError(f"{method}: no usable endpoint left")
+        # every endpoint is cooling down after a rate limit: wait for the first one rather than hammering them
+        soonest = min(self.cooldown.get(u, 0) for u in order) - time.time()
+        if soonest > 0:
+            if soonest > 20:
+                raise RateLimited(f"{method}: every endpoint is rate limited for {soonest:.0f} s more")
+            time.sleep(soonest)
+        for url in order:
             h = host(url)
+            if self.pace:
+                wait = self.last_req.get(url, 0) + self.pace - time.time()
+                if wait > 0:
+                    time.sleep(wait)
+            self.last_req[url] = time.time()
             try:
                 res = http_json(url, {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
                                 timeout=self.timeout)
@@ -98,7 +129,9 @@ class Rpc:
                 errors.append(f"{h}: HTTP {e.code}")
                 self.stats[f"err:{method}:{h}"] += 1
                 if e.code == 429:
-                    self.cooldown[url] = time.time() + 20      # rate limited: try the others for a while
+                    rate_limited += 1
+                    self.stats[f"429:{method}:{h}"] += 1
+                    self.cooldown[url] = time.time() + retry_after(e)   # try the others for a while
                 elif method == "eth_getLogs" and e.code in (400, 413):
                     if span is not None and span <= 2000:
                         self.no_logs[url] = f"HTTP {e.code} on {span} blocks"
@@ -121,6 +154,11 @@ class Rpc:
                 low = msg.lower()
                 errors.append(f"{h}: {msg}")
                 self.stats[f"err:{method}:{h}"] += 1
+                if any(k in low for k in RATE_HINTS):
+                    rate_limited += 1
+                    self.stats[f"429:{method}:{h}"] += 1
+                    self.cooldown[url] = time.time() + 20
+                    continue
                 if method == "eth_getLogs":
                     tiny = TINY_RANGE.search(msg)
                     if any(k in low for k in UNSUPPORTED_HINTS) or (tiny and int(tiny.group(1)) < 1000):
@@ -143,6 +181,8 @@ class Rpc:
             return res["result"]
         if range_errors:
             raise RangeTooLarge("; ".join(errors[-4:]))
+        if rate_limited:
+            raise RateLimited(f"{method} rate limited: " + "; ".join(errors[-5:]))
         raise RpcError(f"{method} failed on all endpoints: " + "; ".join(errors[-5:]))
 
     def block_number(self):
@@ -196,6 +236,7 @@ class Rpc:
         The largest range that worked is kept in self.last_chunk, so the caller can start from it next time.
         """
         start, size, failures, cap = from_block, max(min_chunk, int(chunk)), 0, max(int(chunk), int(max_chunk))
+        limited = 0
         self.last_chunk = size
         while start <= to_block:
             if deadline and time.time() > deadline:
@@ -208,6 +249,13 @@ class Rpc:
                 flt["topics"] = topics
             try:
                 res = self.call("eth_getLogs", [flt])
+            except RateLimited:
+                # the range is fine, the endpoints want us to slow down
+                limited += 1
+                if limited > 5:
+                    raise
+                time.sleep(min(20, 4 * limited))
+                continue
             except RangeTooLarge:
                 if size <= min_chunk:
                     raise
@@ -221,7 +269,7 @@ class Rpc:
                 time.sleep(2 * failures)
                 size = max(min_chunk, size // 2)
                 continue
-            failures = 0
+            failures = limited = 0
             self.last_chunk = max(min_chunk, min(size, cap))
             for lg in res:
                 yield lg
@@ -277,7 +325,7 @@ class Rpc:
         return out
 
     def summary(self):
-        by_host = collections.defaultdict(lambda: collections.Counter())
+        by_host = collections.defaultdict(lambda: collections.Counter())  # kinds: ok, err, 429
         for k, v in self.stats.items():
             kind, method, h = k.split(":", 2)
             by_host[h][f"{kind}:{method}"] += v
