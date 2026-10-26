@@ -185,6 +185,7 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
       <button type="submit">Salva</button>
     </form>
     <p class="note" id="gh-msg"></p>
+    <p class="note">Senza token puoi avviarla anche da GitHub: <a id="gh-actions" href="https://github.com/wkisai95/solid-eureka/actions/workflows/monitor.yml" target="_blank" rel="noopener">Actions → Monitor sAERO → Run workflow</a>.</p>
     <div class="controls"><button type="button" class="ghost" id="gh-forget" hidden>Dimentica il token</button></div>
   </section>
 
@@ -779,6 +780,7 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
   function ghPanel(show, msg) {
     const [owner, name] = repo().split("/");
     $("gh-repo-name").textContent = name;
+    $("gh-actions").href = `https://github.com/${repo()}/actions/workflows/${WORKFLOW}`;
     $("gh-new").href = "https://github.com/settings/personal-access-tokens/new?" + new URLSearchParams({
       name: "Monitor sAERO", description: "Avvia il monitor sAERO dalla pagina o dall'app",
       target_name: owner, expires_in: "366", actions: "write" }).toString();
