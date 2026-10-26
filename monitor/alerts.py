@@ -6,6 +6,8 @@ import os
 import urllib.request
 from zoneinfo import ZoneInfo
 
+from .chain import chain_short
+
 HOUR = 3600
 GIORNI = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"]
 
@@ -65,9 +67,31 @@ def fmt_in(seconds):
     return f"{h} h {m:02d}" if h < 24 else f"{h // 24} g {h % 24} h"
 
 
+DUPES = set()
+
+
+def note_duplicates(report):
+    """Pool names that appear more than once on a chain (e.g. a CL and a volatile USDC/WETH): labels add the kind."""
+    seen, dup = set(), set()
+    for r in report.get("pools", []):
+        k = (r.get("chain"), r["name"])
+        (dup if k in seen else seen).add(k)
+    DUPES.clear()
+    DUPES.update(dup)
+
+
+def label(r):
+    """Pool name with its kind when the name is ambiguous, and its chain except on Base."""
+    name = r["name"]
+    if (r.get("chain"), name) in DUPES and r.get("kind") not in (None, "?"):
+        name = f"{name} {r['kind']}"
+    return name if r.get("chain") in (None, "Base") else f"{name} ({r['chain']})"
+
+
 def evaluate(report, state, cfg, now, new_incentives):
     tz = ZoneInfo(cfg.get("timezone", "Europe/Rome"))
     th = cfg["thresholds"]
+    note_duplicates(report)
     pools = {r["key"]: r for r in report["pools"]}
     out = []
     day = dt.datetime.fromtimestamp(now, tz).strftime("%Y-%m-%d")
@@ -77,23 +101,25 @@ def evaluate(report, state, cfg, now, new_incentives):
         if m.get("missing") or not m.get("ends"):
             continue
         where = ", ".join(f"{n} ({fmt_n(a)})" for n, a in m["pools"][:3]) or "nessun pool"
+        chain = m.get("chain", "Base")
         if m["free"]:
-            out.append({"key": pkey(f"my:{m['id']}:{m['ends']}", cfg), "prio": 4, "tags": ["unlock"],
+            out.append({"key": pkey(f"my:{m['id']}:{chain}:{m['ends']}", cfg), "prio": 4, "tags": ["unlock"],
                         "private": True,
-                        "title": f"Posizione #{m['id']} libera",
-                        "body": f"Il cooldown su Base è finito alle {fmt_time(m['ends'], tz, now)}: puoi riallocare "
+                        "title": f"Posizione #{m['id']} libera su {chain}",
+                        "body": f"Il cooldown su {chain} è finito alle {fmt_time(m['ends'], tz, now)}: puoi riallocare "
                                 f"{fmt_n(m['saero'])} sAERO. Ora è su {where}."})
         elif m["ends"] - now <= HOUR:
-            out.append({"key": pkey(f"mysoon:{m['id']}:{m['ends']}", cfg), "prio": 3, "tags": ["hourglass"],
+            out.append({"key": pkey(f"mysoon:{m['id']}:{chain}:{m['ends']}", cfg), "prio": 3, "tags": ["hourglass"],
                         "private": True,
-                        "title": f"Posizione #{m['id']}: cooldown finisce tra {fmt_in(m['ends'] - now)}",
-                        "body": f"Alle {fmt_time(m['ends'], tz, now)} potrai riallocare {fmt_n(m['saero'])} sAERO."})
+                        "title": f"Posizione #{m['id']} su {chain}: cooldown finisce tra {fmt_in(m['ends'] - now)}",
+                        "body": f"Alle {fmt_time(m['ends'], tz, now)} potrai riallocare {fmt_n(m['saero'])} sAERO "
+                                f"su {chain}."})
 
     # 2. cooldown wave in the next few hours
     win = th["wave_window_h"]
     wave = sum(w["active"] for w in report["waves"] if now < w["h"] + HOUR and w["h"] < now + win * HOUR)
     if wave >= th["wave_min_saero"]:
-        losers = sorted(((r["free_3h_active"], r["name"]) for r in report["pools"]
+        losers = sorted(((r["free_3h_active"], label(r)) for r in report["pools"]
                          if r.get("free_3h_active")), reverse=True)[:3]
         detail = "; ".join(f"{n} {fmt_n(a)}" for a, n in losers)
         out.append({"key": f"wave:{now // (win * HOUR)}", "prio": 3, "tags": ["ocean"],
@@ -112,7 +138,8 @@ def evaluate(report, state, cfg, now, new_incentives):
                if r.get("apr_next") is not None and r.get("ap") else
                " Nessuno è ancora allocato: il primo prende tutto." if not r.get("ap") else "")
         out.append({"key": f"inc:{pid}", "prio": 3, "tags": ["moneybag"],
-                    "title": f"Incentivi su {inc['pool']}: {fmt_usd(inc['usd'])} da {fmt_time(inc['start'], tz, now)}",
+                    "title": f"Incentivi su {inc.get('label') or inc['pool']}: {fmt_usd(inc['usd'])} da "
+                             f"{fmt_time(inc['start'], tz, now)}",
                     "body": f"{fmt_n(inc['amount'])} {inc['token']} in {hours:.0f} ore. "
                             f"Allocazione attuale {fmt_n(inc['ap'])} sAERO.{apr}"})
 
@@ -126,7 +153,7 @@ def evaluate(report, state, cfg, now, new_incentives):
             up = d6 > 0
             out.append({"key": f"flow:{r['key']}:{'+' if up else '-'}:{now // (6 * HOUR)}", "prio": 3,
                         "tags": ["chart_with_upwards_trend" if up else "chart_with_downwards_trend"],
-                        "title": f"{r['name']}: {'+' if up else '−'}{fmt_n(abs(d6))} sAERO in 6 ore "
+                        "title": f"{label(r)}: {'+' if up else '−'}{fmt_n(abs(d6))} sAERO in 6 ore "
                                  f"({'+' if up else '−'}{fmt_pct(abs(pct))})",
                         "body": (f"Allocazione ora {fmt_n(ap)}. " +
                                  ("Il rendimento per chi è dentro si diluisce." if up else
@@ -142,7 +169,8 @@ def evaluate(report, state, cfg, now, new_incentives):
             if abs(delta) >= th["routing_change_pts"]:
                 agg = "KyberSwap" if series.startswith("kyber") else "Velora"
                 out.append({"key": f"route:{r['key']}:{series}:{day}", "prio": 3, "tags": ["twisted_rightwards_arrows"],
-                            "title": f"{r['name']}: quota di routing {fmt_pct(v['pool'] * 100)} (ieri {fmt_pct(v['pool_24h'] * 100)})",
+                            "title": f"{label(r)}: quota di routing {fmt_pct(v['pool'] * 100)} "
+                                     f"(ieri {fmt_pct(v['pool_24h'] * 100)})",
                             "body": f"Su uno swap da $10.000, {agg} ora instrada dal pool Aero il "
                                     f"{fmt_pct(v['pool'] * 100)} del flusso. "
                                     + ("Più flusso dagli aggregatori significa più fee nelle prossime ore."
@@ -156,21 +184,25 @@ def evaluate(report, state, cfg, now, new_incentives):
                 continue
             if r["apr"] >= th["apr_alert_multiple"] * med and r["apr_next"] >= th["apr_alert_multiple"] * med:
                 out.append({"key": f"apr:{r['key']}:{day}", "prio": 3, "tags": ["star"],
-                            "title": f"{r['name']} rende il {fmt_pct(r['apr'])} annuo",
+                            "title": f"{label(r)} rende il {fmt_pct(r['apr'])} annuo",
                             "body": f"La mediana dei pool sopra 1M sAERO è {fmt_pct(med)}. "
                                     f"Fee 48h {fmt_usd(r.get('fees48h'))}, incentivi in arrivo {fmt_usd(r.get('inc_next48h'))}, "
                                     f"allocazione {fmt_n(r['ap'])}."})
-    # 7. protocol parameter changes on the Base leaf voter
-    for ts, name, value in state.get("param_events", []):
+    # 7. protocol parameter changes on a leaf voter
+    for ev in state.get("param_events", []):
+        ts, name, value = ev[:3]
+        cid = ev[3] if len(ev) > 3 else 8453
+        where = "" if int(cid) == 8453 else f" su {chain_short(cid)}"
         if name == "max_reduction":
-            title = ("Aero ha attivato le riduzioni del cooldown" if value else "Aero ha disattivato le riduzioni del cooldown")
+            title = ("Aero ha attivato le riduzioni del cooldown" if value else
+                     "Aero ha disattivato le riduzioni del cooldown") + where
             body = (f"Ogni posizione può ora accumulare fino a {value / 3600:.1f} ore di riduzione, concesse da moduli "
                     f"autorizzati. Alcune posizioni potranno riallocare prima della fine del cooldown."
                     if value else "Le posizioni tornano a riallocare solo a fine cooldown.")
         else:
-            title = f"Il cooldown di Aero ora è di {value / 3600:.1f} ore".replace(".", ",")
+            title = (f"Il cooldown di Aero{where} ora è di {value / 3600:.1f} ore").replace(".", ",")
             body = "Il calendario dei cooldown usa già il nuovo valore."
-        out.append({"key": f"param:{name}:{ts}", "prio": 4, "tags": ["gear"], "title": title, "body": body})
+        out.append({"key": f"param:{name}:{cid}:{ts}", "prio": 4, "tags": ["gear"], "title": title, "body": body})
     sent = state.setdefault("alerts", {})
     fresh = [a for a in out if a["key"] not in sent]
     return fresh
@@ -178,12 +210,13 @@ def evaluate(report, state, cfg, now, new_incentives):
 
 def digest(report, cfg, now):
     tz = ZoneInfo(cfg.get("timezone", "Europe/Rome"))
+    note_duplicates(report)
     lines = []
     top = sorted((r for r in report["pools"] if r["ap"] >= 1_000_000 and r.get("apr_next") is not None),
                  key=lambda r: -r["apr_next"])[:5]
     if top:
         lines.append("Rendimento atteso (fee 48h + incentivi in arrivo):")
-        lines += [f"• {r['name']}: {fmt_pct(r['apr_next'])} ({fmt_n(r['ap'])} sAERO)" for r in top]
+        lines += [f"• {label(r)}: {fmt_pct(r['apr_next'])} ({fmt_n(r['ap'])} sAERO)" for r in top]
     peak = max(report["waves"][:24], key=lambda w: w["active"], default=None)
     total24 = sum(w["active"] for w in report["waves"][:24])
     if total24:
@@ -192,12 +225,12 @@ def digest(report, cfg, now):
     inc = [u for u in report["incentives_upcoming"] if u["start"] > now and (u["usd"] or 0) >= 100][:4]
     if inc:
         lines.append("Incentivi in arrivo: " + "; ".join(
-            f"{u['pool']} {fmt_usd(u['usd'])} alle {fmt_time(u['start'], tz, now)}" for u in inc))
+            f"{u.get('label') or u['pool']} {fmt_usd(u['usd'])} alle {fmt_time(u['start'], tz, now)}" for u in inc))
     personal = []
     for m in report["mine"]:
         if m.get("ends"):
-            personal.append(f"Posizione #{m['id']}: " + ("libera" if m["free"] else
-                                                          f"cooldown fino alle {fmt_time(m['ends'], tz, now)}"))
+            personal.append(f"Posizione #{m['id']} su {m.get('chain', 'Base')}: " + (
+                "libera" if m["free"] else f"cooldown fino alle {fmt_time(m['ends'], tz, now)}"))
     public = "\n".join(lines) or "Nessuna novità rilevante."
     return {"key": f"digest:{dt.datetime.fromtimestamp(now, tz):%Y-%m-%d}", "prio": 2, "tags": ["sunrise"],
             "title": "Monitor sAERO: il punto del mattino", "body": "\n".join(lines + personal) or public,

@@ -63,6 +63,8 @@ class Rpc:
         self.stats = collections.Counter()
         self.streak = collections.Counter()   # consecutive failures per (method, endpoint)
         self.dead = set()                      # (method, endpoint) pairs given up for this run
+        self.multicall3 = None                 # unknown until the first multicall
+        self.last_chunk = None
 
     def _order(self, method):
         now = time.time()
@@ -146,13 +148,55 @@ class Rpc:
     def block_number(self):
         return int(self.call("eth_blockNumber", []), 16)
 
+    def block_ts(self, number):
+        """Timestamp of a block (headers are kept by every node, no archive state needed)."""
+        blk = self.call("eth_getBlockByNumber", [hex(int(number)), False])
+        if not blk or not blk.get("timestamp"):
+            raise RpcError(f"no header for block {number}")
+        return int(blk["timestamp"], 16)
+
+    def block_at_ts(self, ts, head, head_ts, block_time):
+        """Highest block with timestamp <= ts: estimate from the block time, gallop to a bracket, bisect."""
+        if ts >= head_ts:
+            return head
+        bt = max(block_time, 0.01)
+        est = max(0, min(head, int(head - (head_ts - ts) / bt)))
+        t = self.block_ts(est)
+        if t <= ts:
+            lo, step = est, int((ts - t) / bt) + 16
+            hi = min(head, lo + step)
+            while hi < head and self.block_ts(hi) <= ts:
+                lo, step = hi, step * 2
+                hi = min(head, lo + step)
+        else:
+            hi, step = est, int((t - ts) / bt) + 16
+            lo = max(0, hi - step)
+            while lo > 0 and self.block_ts(lo) > ts:
+                hi, step = lo, step * 2
+                lo = max(0, hi - step)
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            if self.block_ts(mid) <= ts:
+                lo = mid
+            else:
+                hi = mid
+        return lo
+
     def eth_call(self, to, data, block="latest"):
         return self.call("eth_call", [{"to": to, "data": "0x" + data.hex()}, block])
 
+    def has_code(self, address):
+        code = self.call("eth_getCode", [address, "latest"])
+        return bool(code) and code not in ("0x", "0x0")
+
     def get_logs(self, from_block, to_block, address=None, topics=None, chunk=5000, max_chunk=20000, min_chunk=100,
                  deadline=None):
-        """Yields logs between from_block and to_block (inclusive), shrinking ranges on provider limits."""
-        start, size, failures = from_block, chunk, 0
+        """Yields logs between from_block and to_block (inclusive), shrinking ranges on provider limits.
+
+        The largest range that worked is kept in self.last_chunk, so the caller can start from it next time.
+        """
+        start, size, failures, cap = from_block, max(min_chunk, int(chunk)), 0, max(int(chunk), int(max_chunk))
+        self.last_chunk = size
         while start <= to_block:
             if deadline and time.time() > deadline:
                 raise TimeBudget(f"time budget reached at block {start}")
@@ -168,6 +212,7 @@ class Rpc:
                 if size <= min_chunk:
                     raise
                 size = max(min_chunk, size // 2)
+                cap = size              # do not grow back past a range a provider refused
                 continue
             except RpcError:
                 failures += 1
@@ -177,14 +222,27 @@ class Rpc:
                 size = max(min_chunk, size // 2)
                 continue
             failures = 0
+            self.last_chunk = max(min_chunk, min(size, cap))
             for lg in res:
                 yield lg
             start = end + 1
-            if size < max_chunk:
-                size = min(max_chunk, size * 2)
+            if size < cap:
+                size = min(cap, size * 2)
 
     def multicall(self, calls, batch=150):
-        """calls: list of (target, calldata bytes). Returns list of (ok, returndata bytes)."""
+        """calls: list of (target, calldata bytes). Returns list of (ok, returndata bytes).
+
+        Uses Multicall3 when the chain has it, otherwise plain eth_call one by one.
+        """
+        if self.multicall3 is None:
+            try:
+                self.multicall3 = self.has_code(MULTICALL3)
+            except RpcError:
+                self.multicall3 = True     # assume the usual deployment; individual batches fall back below
+            if not self.multicall3:
+                self.log(f"{self.name}: no Multicall3, using single calls")
+        if not self.multicall3:
+            return self._single_calls(calls)
         out = []
         for i in range(0, len(calls), batch):
             part = calls[i:i + batch]
@@ -192,18 +250,30 @@ class Rpc:
             for attempt in range(3):
                 try:
                     raw = self.eth_call(MULTICALL3, payload)
+                    if not raw or raw == "0x":
+                        raise RpcError("empty multicall result")
                     res = decode(["(bool,bytes)[]"], bytes.fromhex(raw[2:]))[0]
                     out.extend(res)
                     break
-                except RpcError as e:
+                except (RpcError, ValueError, TypeError) as e:
                     if attempt == 2:
                         if len(part) > 20:
                             # split a batch that may exceed a provider's gas or size cap
                             out.extend(self.multicall(part, batch=max(10, len(part) // 3)))
                             break
-                        self.log(f"multicall batch failed: {e}")
+                        self.log(f"{self.name}: multicall batch failed: {str(e)[:200]}")
                         out.extend([(False, b"")] * len(part))
                     time.sleep(1.5 * (attempt + 1))
+        return out
+
+    def _single_calls(self, calls):
+        out = []
+        for target, data in calls:
+            try:
+                raw = self.eth_call(target, data)
+                out.append((True, bytes.fromhex(raw[2:])) if raw and raw != "0x" else (False, b""))
+            except RpcError:
+                out.append((False, b""))
         return out
 
     def summary(self):

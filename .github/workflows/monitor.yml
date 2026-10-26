@@ -1,8 +1,14 @@
 name: Monitor sAERO
+run-name: >-
+  ${{ inputs.cycle && 'Monitor sAERO · ciclo'
+  || github.event_name == 'workflow_dispatch' && 'Monitor sAERO · avvio manuale'
+  || github.event_name == 'schedule' && 'Monitor sAERO · programmato'
+  || 'Monitor sAERO · aggiornamento' }}
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # off the top of the hour: GitHub drops scheduled runs at its busiest minutes
+    - cron: "7,22,37,52 * * * *"
   push:
     branches: [main]
     paths:
@@ -17,19 +23,41 @@ on:
         description: "Invia una notifica di prova"
         type: boolean
         default: false
-
-concurrency:
-  group: radar-monitor
-  cancel-in-progress: false
+      reset_tracker:
+        description: "Ricomincia la simulazione da zero"
+        type: boolean
+        default: false
+      tracker_size:
+        description: "sAERO della simulazione (vuoto = invariato)"
+        type: string
+        default: ""
+      cycle:
+        description: "Uso interno: giro automatico dopo la pausa dell'ambiente 'attesa'"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   actions: write
 
 jobs:
+  wait:
+    # Automatic cycle: the wait timer of the 'attesa' environment spaces the runs without holding a runner.
+    if: ${{ inputs.cycle }}
+    runs-on: ubuntu-latest
+    environment: attesa
+    timeout-minutes: 5
+    steps:
+      - run: echo "Pausa finita"
+
   monitor:
+    needs: wait
+    if: ${{ !cancelled() && needs.wait.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    concurrency:
+      group: radar-monitor
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +74,7 @@ jobs:
           mkdir -p out
           if git fetch --depth=1 origin data:refs/remotes/origin/data 2>/dev/null; then
             git archive refs/remotes/origin/data | tar -x -C out
-            rm -f out/.keepalive_needed
+            rm -f out/.keepalive_needed out/.skipped
           else
             echo "No data branch yet: first run"
           fi
@@ -54,12 +82,17 @@ jobs:
       - name: Run monitor
         env:
           TEST_NOTIFY: ${{ inputs.test_notify }}
+          RESET_TRACKER: ${{ inputs.reset_tracker }}
+          TRACKER_SIZE: ${{ inputs.tracker_size }}
+          # automatic runs skip when another run collected less than 8 minutes ago; manual runs always collect
+          MIN_INTERVAL_S: ${{ (github.event_name == 'schedule' || inputs.cycle) && '480' || '0' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           MY_POSITIONS: ${{ secrets.MY_POSITIONS }}
         run: python -m monitor.main --out out
 
       - name: Publish data branch
         run: |
+          if [ -f out/.skipped ]; then echo "Nothing new to publish"; exit 0; fi
           cd out
           rm -rf .git
           git init -q
@@ -77,3 +110,43 @@ jobs:
           if [ -f out/.keepalive_needed ]; then
             gh api -X PUT "repos/${{ github.repository }}/actions/workflows/monitor.yml/enable" && echo "Schedule refreshed"
           fi
+
+  next:
+    # Keeps exactly one automatic cycle waiting when GitHub's schedule is not firing and the 'attesa'
+    # environment has a wait timer. Runs after every run, so a manual run also restarts a broken cycle.
+    needs: monitor
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Plan the next run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          wait_min=$(gh api "repos/$REPO/environments/attesa" \
+            --jq '[.protection_rules[]? | select(.type == "wait_timer") | .wait_timer] | max // 0' 2>/dev/null | head -n1 || true)
+          case "$wait_min" in ''|*[!0-9]*) wait_min=0 ;; esac
+          if [ "$wait_min" -lt 5 ]; then
+            echo "No wait timer on the 'attesa' environment: the next run is left to the schedule."
+            exit 0
+          fi
+          last_sched=$(gh api "repos/$REPO/actions/workflows/monitor.yml/runs?event=schedule&per_page=1" \
+            --jq '.workflow_runs[0].created_at // ""' 2>/dev/null | head -n1 || true)
+          if [ -n "$last_sched" ] && [ $(( $(date +%s) - $(date -d "$last_sched" +%s) )) -lt 2400 ]; then
+            echo "The schedule is firing (last run $last_sched): no cycle needed."
+            exit 0
+          fi
+          pending=$(gh api "repos/$REPO/actions/workflows/monitor.yml/runs?event=workflow_dispatch&per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != $RUN_ID and .status != \"completed\" and (.display_title | endswith(\"ciclo\")))] | length" \
+            2>/dev/null | head -n1 || true)
+          case "$pending" in ''|*[!0-9]*) echo "Could not list the runs: no new cycle"; exit 0 ;; esac
+          if [ "$pending" -gt 0 ]; then
+            echo "A cycle is already waiting."
+            exit 0
+          fi
+          gh workflow run monitor.yml --repo "$REPO" --ref main -f cycle=true
+          echo "Next cycle dispatched: it starts after the $wait_min-minute pause."

@@ -49,6 +49,7 @@
   --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body);
@@ -123,11 +124,27 @@ th { font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: upp
 th[aria-sort] { color: var(--accent); }
 td .nm { font-weight: 600; }
 td .kd { color: var(--ink-2); font-size: 12px; margin-left: 6px; }
+td.ch, th[data-k=chain] { text-align: left; }
 .up { color: var(--good); } .down { color: var(--bad); } .muted { color: var(--ink-2); }
 .spark { vertical-align: middle; margin-left: 6px; }
 footer { color: var(--ink-2); font-size: 13px; display: grid; gap: 4px; }
 footer a { color: var(--accent); }
 .empty { color: var(--ink-2); font-size: 14px; padding: 6px 0; }
+.runbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+button:disabled { opacity: .55; cursor: default; filter: none; }
+.linkish { background: none; border: 0; padding: 0; color: var(--accent); font: 500 14px/1.4 var(--f-body); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.steps b { color: var(--ink); font-weight: 600; }
+.steps a, .note a, .runbar a { color: var(--accent); }
+.tag { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font-size: 11px;
+  color: var(--ink-2); margin-left: 6px; vertical-align: 1px; white-space: nowrap; }
+.bad-text { color: var(--bad); }
+.chainsplit { font-size: 12px; color: var(--ink-2); }
+input[type=password] { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 7px 10px; min-width: 0; flex: 1 1 220px; }
+#sim-size-in { width: 112px; flex: none; }
 @media (max-width: 520px) { h1 { font-size: 26px; } .stat .v { font-size: 18px; } }
 @media (prefers-reduced-motion: no-preference) { .sweep { transform-origin: 14px 14px; animation: sweep 6s linear infinite; } }
 @keyframes sweep { to { transform: rotate(360deg); } }
@@ -147,8 +164,29 @@ footer a { color: var(--accent); }
     </h1>
     <div class="sub" id="updated">Carico i dati…</div>
     <div class="chips" id="chips"></div>
+    <div class="runbar">
+      <button type="button" id="run-now">Raccogli i dati adesso</button>
+      <span class="sub" id="run-state" role="status" aria-live="polite"></span>
+      <button type="button" class="linkish" id="gh-open">Collega GitHub</button>
+    </div>
     <div class="banner" id="banner" hidden></div>
   </header>
+
+  <section class="panel" id="gh-panel" hidden>
+    <div class="panel-head"><h2>Avvia la raccolta da qui</h2><button type="button" class="linkish" id="gh-close">Chiudi</button></div>
+    <p class="note">Per far partire il monitor da questa pagina serve un token GitHub che può solo avviare il workflow del monitor. Si crea una volta e resta salvato solo su questo dispositivo.</p>
+    <ol class="steps">
+      <li>Apri <a id="gh-new" href="#" target="_blank" rel="noopener">la pagina di GitHub per il nuovo token</a>: nome, scadenza e permesso <b>Actions: Read and write</b> sono già compilati.</li>
+      <li>In <b>Repository access</b> scegli <b>Only select repositories</b> e seleziona <b id="gh-repo-name">solid-eureka</b>.</li>
+      <li>Premi <b>Generate token</b>, copia il token e incollalo qui sotto.</li>
+    </ol>
+    <form class="controls" id="gh-form">
+      <input type="password" id="gh-token" placeholder="github_pat_…" autocomplete="off" spellcheck="false" aria-label="Token GitHub">
+      <button type="submit">Salva</button>
+    </form>
+    <p class="note" id="gh-msg"></p>
+    <div class="controls"><button type="button" class="ghost" id="gh-forget" hidden>Dimentica il token</button></div>
+  </section>
 
   <section class="panel" id="mine-panel">
     <div class="panel-head"><h2>Le tue posizioni</h2></div>
@@ -162,7 +200,13 @@ footer a { color: var(--accent); }
 
   <section class="panel" id="sim">
     <div class="panel-head"><h2>Simulazione <span id="sim-size">235k</span> sAERO</h2><span class="sub" id="sim-since"></span></div>
-    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore con tre metodi e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown, come una vera.</p>
+    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore tra i pool di tutte le chain di Aero con tre metodi e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown, come una vera.</p>
+    <div class="controls">
+      <label class="toggle" for="sim-size-in">Nuova raccolta con</label>
+      <input type="text" id="sim-size-in" inputmode="numeric" autocomplete="off" aria-label="sAERO della nuova simulazione">
+      <span class="sub">sAERO</span>
+      <button type="button" class="ghost" id="sim-restart">Nuova raccolta</button>
+    </div>
     <div class="cards" id="sim-cards"></div>
     <div class="chartbox"><div class="chart" id="sim-chart"></div></div>
   </section>
@@ -212,6 +256,7 @@ footer a { color: var(--accent); }
     <p class="note">APR 48h: fee e incentivi delle ultime 48 ore sull'allocazione attuale. APR atteso: fee delle ultime 48 ore più gli incentivi programmati nelle prossime 48. Routing: quota di uno swap da $10.000 che KyberSwap e Velora fanno passare dal pool Aero.</p>
     <div class="controls">
       <input type="search" id="q" placeholder="Cerca un pool o un token" aria-label="Cerca un pool">
+      <select id="chain-f" aria-label="Chain"><option value="">Tutte le chain</option></select>
       <select id="sort" aria-label="Ordina per">
         <option value="ap">Allocazione</option>
         <option value="apr_next">APR atteso</option>
@@ -226,7 +271,7 @@ footer a { color: var(--accent); }
     <div class="tbl">
       <table>
         <thead><tr>
-          <th data-k="name">Pool</th><th data-k="ap">Allocazione</th><th data-k="d6h">6 ore</th><th data-k="d24h">24 ore</th>
+          <th data-k="name">Pool</th><th data-k="chain">Chain</th><th data-k="ap">Allocazione</th><th data-k="d6h">6 ore</th><th data-k="d24h">24 ore</th>
           <th data-k="apr">APR 48h</th><th data-k="apr_next">APR atteso</th><th data-k="free_24h_active">Liberi 24h</th>
           <th data-k="rev48h">Revenue 48h</th><th data-k="inc_next48h">Incentivi 48h</th><th data-k="route">Routing K / V</th>
         </tr></thead>
@@ -237,7 +282,8 @@ footer a { color: var(--accent); }
 
   <div class="grid2">
     <section class="panel">
-      <div class="panel-head"><h2>Allocazione per chain</h2></div>
+      <div class="panel-head"><h2>Chain</h2></div>
+      <p class="note">Allocazione, pool e fee delle ultime 48 ore su ogni chain dove gira Aero, con lo stato dell'ultima lettura.</p>
       <div class="list" id="chains"></div>
     </section>
     <section class="panel">
@@ -247,7 +293,7 @@ footer a { color: var(--accent); }
   </div>
 
   <footer>
-    <span>Dati on-chain da Base (contratti Aero di Dromos Labs), prezzi DexScreener, quote KyberSwap e Velora. Aggiornamento ogni 15 minuti con GitHub Actions.</span>
+    <span>Dati on-chain da Base, OP Mainnet, Ethereum, Arbitrum, Ink, Robinhood Chain e Arc (contratti Aero di Dromos Labs), prezzi DexScreener, quote KyberSwap e Velora. Aggiornamento ogni 15 minuti con GitHub Actions.</span>
     <span>Non è una consulenza finanziaria.</span>
   </footer>
 </div>
@@ -297,12 +343,15 @@ footer a { color: var(--accent); }
 
   function header(d) {
     const age = Date.now() / 1000 - d.generated;
-    $("updated").textContent = `Aggiornato ${when(d.generated)} · ${age > 3600 ? "dati vecchi di " + inT(age) : "prossimo controllo entro 15 min"}`;
+    const manual = (d.status || {}).trigger === "workflow_dispatch" ? " (raccolta manuale)" : "";
+    $("updated").textContent = `Aggiornato ${when(d.generated)}${manual} · ${age > 3600 ? "dati vecchi di " + inT(age) : "prossimo controllo entro 15 min"}`;
     const chips = $("chips");
     chips.replaceChildren();
     const chip = (k, v) => { const c = el("span", "chip"); c.append(k + " "); c.append(el("b", null, v)); chips.append(c); };
     if (d.aero_usd) chip("AERO", "$" + d.aero_usd.toFixed(3).replace(".", ","));
-    chip("Allocati su Base", fmtN(d.totals.ap_base));
+    chip("Allocati", fmtN(d.totals.ap_total != null ? d.totals.ap_total : d.totals.ap_base));
+    const ch = d.chains || [];
+    if (ch.length) chip("Chain lette", `${ch.filter(c => c.ok).length} su ${ch.length}`);
     chip("Posizioni", `${(d.totals.active_positions || 0).toLocaleString("it-IT")} attive su ${(d.totals.positions || 0).toLocaleString("it-IT")}`);
     if (d.totals.median_apr_1m != null) chip("APR mediano >1M", fmtPct(d.totals.median_apr_1m));
     if (d.personal_alerts) chip("Avvisi sulle tue posizioni", "attivi");
@@ -318,17 +367,27 @@ footer a { color: var(--accent); }
     $("cd-h").textContent = String(d.cooldown_h).replace(".", ",");
   }
 
-  let POS = null, posLoading = null;
+  let POS = null, SHARDS = {}, posLoading = null;
   let myIds = [];
   try { myIds = JSON.parse(localStorage.getItem("radar-ids") || "[]"); } catch (e) { myIds = []; }
   $("mine-ids").value = myIds.join(", ");
 
   function loadPositions() {
     if (!posLoading) {
-      posLoading = fetch("positions.json?t=" + Date.now(), { cache: "no-store" })
-        .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-        .then(j => { POS = j; mine(); })
-        .catch(e => { posLoading = null; empty($("mine"), "Non riesco a leggere le posizioni: " + e.message + "."); });
+      posLoading = (async () => {
+        const r = await fetch("positions.json?t=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const idx = await r.json();
+        const size = idx.shard || 1000, have = new Set(idx.shards || []);
+        const need = [...new Set(myIds.map(id => Math.floor(id / size)))].filter(n => have.has(n));
+        const got = {};
+        await Promise.all(need.map(async n => {
+          const rr = await fetch(`pos/${n}.json?t=${Date.now()}`, { cache: "no-store" });
+          if (!rr.ok) throw new Error("HTTP " + rr.status);
+          got[n] = await rr.json();
+        }));
+        POS = idx; SHARDS = got; mine();
+      })().catch(e => { posLoading = null; empty($("mine"), "Non riesco a leggere le posizioni: " + e.message + "."); });
     }
     return posLoading;
   }
@@ -338,22 +397,24 @@ footer a { color: var(--accent); }
     box.replaceChildren();
     if (!myIds.length) return empty(box, "Nessuna posizione impostata.");
     if (!POS) { empty(box, "Carico le posizioni…"); loadPositions(); return; }
-    const now = Date.now() / 1000;
+    const now = Date.now() / 1000, size = POS.shard || 1000, have = new Set(POS.shards || []);
+    const chainName = cid => (POS.chains || {})[cid] || "chain " + cid;
     for (const id of myIds) {
-      const p = POS.p[String(id)], other = (POS.x || {})[String(id)] || [];
-      const otherTxt = other.map(([c, a]) => `${c} ${fmtN(a)}`).join(" · ");
-      if (!p) {
-        box.append(row(`#${id}`, el("span", "pill pas", "nessun voto su Base"),
-          otherTxt ? "Allocata su altre chain: " + otherTxt + "." : "Non trovo allocazioni per questo numero: controlla che sia giusto."));
+      const n = Math.floor(id / size);
+      if (have.has(n) && !SHARDS[n]) { POS = null; posLoading = null; empty(box, "Carico le posizioni…"); loadPositions(); return; }
+      const sh = SHARDS[n];
+      const entries = ((sh && sh.p[String(id)]) || []).slice().sort((a, b) => b[2] - a[2]);
+      if (!entries.length) {
+        box.append(row(`#${id}`, el("span", "pill pas", "nessun voto"), "Non trovo allocazioni per questo numero su nessuna chain: controlla che sia giusto."));
         continue;
       }
-      const [ends, saero, , moves, pools] = p;
-      const free = ends <= now;
-      const pill = el("span", "pill " + (free ? "free" : "wait"), free ? "libera" : "cooldown " + inT(ends - now));
-      const where = pools.map(([i, a]) => `${POS.names[i]} ${fmtN(a)}`).join(" · ");
-      box.append(row(`#${id} · ${fmtN(saero)} sAERO`, pill,
-        (free ? "Puoi riallocare su Base ora. " : `Puoi riallocare su Base ${when(ends)}. `) + where +
-        (otherTxt ? ` · altre chain: ${otherTxt}` : "")));
+      for (const [cid, ends, saero, , moves, pools] of entries) {
+        const free = ends <= now, c = chainName(cid);
+        const pill = el("span", "pill " + (free ? "free" : "wait"), free ? "libera" : "cooldown " + inT(ends - now));
+        const where = pools.map(([i, a]) => `${sh.names[i]} ${fmtN(a)}`).join(" · ");
+        box.append(row(`#${id} · ${c} · ${fmtN(saero)} sAERO`, pill,
+          (free ? `Puoi riallocare su ${c} ora. ` : `Puoi riallocare su ${c} ${when(ends)}. `) + where));
+      }
     }
   }
 
@@ -414,7 +475,7 @@ footer a { color: var(--accent); }
     for (const c of rows) {
       const pill = el("span", "pill " + (c.active ? "act" : "pas"), c.free ? "libera" : inT(c.ends - now));
       const pools = c.pools.map(([n, a]) => `${n} ${fmtN(a)}`).join(" · ");
-      box.append(row(`#${c.id} · ${fmtN(c.saero)}`, pill,
+      box.append(row(`#${c.id} · ${c.chain ? c.chain + " · " : ""}${fmtN(c.saero)}`, pill,
         (c.free ? "Già libera, si è spostata " + c.moves + " volte. " : `Libera ${when(c.ends)}${c.active ? ", attiva" : ""}. `) + pools));
     }
   }
@@ -428,7 +489,7 @@ footer a { color: var(--accent); }
     for (const u of rows) {
       const hrs = Math.round((u.end - u.start) / 3600);
       const started = u.start <= now;
-      box.append(row(u.pool, fmtUsd(u.usd),
+      box.append(row(u.label || u.pool, fmtUsd(u.usd),
         `${fmtN(u.amount)} ${u.token} in ${hrs} ore · ${started ? "partito " + when(u.start) : "parte " + when(u.start) + " (tra " + inT(u.start - now) + ")"} · allocazione ${fmtN(u.ap)}`));
     }
   }
@@ -455,9 +516,9 @@ footer a { color: var(--accent); }
 
   function pools(d) {
     const q = $("q").value.trim().toLowerCase();
-    const big = $("big").checked;
-    let rows = (d.pools || []).filter(p => (!big || p.ap >= 100000 || p.unallocated) && (!q || p.name.toLowerCase().includes(q) || (p.pool || "").includes(q)));
-    const val = p => sortKey === "route" ? routeVal(p) : sortKey === "name" ? p.name.toLowerCase() : p[sortKey];
+    const big = $("big").checked, cf = $("chain-f").value;
+    let rows = (d.pools || []).filter(p => (!cf || (p.chain || "Base") === cf) && (!big || p.ap >= 100000 || p.unallocated) && (!q || p.name.toLowerCase().includes(q) || (p.pool || "").includes(q)));
+    const val = p => sortKey === "route" ? routeVal(p) : sortKey === "name" ? p.name.toLowerCase() : sortKey === "chain" ? (p.chain || "Base") : p[sortKey];
     rows.sort((a, b) => {
       const va = val(a), vb = val(b);
       if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1;
@@ -474,7 +535,9 @@ footer a { color: var(--accent); }
       const c0 = document.createElement("td");
       c0.append(el("span", "nm", p.name), el("span", "kd", p.kind && p.kind !== "?" ? p.kind : ""));
       if (p.unallocated) c0.append(el("span", "kd", "nessuna allocazione"));
+      if (p.blocked) c0.append(el("span", "kd", "non votabile"));
       tr.append(c0);
+      tr.append(el("td", "ch muted", p.chain || "Base"));
       const cAp = el("td", "num", fmtN(p.ap));
       const sp = spark(p.spark); if (sp) cAp.append(sp);
       tr.append(cAp);
@@ -496,17 +559,46 @@ footer a { color: var(--accent); }
       tb.append(tr);
     }
     if (!rows.length) {
-      const tr = document.createElement("tr"); const td = el("td", "muted", "Nessun pool corrisponde alla ricerca."); td.colSpan = 10; tr.append(td); tb.append(tr);
+      const tr = document.createElement("tr"); const td = el("td", "muted", "Nessun pool corrisponde alla ricerca."); td.colSpan = 11; tr.append(td); tb.append(tr);
     }
   }
 
   function chains(d) {
     const box = $("chains");
     box.replaceChildren();
-    const by = Object.entries(d.totals.by_chain || {}).sort((a, b) => b[1] - a[1]);
-    const tot = by.reduce((s, [, v]) => s + v, 0) || 1;
-    for (const [c, v] of by) box.append(row(c, fmtN(v), (v / tot * 100).toFixed(1).replace(".", ",") + "% del totale"));
-    if (!by.length) empty(box, "Nessun dato.");
+    const list = d.chains || [];
+    const tot = list.reduce((s, c) => s + (c.ap || 0), 0) || 1;
+    for (const c of list) {
+      const parts = [((c.ap || 0) / tot * 100).toFixed(1).replace(".", ",") + "% del totale"];
+      if (c.pools) parts.push(c.pools + " pool");
+      if (c.positions) parts.push(c.positions.toLocaleString("it-IT") + " posizioni");
+      if (c.fees48h) parts.push("fee 48h " + fmtUsd(c.fees48h));
+      if (c.median_apr != null) parts.push("APR mediano " + fmtPct(c.median_apr));
+      let st = "";
+      if (!c.ok) st = c.error === "chain non configurata" ? "Non ancora monitorata." : "Ultima lettura non riuscita" + (c.checked ? ": dati del " + when(c.checked) : "") + ".";
+      else if (!c.synced) st = "Sto ancora leggendo lo storico delle allocazioni.";
+      else if (c.fee_hours != null && c.fee_hours < 47) st = `Storico delle fee: ${Math.round(c.fee_hours)} ore su 48.`;
+      const w = row(c.name, fmtN(c.ap));
+      const det = el("div", "d", parts.join(" · "));
+      if (st) { det.append(document.createElement("br"), el("span", c.ok ? "" : "bad-text", st)); }
+      w.append(det);
+      box.append(w);
+    }
+    if (!list.length) {
+      const by = Object.entries(d.totals.by_chain || {}).sort((a, b) => b[1] - a[1]);
+      const t2 = by.reduce((s, [, v]) => s + v, 0) || 1;
+      for (const [c, v] of by) box.append(row(c, fmtN(v), (v / t2 * 100).toFixed(1).replace(".", ",") + "% del totale"));
+      if (!by.length) empty(box, "Nessun dato.");
+    }
+  }
+
+  let savedChain = "";
+  try { savedChain = localStorage.getItem("radar-chain") || ""; } catch (e) {}
+  function chainOptions(d) {
+    const sel = $("chain-f"), cur = sel.value || savedChain;
+    const names = (d.chains || []).filter(c => c.pools).map(c => c.short);
+    sel.replaceChildren(new Option("Tutte le chain", ""), ...names.map(n => new Option(n, n)));
+    sel.value = names.includes(cur) ? cur : "";
   }
 
   function alertsList(d) {
@@ -525,6 +617,7 @@ footer a { color: var(--accent); }
 
   function simCards(t) {
     $("sim-size").textContent = kSize(t.size);
+    if (!$("sim-size-in").value && document.activeElement !== $("sim-size-in")) $("sim-size-in").value = String(Math.round(t.size));
     $("sim-since").textContent = t.collected_h < 1 ? "raccolta appena iniziata" : `dati da ${inT(t.collected_h * 3600)}`;
     const box = $("sim-cards");
     box.replaceChildren();
@@ -545,6 +638,8 @@ footer a { color: var(--accent); }
       c.append(kv);
       const hold = (s.holding || []).slice(0, 5).map(([n, a]) => `${n} ${fmtN(a)}`).join(" · ");
       c.append(el("div", "holding", hold ? "Ora su: " + hold : "Nessuna allocazione ancora."));
+      const split = (s.now && s.now.chains) || [];
+      if (split.length) c.append(el("div", "chainsplit", "Consiglio adesso per chain: " + split.map(([n, a]) => `${n} ${fmtN(a)}`).join(" · ")));
       box.append(c);
     });
   }
@@ -620,7 +715,9 @@ footer a { color: var(--accent); }
     const usd4 = v => v == null ? "—" : "$" + (v >= 10 ? v.toFixed(1) : v.toFixed(2)).replace(".", ",");
     for (const p of rows.slice(0, 120)) {
       const tr = document.createElement("tr");
-      const c0 = document.createElement("td"); c0.append(el("span", "nm", p.name)); if (p.ap < 10000) c0.append(el("span", "kd", "quasi vuoto")); tr.append(c0);
+      const c0 = document.createElement("td"); c0.append(el("span", "nm", p.name));
+      if (p.chain && p.chain !== "Base") c0.append(el("span", "tag", p.chain));
+      if (p.ap < 10000) c0.append(el("span", "kd", "quasi vuoto")); tr.append(c0);
       tr.append(el("td", "num", fmtN(p.ap)));
       for (const k of ["m1000_24h", "m1000_7d", "m1000_30d"]) tr.append(el("td", "num", usd4(p[k])));
       tr.append(el("td", "num", fmtPct(p.apr_7d)));
@@ -656,9 +753,166 @@ footer a { color: var(--accent); }
     SIM && yieldTable(SIM);
   }));
 
+  // ---------------------------------------------------------------- manual runs on GitHub Actions
+  const REPO_DEFAULT = "wkisai95/solid-eureka", WORKFLOW = "monitor.yml";
+  const repo = () => (DATA && DATA.repo) || REPO_DEFAULT;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let ghToken = "";
+  try { ghToken = localStorage.getItem("radar-gh-token") || ""; } catch (e) {}
+
+  function gh(path, opts = {}) {
+    const headers = { "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+    if (ghToken) headers.Authorization = "Bearer " + ghToken;
+    if (opts.body) headers["Content-Type"] = "application/json";
+    return fetch("https://api.github.com" + path, { ...opts, headers, cache: "no-store" });
+  }
+
+  function runState(text, opts = {}) {
+    const box = $("run-state");
+    box.replaceChildren(el("span", opts.bad ? "bad-text" : null, text));
+    if (opts.link) { const a = el("a", null, " Dettagli su GitHub"); a.href = opts.link; a.target = "_blank"; a.rel = "noopener"; box.append(a); }
+  }
+
+  function ghLinkText() { $("gh-open").textContent = ghToken ? "GitHub collegato" : "Collega GitHub"; }
+
+  function ghPanel(show, msg) {
+    const [owner, name] = repo().split("/");
+    $("gh-repo-name").textContent = name;
+    $("gh-new").href = "https://github.com/settings/personal-access-tokens/new?" + new URLSearchParams({
+      name: "Monitor sAERO", description: "Avvia il monitor sAERO dalla pagina o dall'app",
+      target_name: owner, expires_in: "366", actions: "write" }).toString();
+    $("gh-msg").textContent = msg || (ghToken ? "Un token è già salvato su questo dispositivo." : "");
+    $("gh-forget").hidden = !ghToken;
+    $("gh-panel").hidden = !show;
+    if (show) $("gh-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  let running = false;
+  function busy(on) { running = on; $("run-now").disabled = on; $("sim-restart").disabled = on; }
+
+  async function startRun(inputs, label) {
+    if (running) return;
+    if (!ghToken) { ghPanel(true, "Collega GitHub una volta per avviare la raccolta da qui."); return; }
+    busy(true);
+    const t0 = Date.now();
+    try {
+      runState(label || "Avvio la raccolta…");
+      const r = await gh(`/repos/${repo()}/actions/workflows/${WORKFLOW}/dispatches`,
+        { method: "POST", body: JSON.stringify({ ref: "main", inputs: inputs || {} }) });
+      if (r.status === 401) { runState("GitHub non accetta il token: è scaduto o sbagliato.", { bad: true }); ghPanel(true); return; }
+      if (r.status === 403 || r.status === 404) {
+        runState("Il token non può avviare il monitor.", { bad: true });
+        ghPanel(true, `Serve il permesso Actions: Read and write sul repository ${repo()}.`);
+        return;
+      }
+      if (!r.ok) { runState(`GitHub ha risposto con un errore (HTTP ${r.status}). Riprova tra poco.`, { bad: true }); return; }
+      let runId = null;
+      try { const j = await r.json(); runId = (j && (j.workflow_run_id || j.id)) || null; } catch (e) {}
+      try { localStorage.setItem("radar-run", JSON.stringify({ id: runId, t0 })); } catch (e) {}
+      await follow(runId, t0);
+    } catch (e) {
+      runState("Non riesco a contattare GitHub: " + e.message + ".", { bad: true });
+    } finally {
+      busy(false);
+    }
+  }
+
+  async function follow(runId, t0) {
+    const before = DATA ? DATA.generated : 0;
+    for (let i = 0; i < 100; i++) {
+      await sleep(i ? 12000 : 4000);
+      let run = null;
+      try {
+        if (runId) {
+          const r = await gh(`/repos/${repo()}/actions/runs/${runId}`);
+          if (r.ok) run = await r.json();
+        } else {
+          const r = await gh(`/repos/${repo()}/actions/workflows/${WORKFLOW}/runs?event=workflow_dispatch&per_page=5`);
+          if (r.ok) {
+            const j = await r.json();
+            run = (j.workflow_runs || []).find(x => Date.parse(x.created_at) >= t0 - 90000) || null;
+            if (run) runId = run.id;
+          }
+        }
+      } catch (e) { /* network hiccup: try again */ }
+      const mins = Math.max(0, Math.round((Date.now() - t0) / 60000));
+      if (!run || ["queued", "waiting", "pending", "requested"].includes(run.status)) { runState(`In coda su GitHub… (${mins} min)`); continue; }
+      if (run.status !== "completed") { runState(`Raccolta in corso… (${mins} min, di solito 2-5)`); continue; }
+      try { localStorage.removeItem("radar-run"); } catch (e) {}
+      if (run.conclusion !== "success") { runState("La raccolta non è riuscita.", { bad: true, link: run.html_url }); return; }
+      runState("Fatto: carico i dati nuovi…");
+      for (let k = 0; k < 10; k++) {
+        await load();
+        if (DATA && DATA.generated > before) { runState(`Dati aggiornati alle ${timeFmt.format(new Date(DATA.generated * 1000))}.`); return; }
+        await sleep(8000);
+      }
+      runState("La raccolta è finita: i dati nuovi compaiono tra qualche minuto.");
+      return;
+    }
+    runState("Ci mette più del solito: i dati compariranno appena pronti.");
+  }
+
+  $("run-now").addEventListener("click", () => startRun({}, "Avvio la raccolta…"));
+  $("gh-open").addEventListener("click", () => ghPanel($("gh-panel").hidden));
+  $("gh-close").addEventListener("click", () => ghPanel(false));
+  $("gh-forget").addEventListener("click", () => {
+    ghToken = "";
+    try { localStorage.removeItem("radar-gh-token"); } catch (e) {}
+    ghLinkText();
+    ghPanel(true, "Token rimosso da questo dispositivo.");
+  });
+  $("gh-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const tok = $("gh-token").value.trim();
+    if (!tok) return;
+    const prev = ghToken;
+    ghToken = tok;
+    $("gh-msg").textContent = "Controllo il token…";
+    try {
+      const r = await gh(`/repos/${repo()}/actions/workflows/${WORKFLOW}`);
+      if (!r.ok) {
+        ghToken = prev;
+        $("gh-msg").textContent = r.status === 401 ? "GitHub non riconosce questo token." : `GitHub risponde ${r.status}: controlla che il token abbia accesso a ${repo()}.`;
+        return;
+      }
+      try { localStorage.setItem("radar-gh-token", tok); } catch (x) {}
+      $("gh-token").value = "";
+      ghLinkText();
+      ghPanel(false);
+      runState("GitHub collegato: ora puoi avviare la raccolta da qui.");
+    } catch (x) {
+      ghToken = prev;
+      $("gh-msg").textContent = "Non riesco a contattare GitHub: " + x.message + ".";
+    }
+  });
+
+  let armed = 0;
+  $("sim-restart").addEventListener("click", () => {
+    const size = parseInt(($("sim-size-in").value || "").replace(/\D/g, ""), 10);
+    if (!size || size < 1000) { runState("Scrivi quante sAERO simulare (almeno 1000).", { bad: true }); return; }
+    if (Date.now() - armed > 6000) {
+      armed = Date.now();
+      $("sim-restart").textContent = `Confermi? Riparte da zero con ${fmtN(size)}`;
+      setTimeout(() => { if (Date.now() - armed >= 6000) $("sim-restart").textContent = "Nuova raccolta"; }, 6100);
+      return;
+    }
+    armed = 0;
+    $("sim-restart").textContent = "Nuova raccolta";
+    startRun({ reset_tracker: "true", tracker_size: String(size) }, `Avvio una nuova raccolta con ${fmtN(size)} sAERO…`);
+  });
+
+  ghLinkText();
+  try {
+    const pend = JSON.parse(localStorage.getItem("radar-run") || "null");
+    if (pend && ghToken && Date.now() - pend.t0 < 30 * 60000) {
+      busy(true);
+      follow(pend.id, pend.t0).catch(() => {}).finally(() => busy(false));
+    }
+  } catch (e) {}
+
   function render() {
     if (!DATA) return;
-    header(DATA); mine(); waves(DATA); calendar(DATA); incentives(DATA); pools(DATA); chains(DATA); alertsList(DATA);
+    header(DATA); mine(); waves(DATA); calendar(DATA); incentives(DATA); chainOptions(DATA); pools(DATA); chains(DATA); alertsList(DATA);
   }
 
   async function load() {
@@ -666,7 +920,7 @@ footer a { color: var(--accent); }
       const r = await fetch("latest.json?t=" + Date.now(), { cache: "no-store" });
       if (!r.ok) throw new Error("HTTP " + r.status);
       DATA = await r.json();
-      if (POS && POS.generated < DATA.generated) { POS = null; posLoading = null; }
+      if (POS && POS.generated < DATA.generated) { POS = null; SHARDS = {}; posLoading = null; }
       render();
       loadSim();
     } catch (e) {
@@ -676,6 +930,7 @@ footer a { color: var(--accent); }
   }
 
   $("q").addEventListener("input", () => DATA && pools(DATA));
+  $("chain-f").addEventListener("change", e => { try { localStorage.setItem("radar-chain", e.target.value); } catch (x) {} DATA && pools(DATA); });
   $("big").addEventListener("change", () => DATA && pools(DATA));
   $("sort").value = sortKey === "name" ? "ap" : sortKey;
   $("sort").addEventListener("change", e => { sortKey = e.target.value; sortDir = -1; try { localStorage.setItem("radar-sort", JSON.stringify({ k: sortKey, d: sortDir })); } catch (x) {} DATA && pools(DATA); });

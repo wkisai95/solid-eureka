@@ -1,4 +1,9 @@
-"""Aero contracts on Base: addresses, event topics, decoders and multicall readers."""
+"""Aero contracts: addresses, chains, event topics, decoders and multicall readers.
+
+The root voter lives on Base. Every chain Aero runs on (Base included) has a LeafVoter at the same address that
+records the gauge allocations, cooldowns and gauges of that chain; each gauge has its own rewards manager (VRM)
+that receives the fees and incentive programs.
+"""
 from eth_abi import decode, encode
 from eth_hash.auto import keccak
 
@@ -6,20 +11,27 @@ LEAF = "0x382409fad8503FbCdbB27A4211551fa03e884078"   # LeafVoter (same address 
 ROOT = "0x49d7d4f17Ec56Ef8fA04E464AF5D1A4942CC31e6"   # root Voter on Base
 FACTORY_REGISTRY = "0x7b2A2c12dC5Ea2a31455952a05031C3E4BB28F3E"   # leaf factory registry on Base
 BASE_CHAIN = 8453
-START_BLOCK = 52875727          # 2026-10-21 00:00 UTC, before the Aero launch
+START_BLOCK = 52875727          # 2026-10-21 00:00 UTC on Base, before the Aero launch
 DEPLOY_BLOCK = 52688157         # root Voter and LeafVoter deployed on Base (2026-10-16)
 BASE_GENESIS_TS = 1686789347    # Base has fixed 2-second blocks: ts = genesis + 2 * block
 ZERO = "0x0000000000000000000000000000000000000000"
 
 CHAIN_NAMES = {1: "Ethereum", 10: "OP Mainnet", 8453: "Base", 42161: "Arbitrum",
                57073: "Ink", 4663: "Robinhood Chain", 5042: "Arc"}
+CHAIN_SHORT = {1: "Ethereum", 10: "OP", 8453: "Base", 42161: "Arbitrum", 57073: "Ink", 4663: "Robinhood",
+               5042: "Arc"}
 
 
 def chain_name(cid):
     return CHAIN_NAMES.get(int(cid), f"Chain {cid}")
 
 
+def chain_short(cid):
+    return CHAIN_SHORT.get(int(cid), f"Chain {cid}")
+
+
 def block_ts(block):
+    """Timestamp of a Base block."""
     return BASE_GENESIS_TS + 2 * int(block)
 
 
@@ -69,11 +81,11 @@ def _data(lg):
     return bytes.fromhex(lg["data"][2:]) if lg.get("data") and lg["data"] != "0x" else b""
 
 
-def decode_log(lg):
-    """Returns a normalised event dict or None for unknown logs."""
+def decode_log(lg, ts_of=block_ts):
+    """Returns a normalised event dict or None for unknown logs. ts_of maps a block number to its timestamp."""
     t0 = lg["topics"][0].lower() if lg.get("topics") else None
     block = hexint(lg["blockNumber"])
-    base = {"block": block, "idx": hexint(lg.get("logIndex")), "ts": block_ts(block),
+    base = {"block": block, "idx": hexint(lg.get("logIndex")), "ts": int(ts_of(block)),
             "emitter": lg["address"].lower()}
     try:
         if t0 == T["leaf_alloc"]:
@@ -121,6 +133,8 @@ S = {k: sel(v) for k, v in {
     "allocationCooldown": "allocationCooldown()",
     "maxReduction": "maxAccumulatedCooldownReduction()",
     "maxGauges": "maxGauges()",
+    "factoryRegistry": "FACTORY_REGISTRY()",
+    "chainStatus": "chainStatus()",
     "incentiveCount": "incentiveCount()",
     "incentive": "incentive(uint256)",
     "isActivated": "isActivated(address)",
@@ -169,6 +183,7 @@ def _dec_symbol(ok, data):
 
 
 def read_params(rpc):
+    """Root voter (Base): AERO token and registered chains, plus the Base leaf settings."""
     res = rpc.multicall([(LEAF, S["allocationCooldown"]), (LEAF, S["maxReduction"]),
                          (ROOT, S["TOKEN"]), (ROOT, S["chains"]), (LEAF, S["maxGauges"])])
     cooldown = _dec(["uint48"], *res[0])
@@ -181,6 +196,21 @@ def read_params(rpc):
             "aero": token or "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
             "chains": [int(c) for c in chains] if chains else [],
             "max_gauges": int(max_gauges) if max_gauges else 20}
+
+
+def read_leaf_params(rpc):
+    """Settings of the LeafVoter of one chain."""
+    res = rpc.multicall([(LEAF, S["allocationCooldown"]), (LEAF, S["maxReduction"]), (LEAF, S["maxGauges"]),
+                         (LEAF, S["factoryRegistry"]), (LEAF, S["chainStatus"])])
+    cooldown = _dec(["uint48"], *res[0])
+    max_red = _dec(["uint48"], *res[1])
+    max_gauges = _dec(["uint256"], *res[2])
+    status = _dec(["uint8"], *res[4])
+    return {"cooldown": int(cooldown) if cooldown else None,
+            "max_reduction": int(max_red) if max_red is not None else None,
+            "max_gauges": int(max_gauges) if max_gauges else None,
+            "factory_registry": _dec_addr(*res[3]),
+            "status": int(status) if status is not None else None}
 
 
 def read_token_states(rpc, token_ids):
@@ -201,7 +231,7 @@ def read_token_states(rpc, token_ids):
 
 
 def read_token_allocations(rpc, token_ids):
-    """Rebuilds the current Base allocation of each token straight from the leaf voter."""
+    """Rebuilds the current allocation of each token on one chain straight from its leaf voter."""
     res = rpc.multicall([(LEAF, S["allocatedGauges"] + encode(["uint256"], [int(t)])) for t in token_ids])
     gauges = {}
     calls = []
@@ -223,7 +253,7 @@ def read_token_allocations(rpc, token_ids):
 
 
 def read_gauge_meta(rpc, gauges):
-    """Pool, tokens and voting-rewards manager for each gauge (Base)."""
+    """Pool, tokens and voting-rewards manager for each gauge of one chain."""
     calls = []
     for g in gauges:
         for k in ("stakingToken", "pool", "token0", "token1", "vrm"):

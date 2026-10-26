@@ -9,6 +9,7 @@ import heapq
 import statistics
 
 from . import aero as A
+from . import chain as C
 
 HOUR = 3600
 DAY = 86400
@@ -61,11 +62,15 @@ def candidates(state, prices, now, cooldown, strategy):
 
 
 def recommend(cands, size, max_pools, slices=100):
-    """Greedy marginal allocation in 1% slices; returns ({gauge: amount}, expected USD)."""
+    """Greedy marginal allocation in 1% slices; returns ({gauge: amount}, expected USD).
+
+    max_pools is the LeafVoter limit, which applies to each chain separately.
+    """
     if not cands or size <= 0:
         return {}, 0.0
     step = size / slices
     alloc = {}
+    per_chain = {}
 
     def share(k, x):
         r, a = cands[k]
@@ -80,12 +85,15 @@ def recommend(cands, size, max_pools, slices=100):
     for _ in range(slices):
         while heap:
             neg, k = heapq.heappop(heap)
-            if k not in alloc and len(alloc) >= max_pools:
+            c = A.chain_of(k)
+            if k not in alloc and per_chain.get(c, 0) >= max_pools:
                 continue
             cur = gain(k)
             if abs(-neg - cur) > 1e-9:
                 heapq.heappush(heap, (-cur, k))
                 continue
+            if k not in alloc:
+                per_chain[c] = per_chain.get(c, 0) + 1
             alloc[k] = alloc.get(k, 0.0) + step
             heapq.heappush(heap, (-gain(k), k))
             break
@@ -226,6 +234,15 @@ def snapshot(tr, state, prices, now, cooldown, max_pools):
 
 # ---------------------------------------------------------------- public summary
 
+def _chain_split(alloc):
+    """sAERO per chain of an allocation, largest first."""
+    out = {}
+    for k, x in alloc.items():
+        name = C.chain_short(A.chain_of(k))
+        out[name] = out.get(name, 0) + (x[0] if isinstance(x, list) else x)
+    return [[n, round(v)] for n, v in sorted(out.items(), key=lambda kv: -kv[1])]
+
+
 def _sum_hist(tr, k, start, now):
     rev = m = 0.0
     for hr, v in (tr["pool_hist"].get(k) or {}).items():
@@ -273,15 +290,17 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
             "usd_day": round(day_rate, 2) if day_rate is not None else None,
             "apr": apr(day_rate, size) if day_rate is not None else None,
             "moves": v.get("moves", 0), "until": v.get("until"),
-            "holding": [[A.gauge_name(state, k), round(x)] for k, x in
+            "holding": [[A.pool_label(state, k), round(x)] for k, x in
                         sorted((v.get("alloc") or {}).items(), key=lambda kv: -kv[1])[:20]],
+            "chains": _chain_split(v.get("alloc") or {}),
             "curve": [[h, round(c, 2)] for h, c in curve][-24 * 30:],
             "closed_7d": len(closed),
             "real_vs_pred": round(statistics.median(ratio), 3) if ratio else None,
             "avg_real_47h": round(statistics.mean(c[2] for c in closed), 2) if closed else None,
             "now": {"pred_47h": round(reco.get("pred", 0.0), 2),
                     "apr": apr(reco.get("pred", 0.0) / (cooldown / DAY), size),
-                    "pools": [[A.gauge_name(state, k), round(x),
+                    "chains": _chain_split(dict(alloc)),
+                    "pools": [[A.pool_label(state, k), round(x),
                                round(cands[k][0] * x / (cands[k][1] + x), 2), round(cands[k][1])]
                               for k, x in alloc if k in cands]},
         })
@@ -290,7 +309,8 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
     pools = []
     keys = set(tr["pool_hist"]) | set(tr["pool_daily"]) | set(tr["pool_reco"])
     for k in keys:
-        row = {"name": A.gauge_name(state, k), "key": k, "ap": round(state["ap"].get(k, 0.0))}
+        row = {"name": A.gauge_name(state, k), "key": k, "chain": C.chain_short(A.chain_of(k)),
+               "ap": round(state["ap"].get(k, 0.0))}
         any_data = False
         for label, span in (("24h", DAY), ("7d", 7 * DAY), ("30d", 30 * DAY)):
             start = max(now - span, tr["start"])

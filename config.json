@@ -4,6 +4,7 @@
   "timezone": "Europe/Rome",
   "digest_hour": 8,
   "my_positions": [],
+  "read_budget_s": 360,
   "thresholds": {
     "calendar_min_saero": 250000,
     "wave_window_h": 3,
@@ -17,26 +18,123 @@
   },
   "routing": {
     "top_pools": 15,
+    "top_pools_other_chains": 2,
     "usd_sizes": [
       1000,
       10000
     ],
     "pinned_gauges": []
   },
-  "rpc": {
-    "base": [
-      "https://base-rpc.publicnode.com",
-      "https://mainnet.base.org",
-      "https://base.drpc.org",
-      "https://base-mainnet.public.blastapi.io",
-      "https://base.gateway.tenderly.co",
-      "https://endpoints.omniatech.io/v1/base/mainnet/public",
-      "https://developer-access-mainnet.base.org",
-      "https://1rpc.io/base",
-      "https://base.meowrpc.com"
-    ]
+  "chains": {
+    "8453": {
+      "name": "Base",
+      "deploy_block": 52688157,
+      "lag": 2,
+      "dexscreener": "base",
+      "kyber": "base",
+      "velora": 8453,
+      "rpc": [
+        "https://base-rpc.publicnode.com",
+        "https://mainnet.base.org",
+        "https://base.drpc.org",
+        "https://base-mainnet.public.blastapi.io",
+        "https://base.gateway.tenderly.co",
+        "https://endpoints.omniatech.io/v1/base/mainnet/public",
+        "https://developer-access-mainnet.base.org",
+        "https://1rpc.io/base",
+        "https://base.meowrpc.com"
+      ]
+    },
+    "10": {
+      "name": "OP Mainnet",
+      "deploy_block": 158285170,
+      "lag": 2,
+      "dexscreener": "optimism",
+      "kyber": "optimism",
+      "velora": 10,
+      "rpc": [
+        "https://optimism-rpc.publicnode.com",
+        "https://mainnet.optimism.io",
+        "https://optimism.drpc.org",
+        "https://optimism.gateway.tenderly.co",
+        "https://1rpc.io/op",
+        "https://optimism.meowrpc.com"
+      ]
+    },
+    "1": {
+      "name": "Ethereum",
+      "deploy_block": 26206276,
+      "lag": 2,
+      "dexscreener": "ethereum",
+      "kyber": "ethereum",
+      "velora": 1,
+      "rpc": [
+        "https://ethereum-rpc.publicnode.com",
+        "https://eth.drpc.org",
+        "https://eth.llamarpc.com",
+        "https://mainnet.gateway.tenderly.co",
+        "https://eth.merkle.io",
+        "https://1rpc.io/eth"
+      ]
+    },
+    "42161": {
+      "name": "Arbitrum",
+      "deploy_block": 515435177,
+      "lag": 20,
+      "dexscreener": "arbitrum",
+      "kyber": "arbitrum",
+      "velora": 42161,
+      "rpc": [
+        "https://arbitrum-one-rpc.publicnode.com",
+        "https://arb1.arbitrum.io/rpc",
+        "https://arbitrum.drpc.org",
+        "https://arbitrum.gateway.tenderly.co",
+        "https://1rpc.io/arb",
+        "https://arbitrum.meowrpc.com"
+      ]
+    },
+    "57073": {
+      "name": "Ink",
+      "deploy_ts": 1792165000,
+      "lag": 4,
+      "dexscreener": "ink",
+      "kyber": null,
+      "velora": null,
+      "rpc": [
+        "https://rpc-gel.inkonchain.com",
+        "https://rpc-qnd.inkonchain.com",
+        "https://ink.drpc.org"
+      ]
+    },
+    "4663": {
+      "name": "Robinhood Chain",
+      "deploy_block": 90246382,
+      "lag": 20,
+      "dexscreener": null,
+      "kyber": null,
+      "velora": null,
+      "rpc": [
+        "https://rpc.mainnet.chain.robinhood.com",
+        "https://robinhood.drpc.org"
+      ]
+    },
+    "5042": {
+      "name": "Arc",
+      "deploy_block": 26430600,
+      "lag": 4,
+      "dexscreener": null,
+      "kyber": null,
+      "velora": null,
+      "rpc": [
+        "https://rpc.mainnet.arc.io",
+        "https://arc.drpc.org",
+        "https://rpc.drpc.mainnet.arc.io",
+        "https://rpc.quicknode.mainnet.arc.io"
+      ]
+    }
   },
   "page_url": "https://wkisai95.github.io/solid-eureka/",
+  "repo": "wkisai95/solid-eureka",
   "tracker": {
     "size": 235000
   }
