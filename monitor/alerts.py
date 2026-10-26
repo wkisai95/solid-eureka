@@ -200,7 +200,7 @@ def digest(report, cfg, now):
                                                           f"cooldown fino alle {fmt_time(m['ends'], tz, now)}"))
     public = "\n".join(lines) or "Nessuna novità rilevante."
     return {"key": f"digest:{dt.datetime.fromtimestamp(now, tz):%Y-%m-%d}", "prio": 2, "tags": ["sunrise"],
-            "title": "Radar sAERO: il punto del mattino", "body": "\n".join(lines + personal) or public,
+            "title": "Monitor sAERO: il punto del mattino", "body": "\n".join(lines + personal) or public,
             "public_body": public}
 
 

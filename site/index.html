@@ -3,7 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Radar sAERO</title>
+<title>Monitor sAERO</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Monitor sAERO">
 <meta name="theme-color" content="#0f1a1c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -138,7 +143,7 @@ footer a { color: var(--accent); }
         <g class="sweep"><path d="M14 14 L14 1.5 A12.5 12.5 0 0 1 24.8 7.8 Z" fill="var(--accent)" opacity=".28"/></g>
         <circle cx="19" cy="9" r="1.8" fill="var(--accent)"/>
       </svg>
-      Radar sAERO
+      Monitor sAERO
     </h1>
     <div class="sub" id="updated">Carico i dati…</div>
     <div class="chips" id="chips"></div>
@@ -683,6 +688,7 @@ footer a { color: var(--accent); }
   }));
   load();
   setInterval(load, 5 * 60 * 1000);
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
   let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { DATA && waves(DATA); SIM && simChart(SIM); }, 200); });
 })();

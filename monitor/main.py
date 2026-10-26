@@ -1,4 +1,4 @@
-"""Radar sAERO monitor: one run = read chain + markets, update state, publish snapshot, notify."""
+"""Monitor sAERO: one run = read chain + markets, update state, publish snapshot, notify."""
 import argparse
 import datetime as dt
 import gzip
@@ -65,6 +65,16 @@ def save_json(path, obj, gz=False):
     else:
         tmp.write_text(json.dumps(obj, separators=(",", ":"), ensure_ascii=False))
     tmp.replace(path)
+
+
+def publish_site(out):
+    """Copies the page, the app manifest, the service worker and the icons next to the data."""
+    site = ROOT / "site"
+    if site.is_dir():
+        for f in site.iterdir():
+            if f.is_file():
+                shutil.copy(f, out / f.name)
+    (out / ".nojekyll").write_text("")
 
 
 def routing_targets(state, cfg):
@@ -166,7 +176,7 @@ def run(args):
         state["last_digest"] = local.strftime("%Y-%m-%d")
     if N.topic_of(cfg) and not state.get("welcome_sent"):
         fresh.insert(0, {"key": f"welcome:{now}", "prio": 3, "tags": ["satellite"],
-                         "title": "Radar sAERO: monitor attivo",
+                         "title": "Monitor sAERO attivo",
                          "body": f"Controllo Aero ogni 15 minuti. Ora seguo {report['totals']['positions']} posizioni "
                                  f"su Base e {len(report['pools'])} pool. Ti scrivo qui quando succede qualcosa di "
                                  f"rilevante, più un riepilogo ogni mattina."})
@@ -192,10 +202,7 @@ def run(args):
     save_json(out / "positions.json", R.positions_export(state, params, now))
     save_json(out / "tracker.json", tracker_report)
     save_json(out / "state.json.gz", state, gz=True)
-    site = ROOT / "site" / "index.html"
-    if site.exists():
-        shutil.copy(site, out / "index.html")
-    (out / ".nojekyll").write_text("")
+    publish_site(out)
     write_run_log(out)
     log(f"done: {len(report['pools'])} pools, {len(report['calendar'])} calendar rows, "
         f"{len(report['incentives_upcoming'])} upcoming incentives, latest.json "
@@ -224,15 +231,12 @@ def main():
             latest["status"]["rpc"] = RPC["rpc"].summary()
         save_json(out / "latest.json", latest)
         write_run_log(out)
-        site = ROOT / "site" / "index.html"
-        if site.exists():
-            shutil.copy(site, out / "index.html")
-        (out / ".nojekyll").write_text("")
+        publish_site(out)
         if fails in (4, 24):
             cfg = json.loads((ROOT / "config.json").read_text())
             state = load_json(out / "state.json.gz", {"alerts": {}}) or {"alerts": {}}
             N.send([{"key": f"fail:{int(time.time())}", "prio": 4, "tags": ["warning"],
-                     "title": "Radar sAERO non riesce a leggere i dati",
+                     "title": "Monitor sAERO non riesce a leggere i dati",
                      "body": f"Le ultime {fails} esecuzioni sono fallite. Controllo GitHub Actions per i dettagli."}],
                    cfg, log, int(time.time()), state)
         sys.exit(0)

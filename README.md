@@ -1,4 +1,4 @@
-# Radar sAERO
+# Monitor sAERO
 
 Monitor di Aero che gira da solo su GitHub Actions ogni 15 minuti.
 
@@ -32,6 +32,9 @@ Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown. 
 
 Nella sezione «Le tue posizioni» scrivi i numeri delle tue sAERO: restano salvati solo nel browser.
 
+Si installa come app: in Chrome su Android apri la pagina, menu ⋮ → «Installa app» (o «Aggiungi a schermata Home»).
+Compare come **Monitor sAERO**, separata da altre app.
+
 ## Dati privati (Settings → Secrets and variables → Actions)
 
 Il repository è pubblico, quindi i dati personali stanno solo nei secret, mai nei file:
@@ -60,7 +63,7 @@ Le soglie si cambiano in `config.json`.
 
 ## Esecuzione manuale
 
-Da **Actions → Radar sAERO monitor → Run workflow**. Spunta *Invia una notifica di prova* per controllare ntfy.
+Da **Actions → Monitor sAERO → Run workflow**. Spunta *Invia una notifica di prova* per controllare ntfy.
 
 In locale:
 

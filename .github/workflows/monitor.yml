@@ -1,4 +1,4 @@
-name: Radar sAERO monitor
+name: Monitor sAERO
 
 on:
   schedule:
