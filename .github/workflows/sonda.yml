@@ -1,0 +1,20 @@
+name: Sonda (temporanea)
+on:
+  push:
+    branches: [sonda]
+permissions:
+  contents: write
+concurrency: sonda
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 probe.py > out.json 2> err.txt || true
+      - run: |
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add out.json err.txt
+          git commit -m "risultati sonda"
+          git push
