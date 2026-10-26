@@ -10,6 +10,21 @@ Ogni giro:
 - calcola il calendario dei cooldown: quante sAERO escono dal cooldown ora per ora e da quali pool;
 - pubblica i dati sul ramo `data` e manda le notifiche sull'app **ntfy**.
 
+## Simulazione
+
+Ogni giro calcola l'allocazione migliore per una posizione di `tracker.size` sAERO (235.000 di default)
+con tre metodi e segue ogni consiglio per tutto il cooldown con le fee e gli incentivi che arrivano davvero,
+diluiti dall'allocazione reale degli altri:
+
+| Metodo | Come stima la resa delle prossime 47 ore |
+|---|---|
+| Ultime 48 ore | Fee delle ultime 48 ore più gli incentivi programmati |
+| Tendenza 12 ore | Metà peso alle ultime 48 ore, metà alle ultime 12 |
+| Prudente | Come il primo, ma prevede che gli altri allocatori arrivino sui pool che rendono molto più della media |
+
+Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown. I risultati sono in
+`tracker.json` sul ramo `data` e nella pagina. Per ora conta solo le ricompense su Base.
+
 ## Pagina
 
 `https://wkisai95.github.io/solid-eureka/`, servita da GitHub Pages dal ramo `data`
