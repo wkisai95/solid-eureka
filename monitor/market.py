@@ -103,18 +103,16 @@ def _velora(t_in, d_in, t_out, d_out, amount):
     for route in (res.get("priceRoute") or {}).get("bestRoute") or []:
         rp = float(route.get("percent") or 0) / 100
         swaps = route.get("swaps") or []
-        # every hop of a route carries the whole route share: count the route once, through all its pools
-        pools, dexes = [], set()
-        for sw in swaps:
+        # later hops carry the whole share of their route: count them once for every first-hop split
+        later, dexes = [], set()
+        for sw in swaps[1:]:
             for ex in sw.get("swapExchanges") or []:
-                pools += [a.lower() for a in (ex.get("poolAddresses") or [])]
+                later += [a.lower() for a in (ex.get("poolAddresses") or [])]
                 dexes.add(ex.get("exchange") or "?")
-        if swaps:
-            first = swaps[0].get("swapExchanges") or []
-            for ex in first:
-                share = rp * float(ex.get("percent") or 0) / 100
-                legs.append({"frac": share, "swaps": [[a.lower() for a in (ex.get("poolAddresses") or [])], pools],
-                             "dex": sorted(dexes)})
+        for ex in (swaps[0].get("swapExchanges") or []) if swaps else []:
+            share = rp * float(ex.get("percent") or 0) / 100
+            legs.append({"frac": share, "swaps": [[a.lower() for a in (ex.get("poolAddresses") or [])], later],
+                         "dex": sorted(dexes | {ex.get("exchange") or "?"})})
     _sample("velora", legs)
     return legs
 
