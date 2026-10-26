@@ -6,6 +6,7 @@ LEAF = "0x382409fad8503FbCdbB27A4211551fa03e884078"   # LeafVoter (same address 
 ROOT = "0x49d7d4f17Ec56Ef8fA04E464AF5D1A4942CC31e6"   # root Voter on Base
 BASE_CHAIN = 8453
 START_BLOCK = 52875727          # 2026-10-21 00:00 UTC, before the Aero launch
+DEPLOY_BLOCK = 52688157         # root Voter and LeafVoter deployed on Base (2026-10-16)
 BASE_GENESIS_TS = 1686789347    # Base has fixed 2-second blocks: ts = genesis + 2 * block
 ZERO = "0x0000000000000000000000000000000000000000"
 

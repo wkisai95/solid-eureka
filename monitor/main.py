@@ -22,8 +22,24 @@ from .rpc import Rpc
 ROOT = Path(__file__).resolve().parent.parent
 
 
+LOG_LINES = []
+RPC = {}
+
+
 def log(msg):
-    print(f"[{dt.datetime.now(dt.timezone.utc):%H:%M:%S}] {msg}", flush=True)
+    line = f"[{dt.datetime.now(dt.timezone.utc):%H:%M:%S}] {msg}"
+    LOG_LINES.append(line)
+    print(line, flush=True)
+
+
+def write_run_log(out):
+    try:
+        lines = LOG_LINES[-400:]
+        if RPC.get("rpc"):
+            lines.append("rpc: " + json.dumps(RPC["rpc"].summary()))
+        Path(out, "run.log").write_text("\n".join(lines) + "\n")
+    except Exception as e:
+        print("could not write run.log:", e)
 
 
 def load_json(path, default=None):
@@ -75,6 +91,7 @@ def run(args):
         state = A.new_state(now)
     status = {"started": now, "errors": [], "first_run": first_run}
     rpc = Rpc(cfg["rpc"]["base"], log=log)
+    RPC["rpc"] = rpc
 
     head = rpc.block_number() - 2
     params = C.read_params(rpc)
@@ -83,12 +100,14 @@ def run(args):
     if args.max_blocks and not state["last_block"]:
         state["last_block"] = head - args.max_blocks
 
-    events = A.fetch_events(rpc, state, head, log)
+    events = A.fetch_voter_events(rpc, state, head, log)
     A.apply_events(state, events, params["cooldown"])
     state["last_block"] = head
     A.refresh_metadata(rpc, state, log)
     A.refresh_tokens(rpc, state, cfg, log)
     A.refresh_metadata(rpc, state, log)   # gauges found while rebuilding positions
+    A.apply_events(state, A.fetch_reward_events(rpc, state, head, log), params["cooldown"])
+    A.refresh_metadata(rpc, state, log)   # symbols of reward tokens
     A.refresh_allocation_power(rpc, state, now, log)
 
     want = {params["aero"]} | {p[2] for p in state["fees_pending"]} | {p["tok"] for p in state["incentives"].values()}
@@ -110,7 +129,7 @@ def run(args):
             status["errors"].append(f"routing: {e}")
             log(f"routing failed: {e}")
 
-    status["rpc"] = {k: v for k, v in rpc.stats.items()}
+    status["rpc"] = rpc.summary()
     status["finished"] = int(time.time())
     report = R.build(state, params, prices, now, cfg, routing_errors, status)
     report["block"] = head
@@ -157,6 +176,7 @@ def run(args):
     if site.exists():
         shutil.copy(site, out / "index.html")
     (out / ".nojekyll").write_text("")
+    write_run_log(out)
     log(f"done: {len(report['pools'])} pools, {len(report['calendar'])} calendar rows, "
         f"{len(report['incentives_upcoming'])} upcoming incentives, latest.json "
         f"{(out / 'latest.json').stat().st_size / 1024:.0f} KB, state {(out / 'state.json.gz').stat().st_size / 1024:.0f} KB")
@@ -180,7 +200,10 @@ def main():
         latest["status"].update({"last_error": traceback.format_exc()[-1500:], "last_error_at": int(time.time()),
                                  "consecutive_failures": fails})
         out.mkdir(parents=True, exist_ok=True)
+        if RPC.get("rpc"):
+            latest["status"]["rpc"] = RPC["rpc"].summary()
         save_json(out / "latest.json", latest)
+        write_run_log(out)
         site = ROOT / "site" / "index.html"
         if site.exists():
             shutil.copy(site, out / "index.html")

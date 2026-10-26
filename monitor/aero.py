@@ -80,25 +80,59 @@ def apply_events(state, events, cooldown):
     state["dirty"] = sorted(dirty)
 
 
-def fetch_events(rpc, state, head, log):
-    """Pulls every relevant log since the last processed block."""
-    first_run = not state["last_block"]
-    start = state["last_block"] + 1 if not first_run else C.START_BLOCK
-    raw = []
+def _count(events, kind):
+    return sum(1 for e in events if e["kind"] == kind)
+
+
+def fetch_voter_events(rpc, state, head, log):
+    """Allocation, cooldown and gauge events of the root and leaf voters since the last processed block."""
+    start = state["last_block"] + 1 if state["last_block"] else C.DEPLOY_BLOCK
     t0 = time.time()
-    raw += list(rpc.get_logs(start, head, address=C.LEAF, topics=[C.LEAF_TOPICS]))
+    raw = list(rpc.get_logs(start, head, address=C.LEAF, topics=[C.LEAF_TOPICS]))
     raw += list(rpc.get_logs(start, head, address=C.ROOT, topics=[C.ROOT_TOPICS]))
-    fee_start = max(start, head - FEE_WINDOW // 2)
-    if first_run:
-        raw += list(rpc.get_logs(start, head, topics=[[C.T["incentive"]]]))
-        raw += list(rpc.get_logs(fee_start, head, topics=[[C.T["fees"]]]))
-    else:
-        raw += list(rpc.get_logs(start, head, topics=[C.REWARD_TOPICS]))
     events = [e for e in (C.decode_log(lg) for lg in raw) if e]
-    log(f"events: {len(raw)} logs from block {start} to {head} in {time.time() - t0:.1f}s "
-        f"({sum(1 for e in events if e['kind'] == 'leaf_alloc')} allocations, "
-        f"{sum(1 for e in events if e['kind'] == 'fees')} fee transfers, "
-        f"{sum(1 for e in events if e['kind'] == 'incentive')} incentive programs)")
+    log(f"voter events: {len(raw)} logs, blocks {start}-{head}, {time.time() - t0:.1f}s "
+        f"({_count(events, 'leaf_alloc')} allocations, {_count(events, 'gauge_registered')} new gauges)")
+    return events
+
+
+def fetch_reward_events(rpc, state, head, log, batch=80):
+    """Fee transfers and incentive programs, read only from the rewards managers of known Aero gauges."""
+    vrms = sorted(state["vrm_map"])
+    if not vrms:
+        return []
+    prev = state.get("vrm_block") or 0
+    first = not prev
+    t0 = time.time()
+    raw = []
+    for i in range(0, len(vrms), batch):
+        part = vrms[i:i + batch]
+        if first:
+            raw += list(rpc.get_logs(C.START_BLOCK, head, address=part, topics=[[C.T["incentive"]]]))
+            raw += list(rpc.get_logs(max(C.START_BLOCK, head - FEE_WINDOW // 2), head, address=part,
+                                     topics=[[C.T["fees"]]]))
+        else:
+            raw += list(rpc.get_logs(prev + 1, head, address=part, topics=[C.REWARD_TOPICS]))
+    # rewards managers discovered in this run start from their creation, which is after the previous block
+    known_before = set(state.get("vrm_scanned", []))
+    fresh = [v for v in vrms if v not in known_before]
+    if not first and fresh and len(fresh) < len(vrms):
+        start = max(C.START_BLOCK, head - FEE_WINDOW // 2)
+        for i in range(0, len(fresh), batch):
+            raw += list(rpc.get_logs(start, prev, address=fresh[i:i + batch], topics=[C.REWARD_TOPICS]))
+    state["vrm_scanned"] = vrms
+    state["vrm_block"] = head
+    seen, events = set(), []
+    for lg in raw:
+        key = (lg.get("transactionHash"), lg.get("logIndex"), lg["address"].lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        e = C.decode_log(lg)
+        if e:
+            events.append(e)
+    log(f"reward events: {len(raw)} logs from {len(vrms)} rewards managers, {time.time() - t0:.1f}s "
+        f"({_count(events, 'fees')} fee transfers, {_count(events, 'incentive')} incentive programs)")
     return events
 
 
