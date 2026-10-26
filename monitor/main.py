@@ -100,20 +100,10 @@ def routing_targets(state, cfg, chains_cfg):
 
 
 def tracker_settings(state, cfg, log):
-    """Size and reset of the simulation: a manual run can restart it, optionally with another size."""
+    """Size of the simulation. It starts once and then keeps collecting: nothing in a run resets it."""
     tr = state.get("tracker")
-    reset = os.environ.get("RESET_TRACKER", "").lower() == "true"
-    size_in = re.sub(r"[^\d.]", "", os.environ.get("TRACKER_SIZE", "") or "")
-    try:
-        size_in = float(size_in) if size_in else None
-    except ValueError:
-        size_in = None
-    if size_in is not None and not 1000 <= size_in <= 1e9:
-        log(f"tracker: size {size_in} ignored")
-        size_in = None
-    size = size_in or (tr or {}).get("size") or float(cfg.get("tracker", {}).get("size", 235_000))
-    restart = not tr or reset or (size_in is not None and size_in != tr.get("size"))
-    return size, restart
+    size = (tr or {}).get("size") or float(cfg.get("tracker", {}).get("size", 235_000))
+    return size, not tr
 
 
 def run(args):
@@ -245,7 +235,8 @@ def run(args):
     tracker_report = T.summary(tr, state, now, prices.get(aero_key), params["cooldown"], latest_reco)
     log(f"tracker: size {size:,.0f}, " + ", ".join(
         f"{x['id']} {x['usd_total']:.2f} USD in {x['hours']:.1f} h, now {x['now']['pred_47h']:.2f} USD/47h on "
-        f"{len(x['now']['pools'])} pools {x['now']['chains']}" for x in tracker_report["strategies"]))
+        f"{len(x['now']['pools'])} pools (" + " ".join(f"{c} {pc}%" for c, _, pc in x["now"]["chains"]) + ")"
+        for x in tracker_report["strategies"]))
 
     routing, routing_errors = {}, {}
     if not args.no_routing and now - state.get("last_routing", 0) >= 55 * 60:

@@ -23,14 +23,6 @@ on:
         description: "Invia una notifica di prova"
         type: boolean
         default: false
-      reset_tracker:
-        description: "Ricomincia la simulazione da zero"
-        type: boolean
-        default: false
-      tracker_size:
-        description: "sAERO della simulazione (vuoto = invariato)"
-        type: string
-        default: ""
       cycle:
         description: "Uso interno: giro automatico dopo la pausa dell'ambiente 'attesa'"
         type: boolean
@@ -82,8 +74,6 @@ jobs:
       - name: Run monitor
         env:
           TEST_NOTIFY: ${{ inputs.test_notify }}
-          RESET_TRACKER: ${{ inputs.reset_tracker }}
-          TRACKER_SIZE: ${{ inputs.tracker_size }}
           # automatic runs skip when another run collected less than 8 minutes ago; manual runs always collect
           MIN_INTERVAL_S: ${{ (github.event_name == 'schedule' || inputs.cycle) && '480' || '0' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}

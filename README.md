@@ -26,9 +26,9 @@ con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione reale 
 | Tendenza 12 ore | Metà peso alle ultime 48 ore, metà alle ultime 12 |
 | Prudente | Come il primo, ma prevede che gli altri allocatori arrivino sui pool che rendono molto più della media |
 
-Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown. I risultati sono in
-`tracker.json` sul ramo `data` e nella pagina. Dalla pagina, «Nuova raccolta» ricomincia da zero, anche con un'altra
-dimensione.
+Il consiglio di ogni metodo è in percentuale della posizione, pool per pool (con il tipo di pool) e per chain.
+Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown. I risultati sono in `tracker.json`
+sul ramo `data` e nella pagina. La raccolta non si azzera mai da sola né da un tasto.
 
 ## Pagina e app
 
@@ -83,7 +83,7 @@ Le soglie, le chain e i loro RPC pubblici si cambiano in `config.json`.
 ## Esecuzione manuale
 
 Dalla pagina con «Raccogli i dati adesso», oppure da **Actions → Monitor sAERO → Run workflow**
-(*Invia una notifica di prova* controlla ntfy, *Ricomincia la simulazione da zero* fa ripartire la simulazione).
+(*Invia una notifica di prova* controlla ntfy).
 
 In locale:
 

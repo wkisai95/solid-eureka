@@ -144,7 +144,14 @@ button:disabled { opacity: .55; cursor: default; filter: none; }
 .chainsplit { font-size: 12px; color: var(--ink-2); }
 input[type=password] { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
   border-radius: 10px; padding: 7px 10px; min-width: 0; flex: 1 1 220px; }
-#sim-size-in { width: 112px; flex: none; }
+.reco-h { font: 600 13px/1.3 var(--f-body); margin-top: 4px; }
+.reco { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.reco li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.reco .nm { min-width: 0; overflow-wrap: anywhere; }
+.reco .kd2 { color: var(--ink-2); font-size: 11px; margin-left: 5px; }
+.reco .pc { flex: none; font: 500 13px var(--f-num); font-variant-numeric: tabular-nums; }
+details.more summary { cursor: pointer; color: var(--accent); font-size: 13px; padding: 2px 0; }
+details.more[open] summary { margin-bottom: 3px; }
 @media (max-width: 520px) { h1 { font-size: 26px; } .stat .v { font-size: 18px; } }
 @media (prefers-reduced-motion: no-preference) { .sweep { transform-origin: 14px 14px; animation: sweep 6s linear infinite; } }
 @keyframes sweep { to { transform: rotate(360deg); } }
@@ -201,13 +208,7 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
 
   <section class="panel" id="sim">
     <div class="panel-head"><h2>Simulazione <span id="sim-size">235k</span> sAERO</h2><span class="sub" id="sim-since"></span></div>
-    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore tra i pool di tutte le chain di Aero con tre metodi e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown, come una vera.</p>
-    <div class="controls">
-      <label class="toggle" for="sim-size-in">Nuova raccolta con</label>
-      <input type="text" id="sim-size-in" inputmode="numeric" autocomplete="off" aria-label="sAERO della nuova simulazione">
-      <span class="sub">sAERO</span>
-      <button type="button" class="ghost" id="sim-restart">Nuova raccolta</button>
-    </div>
+    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore tra i pool di tutte le chain di Aero con tre metodi e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. Il consiglio è in percentuale della posizione. Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown, come una vera.</p>
     <div class="cards" id="sim-cards"></div>
     <div class="chartbox"><div class="chart" id="sim-chart"></div></div>
   </section>
@@ -616,9 +617,26 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
   const SCOL = ["var(--s1)", "var(--s2)", "var(--s3)"];
   const kSize = n => n >= 1000 ? fmtN(n) : String(n);
 
+  // percent of the position per pool; tracker.json written before percentages had only sAERO amounts
+  const recoRows = (now, size) => (now && now.reco) ||
+    ((now && now.pools) || []).map(p => ({ n: p[0], c: "", p: p[4] != null ? p[4] : Math.round(p[1] / size * 100) }));
+  const holdRows = (s, size) => s.hold ||
+    (s.holding || []).map(h => ({ n: h[0], c: "", p: h[2] != null ? h[2] : Math.round(h[1] / size * 100) }));
+  const pctOf = (r, size) => r[2] != null ? r[2] : Math.round(r[1] / size * 100);
+  function recoList(rows) {
+    const ol = el("ol", "reco");
+    for (const r of rows) {
+      const li = el("li"), nm = el("span", "nm", r.n);
+      if (r.k) nm.append(el("span", "kd2", r.k));
+      if (r.c && r.c !== "Base") nm.append(el("span", "tag", r.c));
+      li.append(nm, el("span", "pc", r.p + "%"));
+      ol.append(li);
+    }
+    return ol;
+  }
+
   function simCards(t) {
     $("sim-size").textContent = kSize(t.size);
-    if (!$("sim-size-in").value && document.activeElement !== $("sim-size-in")) $("sim-size-in").value = String(Math.round(t.size));
     $("sim-since").textContent = t.collected_h < 1 ? "raccolta appena iniziata" : `dati da ${inT(t.collected_h * 3600)}`;
     const box = $("sim-cards");
     box.replaceChildren();
@@ -637,10 +655,22 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
       add("Reale / previsto 7g", s.real_vs_pred != null ? (s.real_vs_pred * 100).toFixed(0) + "%" : "dopo 47 h");
       add("Prossimo spostamento", s.until ? (s.until * 1000 > Date.now() ? when(s.until) : "ora") : "—");
       c.append(kv);
-      const hold = (s.holding || []).slice(0, 5).map(([n, a]) => `${n} ${fmtN(a)}`).join(" · ");
-      c.append(el("div", "holding", hold ? "Ora su: " + hold : "Nessuna allocazione ancora."));
-      const split = (s.now && s.now.chains) || [];
-      if (split.length) c.append(el("div", "chainsplit", "Consiglio adesso per chain: " + split.map(([n, a]) => `${n} ${fmtN(a)}`).join(" · ")));
+      const reco = recoRows(s.now, t.size);
+      if (reco.length) {
+        c.append(el("div", "reco-h", "Consiglio adesso"));
+        const split = (s.now && s.now.chains) || [];
+        if (split.length) c.append(el("div", "chainsplit", "Per chain: " + split.map(r => `${r[0]} ${pctOf(r, t.size)}%`).join(" · ")));
+        c.append(recoList(reco.slice(0, 8)));
+        if (reco.length > 8) {
+          const more = el("details", "more");
+          more.append(el("summary", null, `Altri ${reco.length - 8} pool`), recoList(reco.slice(8)));
+          c.append(more);
+        }
+      } else {
+        c.append(el("div", "holding", "Nessun consiglio per ora: servono fee o incentivi da confrontare."));
+      }
+      const hold = holdRows(s, t.size).slice(0, 5).map(r => `${r.n}${r.c && r.c !== "Base" ? " (" + r.c + ")" : ""} ${r.p}%`).join(" · ");
+      c.append(el("div", "holding", hold ? "Posizione virtuale ora su: " + hold : "La posizione virtuale non è ancora allocata."));
       box.append(c);
     });
   }
@@ -791,7 +821,7 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
   }
 
   let running = false;
-  function busy(on) { running = on; $("run-now").disabled = on; $("sim-restart").disabled = on; }
+  function busy(on) { running = on; $("run-now").disabled = on; }
 
   async function startRun(inputs, label) {
     if (running) return;
@@ -887,21 +917,6 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
       ghToken = prev;
       $("gh-msg").textContent = "Non riesco a contattare GitHub: " + x.message + ".";
     }
-  });
-
-  let armed = 0;
-  $("sim-restart").addEventListener("click", () => {
-    const size = parseInt(($("sim-size-in").value || "").replace(/\D/g, ""), 10);
-    if (!size || size < 1000) { runState("Scrivi quante sAERO simulare (almeno 1000).", { bad: true }); return; }
-    if (Date.now() - armed > 6000) {
-      armed = Date.now();
-      $("sim-restart").textContent = `Confermi? Riparte da zero con ${fmtN(size)}`;
-      setTimeout(() => { if (Date.now() - armed >= 6000) $("sim-restart").textContent = "Nuova raccolta"; }, 6100);
-      return;
-    }
-    armed = 0;
-    $("sim-restart").textContent = "Nuova raccolta";
-    startRun({ reset_tracker: "true", tracker_size: String(size) }, `Avvio una nuova raccolta con ${fmtN(size)} sAERO…`);
   });
 
   ghLinkText();

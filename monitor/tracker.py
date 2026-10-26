@@ -234,13 +234,35 @@ def snapshot(tr, state, prices, now, cooldown, max_pools):
 
 # ---------------------------------------------------------------- public summary
 
-def _chain_split(alloc):
-    """sAERO per chain of an allocation, largest first."""
+def _pct(x, size):
+    """Share of the position in whole percent: allocations are built in 1% slices, so these add up to 100."""
+    return int(round(x / size * 100)) if size else 0
+
+
+def _chain_split(alloc, size):
+    """sAERO and percent per chain of an allocation, largest first."""
     out = {}
     for k, x in alloc.items():
         name = C.chain_short(A.chain_of(k))
         out[name] = out.get(name, 0) + (x[0] if isinstance(x, list) else x)
-    return [[n, round(v)] for n, v in sorted(out.items(), key=lambda kv: -kv[1])]
+    return [[n, round(v), _pct(v, size)] for n, v in sorted(out.items(), key=lambda kv: -kv[1])]
+
+
+def _pool_list(state, alloc, size, cands=None):
+    """Every pool of an allocation with its share in percent, largest first: what to type in the allocation form."""
+    rows = []
+    for k, x in alloc.items():
+        x = x[0] if isinstance(x, list) else x
+        row = {"n": A.gauge_name(state, k), "c": C.chain_short(A.chain_of(k)), "p": _pct(x, size), "x": round(x)}
+        m = state["gauges"].get(k) or {}
+        if m.get("kind") and m["kind"] != "?":
+            row["k"] = m["kind"]
+        if cands and k in cands:
+            r, a = cands[k]
+            row["usd"] = round(r * x / (a + x), 2)
+        rows.append(row)
+    rows.sort(key=lambda r: (-r["p"], -r["x"], r["n"]))
+    return rows
 
 
 def _sum_hist(tr, k, start, now):
@@ -290,18 +312,20 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
             "usd_day": round(day_rate, 2) if day_rate is not None else None,
             "apr": apr(day_rate, size) if day_rate is not None else None,
             "moves": v.get("moves", 0), "until": v.get("until"),
-            "holding": [[A.pool_label(state, k), round(x)] for k, x in
+            "holding": [[A.pool_label(state, k), round(x), _pct(x, size)] for k, x in
                         sorted((v.get("alloc") or {}).items(), key=lambda kv: -kv[1])[:20]],
-            "chains": _chain_split(v.get("alloc") or {}),
+            "hold": _pool_list(state, v.get("alloc") or {}, size),
+            "chains": _chain_split(v.get("alloc") or {}, size),
             "curve": [[h, round(c, 2)] for h, c in curve][-24 * 30:],
             "closed_7d": len(closed),
             "real_vs_pred": round(statistics.median(ratio), 3) if ratio else None,
             "avg_real_47h": round(statistics.mean(c[2] for c in closed), 2) if closed else None,
             "now": {"pred_47h": round(reco.get("pred", 0.0), 2),
                     "apr": apr(reco.get("pred", 0.0) / (cooldown / DAY), size),
-                    "chains": _chain_split(dict(alloc)),
+                    "chains": _chain_split(dict(alloc), size),
+                    "reco": _pool_list(state, dict(alloc), size, cands),
                     "pools": [[A.pool_label(state, k), round(x),
-                               round(cands[k][0] * x / (cands[k][1] + x), 2), round(cands[k][1])]
+                               round(cands[k][0] * x / (cands[k][1] + x), 2), round(cands[k][1]), _pct(x, size)]
                               for k, x in alloc if k in cands]},
         })
 
