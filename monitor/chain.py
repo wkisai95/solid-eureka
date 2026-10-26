@@ -4,6 +4,7 @@ from eth_hash.auto import keccak
 
 LEAF = "0x382409fad8503FbCdbB27A4211551fa03e884078"   # LeafVoter (same address on every Aero chain)
 ROOT = "0x49d7d4f17Ec56Ef8fA04E464AF5D1A4942CC31e6"   # root Voter on Base
+FACTORY_REGISTRY = "0x7b2A2c12dC5Ea2a31455952a05031C3E4BB28F3E"   # leaf factory registry on Base
 BASE_CHAIN = 8453
 START_BLOCK = 52875727          # 2026-10-21 00:00 UTC, before the Aero launch
 DEPLOY_BLOCK = 52688157         # root Voter and LeafVoter deployed on Base (2026-10-16)
@@ -119,6 +120,11 @@ def decode_log(lg):
 S = {k: sel(v) for k, v in {
     "allocationCooldown": "allocationCooldown()",
     "maxReduction": "maxAccumulatedCooldownReduction()",
+    "maxGauges": "maxGauges()",
+    "incentiveCount": "incentiveCount()",
+    "incentive": "incentive(uint256)",
+    "isActivated": "isActivated(address)",
+    "emissionCap": "emissionCap(address)",
     "tokenStates": "tokenStates(uint256)",
     "reduction": "accumulatedCooldownReduction(uint256)",
     "allocatedGauges": "allocatedGauges(uint256)",
@@ -164,15 +170,17 @@ def _dec_symbol(ok, data):
 
 def read_params(rpc):
     res = rpc.multicall([(LEAF, S["allocationCooldown"]), (LEAF, S["maxReduction"]),
-                         (ROOT, S["TOKEN"]), (ROOT, S["chains"])])
+                         (ROOT, S["TOKEN"]), (ROOT, S["chains"]), (LEAF, S["maxGauges"])])
     cooldown = _dec(["uint48"], *res[0])
     max_red = _dec(["uint48"], *res[1])
     token = _dec_addr(*res[2])
     chains = _dec(["uint256[]"], *res[3])
+    max_gauges = _dec(["uint256"], *res[4])
     return {"cooldown": int(cooldown) if cooldown else 47 * 3600,
             "max_reduction": int(max_red) if max_red is not None else 0,
             "aero": token or "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
-            "chains": [int(c) for c in chains] if chains else []}
+            "chains": [int(c) for c in chains] if chains else [],
+            "max_gauges": int(max_gauges) if max_gauges else 20}
 
 
 def read_token_states(rpc, token_ids):

@@ -49,7 +49,7 @@ def host(url):
 
 
 class Rpc:
-    def __init__(self, urls, name="base", log=print, timeout=25):
+    def __init__(self, urls, name="base", log=print, timeout=20):
         self.urls = list(urls)
         self.name = name
         self.log = log
@@ -57,13 +57,23 @@ class Rpc:
         self.cooldown = {}
         self.no_logs = {}          # endpoint -> reason it cannot serve eth_getLogs
         self.stats = collections.Counter()
+        self.streak = collections.Counter()   # consecutive failures per (method, endpoint)
+        self.dead = set()                      # (method, endpoint) pairs given up for this run
 
     def _order(self, method):
         now = time.time()
-        urls = [u for u in self.urls if not (method == "eth_getLogs" and u in self.no_logs)]
+        urls = [u for u in self.urls if not (method == "eth_getLogs" and u in self.no_logs)
+                and (method, u) not in self.dead]
         good = [u for u in urls if self.cooldown.get(u, 0) <= now] or urls
         # endpoints that already served this method come first
         return sorted(good, key=lambda u: -self.stats[f"ok:{method}:{host(u)}"])
+
+    def _fail(self, method, url, cool):
+        """A hard failure (not a range limit): cool the endpoint down and give up on it after a streak."""
+        self.streak[(method, url)] += 1
+        if self.streak[(method, url)] >= 5:
+            self.dead.add((method, url))
+        self.cooldown[url] = time.time() + cool
 
     def call(self, method, params):
         errors, range_errors = [], 0
@@ -78,14 +88,16 @@ class Rpc:
                 if method == "eth_getLogs" and e.code in (400, 413):
                     range_errors += 1
                 else:
-                    self.cooldown[url] = time.time() + 90
+                    self._fail(method, url, 90)
                 continue
             except Exception as e:  # network error, timeout, TLS
                 errors.append(f"{h}: {type(e).__name__} {e}"[:160])
                 self.stats[f"err:{method}:{h}"] += 1
-                self.cooldown[url] = time.time() + 90
                 if method == "eth_getLogs" and "timed out" in str(e).lower():
                     range_errors += 1
+                    self.cooldown[url] = time.time() + 30
+                else:
+                    self._fail(method, url, 90)
                 continue
             if isinstance(res, dict) and "error" in res:
                 msg = json.dumps(res["error"])[:300]
@@ -100,12 +112,14 @@ class Rpc:
                     if any(k in low for k in RANGE_HINTS):
                         range_errors += 1
                         continue
-                self.cooldown[url] = time.time() + 60
+                self._fail(method, url, 60)
                 continue
             if not isinstance(res, dict) or "result" not in res:
                 errors.append(f"{h}: unexpected response")
+                self._fail(method, url, 60)
                 continue
             self.stats[f"ok:{method}:{h}"] += 1
+            self.streak[(method, url)] = 0
             return res["result"]
         if range_errors:
             raise RangeTooLarge("; ".join(errors[-4:]))
@@ -177,4 +191,5 @@ class Rpc:
             kind, method, h = k.split(":", 2)
             by_host[h][f"{kind}:{method}"] += v
         return {"endpoints": {h: dict(c) for h, c in by_host.items()},
-                "no_logs": {host(u): r for u, r in self.no_logs.items()}}
+                "no_logs": {host(u): r for u, r in self.no_logs.items()},
+                "gave_up": sorted(f"{m}:{host(u)}" for m, u in self.dead)}

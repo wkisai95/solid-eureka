@@ -17,6 +17,7 @@ from . import alerts as N
 from . import chain as C
 from . import market as M
 from . import report as R
+from . import tracker as T
 from .rpc import Rpc
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -107,6 +108,7 @@ def run(args):
     A.refresh_tokens(rpc, state, cfg, log)
     A.refresh_metadata(rpc, state, log)   # gauges found while rebuilding positions
     A.apply_events(state, A.fetch_reward_events(rpc, state, head, log), params["cooldown"])
+    new_programs = A.refresh_incentives(rpc, state, now, log)
     A.refresh_metadata(rpc, state, log)   # symbols of reward tokens
     A.refresh_allocation_power(rpc, state, now, log)
 
@@ -115,7 +117,22 @@ def run(args):
     for k, pool, t0, t1 in routing_targets(state, cfg):
         want |= {t0, t1}
     prices = M.fetch_prices(want, state["prices"], now, log)
-    new_inc = A.settle_rewards(state, prices, now, log)
+    new_inc, fresh_fees = A.settle_rewards(state, prices, now, log)
+    new_inc = list(dict.fromkeys(new_inc + new_programs))
+    A.refresh_eligibility(rpc, state, now, log)
+
+    # paper allocation of a fixed size, followed through every cooldown
+    tcfg = cfg.get("tracker", {})
+    size = float(tcfg.get("size", 235_000))
+    tr = state.get("tracker")
+    if not tr or tr.get("size") != size:
+        tr = state["tracker"] = T.new_tracker(size, now)
+    T.accrue(tr, state, prices, fresh_fees, now, params["cooldown"])
+    latest_reco = T.snapshot(tr, state, prices, now, params["cooldown"], params["max_gauges"])
+    tracker_report = T.summary(tr, state, now, prices.get(params["aero"]), params["cooldown"], latest_reco)
+    log(f"tracker: size {size:,.0f}, " + ", ".join(
+        f"{x['id']} {x['usd_total']:.2f} USD in {x['hours']:.1f} h, now {x['now']['pred_47h']:.2f} USD/47h on "
+        f"{len(x['now']['pools'])} pools" for x in tracker_report["strategies"]))
 
     routing, routing_errors = {}, {}
     if not args.no_routing and now - state.get("last_routing", 0) >= 55 * 60:
@@ -171,6 +188,7 @@ def run(args):
     public_report["personal_alerts"] = bool(cfg["my_positions"]) and bool(N.topic_of(cfg))
     save_json(out / "latest.json", public_report)
     save_json(out / "positions.json", R.positions_export(state, params, now))
+    save_json(out / "tracker.json", tracker_report)
     save_json(out / "state.json.gz", state, gz=True)
     site = ROOT / "site" / "index.html"
     if site.exists():

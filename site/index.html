@@ -23,6 +23,9 @@
   --warn: #a8640c;
   --bad: #b3302a;
   --chip: #e6ece8;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
   --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --f-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -32,13 +35,13 @@
   :root:not([data-theme="light"]) {
     --bg: #0d1517; --panel: #142023; --ink: #e4ecea; --ink-2: #9db0ad; --line: #26383b;
     --accent: #3cc2b4; --accent-soft: #163c3a; --passive: #3b4f51; --good: #58c27a; --warn: #e3a34a;
-    --bad: #ef6f66; --chip: #1b2c2f; color-scheme: dark;
+    --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0d1517; --panel: #142023; --ink: #e4ecea; --ink-2: #9db0ad; --line: #26383b;
   --accent: #3cc2b4; --accent-soft: #163c3a; --passive: #3b4f51; --good: #58c27a; --warn: #e3a34a;
-  --bad: #ef6f66; --chip: #1b2c2f; color-scheme: dark;
+  --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -63,6 +66,19 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
 .banner { border: 1px solid var(--warn); color: var(--warn); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
 .grid2 { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.card h3 { margin: 0; font: 600 15px/1.3 var(--f-body); display: flex; align-items: center; gap: 8px; }
+.card h3 i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.card .big { font: 500 24px/1.15 var(--f-num); }
+.card .big small { font: 400 13px var(--f-body); color: var(--ink-2); margin-left: 4px; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13px; }
+.kv span:nth-child(odd) { color: var(--ink-2); }
+.kv span:nth-child(even) { font-family: var(--f-num); text-align: right; }
+.holding { font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgb(0 0 0 / .12); white-space: nowrap; }
+.chartbox { position: relative; }
 .pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .pill.free { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
 .pill.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
@@ -137,6 +153,30 @@ footer a { color: var(--accent); }
       <button type="submit">Mostra</button>
     </form>
     <div class="list" id="mine"></div>
+  </section>
+
+  <section class="panel" id="sim">
+    <div class="panel-head"><h2>Simulazione <span id="sim-size">235k</span> sAERO</h2><span class="sub" id="sim-since"></span></div>
+    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore con tre metodi e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown, come una vera.</p>
+    <div class="cards" id="sim-cards"></div>
+    <div class="chartbox"><div class="chart" id="sim-chart"></div></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Pool che rendono di più nel tempo</h2><span class="sub" id="yield-count"></span></div>
+    <p class="note">Quanto avrebbero reso 1000 sAERO in più su ogni pool, in dollari al giorno, e quanto hanno reso davvero le allocazioni consigliate lì rispetto alla previsione.</p>
+    <div class="controls"><label class="toggle"><input type="checkbox" id="yield-big" checked> Solo pool con almeno 10k sAERO allocati</label></div>
+    <div class="tbl">
+      <table>
+        <thead><tr>
+          <th data-y="name">Pool</th><th data-y="ap">Allocazione</th><th data-y="m1000_24h">$/g 24h</th><th data-y="m1000_7d">$/g 7g</th>
+          <th data-y="m1000_30d">$/g 30g</th><th data-y="apr_7d">APR 7g</th><th data-y="reco_n_7d">Consigliato</th>
+          <th data-y="reco_real_1000_day">Reso se consigliato</th><th data-y="reco_real_vs_pred">Reale / previsto</th>
+        </tr></thead>
+        <tbody id="yield-rows"></tbody>
+      </table>
+    </div>
+    <p class="note" id="yield-foot"></p>
   </section>
 
   <section class="panel">
@@ -472,6 +512,145 @@ footer a { color: var(--accent); }
     for (const a of rows) box.append(row(a.title, when(a.ts), a.body));
   }
 
+
+  // ---------------------------------------------------------------- simulation
+  let SIM = null, ySort = "m1000_7d", yDir = -1;
+  const SCOL = ["var(--s1)", "var(--s2)", "var(--s3)"];
+  const kSize = n => n >= 1000 ? fmtN(n) : String(n);
+
+  function simCards(t) {
+    $("sim-size").textContent = kSize(t.size);
+    $("sim-since").textContent = t.collected_h < 1 ? "raccolta appena iniziata" : `dati da ${inT(t.collected_h * 3600)}`;
+    const box = $("sim-cards");
+    box.replaceChildren();
+    t.strategies.forEach((s, i) => {
+      const c = el("div", "card");
+      const h = el("h3"); const sw = el("i"); sw.style.background = SCOL[i]; h.append(sw, s.label); c.append(h);
+      const big = el("div", "big", s.usd_day != null ? fmtUsd(s.usd_day) : "—");
+      big.append(el("small", null, s.usd_day != null ? "al giorno, reale" : "in raccolta"));
+      c.append(big);
+      const kv = el("div", "kv");
+      const add = (k, v) => kv.append(el("span", null, k), el("span", null, v));
+      add("APR reale", s.apr != null ? fmtPct(s.apr) : "—");
+      add("Ultime 24 ore", s.usd_24h != null ? fmtUsd(s.usd_24h) : "—");
+      add("Totale", `${fmtUsd(s.usd_total)} in ${Math.round(s.hours)} h`);
+      add("Previsione adesso", s.now.apr != null ? "APR " + fmtPct(s.now.apr) : "—");
+      add("Reale / previsto 7g", s.real_vs_pred != null ? (s.real_vs_pred * 100).toFixed(0) + "%" : "dopo 47 h");
+      add("Prossimo spostamento", s.until ? (s.until * 1000 > Date.now() ? when(s.until) : "ora") : "—");
+      c.append(kv);
+      const hold = (s.holding || []).slice(0, 5).map(([n, a]) => `${n} ${fmtN(a)}`).join(" · ");
+      c.append(el("div", "holding", hold ? "Ora su: " + hold : "Nessuna allocazione ancora."));
+      box.append(c);
+    });
+  }
+
+  function simChart(t) {
+    const host = $("sim-chart");
+    const series = t.strategies.map(s => (s.curve || []).map(([h, c]) => [h, c]));
+    const pts = series.flat();
+    if (pts.length < 4) { host.replaceChildren(el("div", "empty", "Il grafico compare dopo qualche ora di raccolta.")); return; }
+    const w = Math.max(520, Math.round(host.clientWidth || 720)), h = 200, padL = 52, padR = 70, padB = 26, padT = 10;
+    const x0 = Math.min(...pts.map(p => p[0])), x1 = Math.max(...pts.map(p => p[0]));
+    const ymax = Math.max(1, ...pts.map(p => p[1]));
+    const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(ymax))); const m = ymax / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+    const X = v => padL + (x1 === x0 ? 0 : (v - x0) / (x1 - x0)) * (w - padL - padR);
+    const Y = v => h - padB - (v / nice) * (h - padB - padT);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Dollari guadagnati dalle posizioni virtuali nel tempo");
+    const add = (name, attrs, text) => { const e = document.createElementNS(ns, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
+    for (let i = 0; i <= 4; i++) {
+      const v = nice * i / 4, yy = Y(v);
+      add("line", { x1: padL, x2: w - padR, y1: yy, y2: yy, stroke: "var(--line)", "stroke-width": 1 });
+      add("text", { x: padL - 6, y: yy + 4, "text-anchor": "end", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, fmtUsd(v));
+    }
+    const ticks = 4;
+    for (let i = 0; i <= ticks; i++) {
+      const v = x0 + (x1 - x0) * i / ticks;
+      add("text", { x: X(v), y: h - 8, "text-anchor": i === 0 ? "start" : i === ticks ? "end" : "middle", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, when(v));
+    }
+    const ends = [];
+    series.forEach((ser, i) => {
+      if (ser.length < 2) return;
+      add("path", { d: ser.map((p, j) => `${j ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(""), fill: "none", stroke: SCOL[i], "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" });
+      const last = ser[ser.length - 1];
+      add("circle", { cx: X(last[0]), cy: Y(last[1]), r: 4, fill: SCOL[i], stroke: "var(--panel)", "stroke-width": 2 });
+      ends.push({ y: Y(last[1]), label: t.strategies[i].label.split(" ")[0] + " " + fmtUsd(last[1]), x: X(last[0]) });
+    });
+    ends.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+    ends.forEach(e => add("text", { x: e.x + 8, y: e.y + 4, "font-size": 11, fill: "var(--ink)", "font-family": "var(--f-body)" }, e.label));
+    const cross = add("line", { x1: 0, x2: 0, y1: padT, y2: h - padB, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 });
+    const tip = el("div", "tip"); tip.hidden = true;
+    const hit = add("rect", { x: padL, y: padT, width: w - padL - padR, height: h - padB - padT, fill: "transparent" });
+    hit.addEventListener("pointermove", ev => {
+      const r = svg.getBoundingClientRect();
+      const vx = x0 + ((ev.clientX - r.left) * (w / r.width) - padL) / (w - padL - padR) * (x1 - x0);
+      const vals = series.map(ser => { let best = null; for (const p of ser) if (p[0] <= vx + 1800) best = p; return best; });
+      const tx = vals.find(v => v) ? vals.find(v => v)[0] : vx;
+      cross.setAttribute("x1", X(tx)); cross.setAttribute("x2", X(tx)); cross.setAttribute("opacity", 1);
+      tip.replaceChildren(el("div", null, when(tx)));
+      t.strategies.forEach((s, i) => { if (vals[i]) { const line = el("div"); const sw = el("span"); sw.textContent = "■ "; sw.style.color = SCOL[i]; line.append(sw, `${s.label}: ${fmtUsd(vals[i][1])}`); tip.append(line); } });
+      tip.hidden = false;
+      const left = (X(tx) / w) * r.width;
+      tip.style.left = Math.min(left + 12, r.width - 170) + "px"; tip.style.top = "8px";
+    });
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hidden = true; });
+    host.replaceChildren(svg);
+    host.parentElement.querySelectorAll(".tip").forEach(n => n.remove());
+    host.parentElement.append(tip);
+  }
+
+  function yieldTable(t) {
+    const big = $("yield-big").checked;
+    let rows = (t.pools || []).filter(p => !big || p.ap >= 10000);
+    const val = p => ySort === "name" ? p.name.toLowerCase() : p[ySort];
+    rows.sort((a, b) => { const va = val(a), vb = val(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; return (va > vb ? 1 : va < vb ? -1 : 0) * yDir; });
+    $("yield-count").textContent = `${rows.length} pool`;
+    document.querySelectorAll("th[data-y]").forEach(th => { if (th.dataset.y === ySort) th.setAttribute("aria-sort", yDir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort"); });
+    const tb = $("yield-rows");
+    tb.replaceChildren();
+    const usd4 = v => v == null ? "—" : "$" + (v >= 10 ? v.toFixed(1) : v.toFixed(2)).replace(".", ",");
+    for (const p of rows.slice(0, 120)) {
+      const tr = document.createElement("tr");
+      const c0 = document.createElement("td"); c0.append(el("span", "nm", p.name)); if (p.ap < 10000) c0.append(el("span", "kd", "quasi vuoto")); tr.append(c0);
+      tr.append(el("td", "num", fmtN(p.ap)));
+      for (const k of ["m1000_24h", "m1000_7d", "m1000_30d"]) tr.append(el("td", "num", usd4(p[k])));
+      tr.append(el("td", "num", fmtPct(p.apr_7d)));
+      tr.append(el("td", "num", p.reco_n_7d ? `${p.reco_n_7d} volte` : p.reco_open ? `in corso (${p.reco_open})` : "—"));
+      tr.append(el("td", "num", usd4(p.reco_real_1000_day)));
+      const r = p.reco_real_vs_pred;
+      tr.append(el("td", "num " + (r == null ? "muted" : r >= 0.9 ? "up" : r < 0.6 ? "down" : ""), r == null ? "—" : Math.round(r * 100) + "%"));
+      tb.append(tr);
+    }
+    if (!rows.length) { const tr = document.createElement("tr"); const td = el("td", "muted", "Dati in raccolta."); td.colSpan = 9; tr.append(td); tb.append(tr); }
+    const days = t.collected_h / 24;
+    $("yield-foot").textContent = (days < 30 ? `Le colonne 7g e 30g coprono ${days < 1 ? Math.round(t.collected_h) + " ore" : days.toFixed(1).replace(".", ",") + " giorni"}: la raccolta è iniziata ${when(t.start)}. ` : "") +
+      "«Reso se consigliato» è in dollari al giorno per 1000 sAERO, sulle allocazioni chiuse negli ultimi 7 giorni.";
+  }
+
+  function simRender() { if (SIM) { simCards(SIM); simChart(SIM); yieldTable(SIM); } }
+
+  async function loadSim() {
+    try {
+      const r = await fetch("tracker.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      SIM = await r.json();
+      simRender();
+    } catch (e) {
+      empty($("sim-cards"), "La simulazione parte con il prossimo aggiornamento.");
+    }
+  }
+
+  $("yield-big").addEventListener("change", () => SIM && yieldTable(SIM));
+  document.querySelectorAll("th[data-y]").forEach(th => th.addEventListener("click", () => {
+    const k = th.dataset.y;
+    if (ySort === k) yDir = -yDir; else { ySort = k; yDir = k === "name" ? 1 : -1; }
+    SIM && yieldTable(SIM);
+  }));
+
   function render() {
     if (!DATA) return;
     header(DATA); mine(); waves(DATA); calendar(DATA); incentives(DATA); pools(DATA); chains(DATA); alertsList(DATA);
@@ -484,6 +663,7 @@ footer a { color: var(--accent); }
       DATA = await r.json();
       if (POS && POS.generated < DATA.generated) { POS = null; posLoading = null; }
       render();
+      loadSim();
     } catch (e) {
       $("updated").textContent = "Non riesco a leggere i dati: " + e.message + ". Riprovo tra un minuto.";
       setTimeout(load, 60000);
@@ -504,7 +684,7 @@ footer a { color: var(--accent); }
   load();
   setInterval(load, 5 * 60 * 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
-  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => DATA && waves(DATA), 200); });
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { DATA && waves(DATA); SIM && simChart(SIM); }, 200); });
 })();
 </script>
 </body>

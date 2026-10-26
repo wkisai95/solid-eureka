@@ -36,5 +36,8 @@
       "https://base.meowrpc.com"
     ]
   },
-  "page_url": "https://wkisai95.github.io/solid-eureka/"
+  "page_url": "https://wkisai95.github.io/solid-eureka/",
+  "tracker": {
+    "size": 235000
+  }
 }

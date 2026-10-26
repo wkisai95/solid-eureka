@@ -1,5 +1,6 @@
 """Aero allocation state: replays voter events, keeps positions, gauges, fees and incentive programs."""
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from eth_abi import decode, encode
 
@@ -96,30 +97,27 @@ def fetch_voter_events(rpc, state, head, log):
     return events
 
 
-def fetch_reward_events(rpc, state, head, log, batch=80):
-    """Fee transfers and incentive programs, read only from the rewards managers of known Aero gauges."""
+def fetch_reward_events(rpc, state, head, log, batch=250, workers=4):
+    """Fee transfers, read only from the rewards managers of known Aero gauges."""
     vrms = sorted(state["vrm_map"])
     if not vrms:
         return []
     prev = state.get("vrm_block") or 0
-    first = not prev
-    t0 = time.time()
-    raw = []
-    for i in range(0, len(vrms), batch):
-        part = vrms[i:i + batch]
-        if first:
-            raw += list(rpc.get_logs(C.START_BLOCK, head, address=part, topics=[[C.T["incentive"]]]))
-            raw += list(rpc.get_logs(max(C.START_BLOCK, head - FEE_WINDOW // 2), head, address=part,
-                                     topics=[[C.T["fees"]]]))
-        else:
-            raw += list(rpc.get_logs(prev + 1, head, address=part, topics=[C.REWARD_TOPICS]))
-    # rewards managers discovered in this run start from their creation, which is after the previous block
     known_before = set(state.get("vrm_scanned", []))
-    fresh = [v for v in vrms if v not in known_before]
-    if not first and fresh and len(fresh) < len(vrms):
-        start = max(C.START_BLOCK, head - FEE_WINDOW // 2)
-        for i in range(0, len(fresh), batch):
-            raw += list(rpc.get_logs(start, prev, address=fresh[i:i + batch], topics=[C.REWARD_TOPICS]))
+    backfill_from = max(C.START_BLOCK, head - (49 * HOUR) // 2)
+    jobs = []
+    if not prev:
+        jobs += [(backfill_from, head, vrms[i:i + batch]) for i in range(0, len(vrms), batch)]
+    else:
+        jobs += [(prev + 1, head, vrms[i:i + batch]) for i in range(0, len(vrms), batch)]
+        fresh = [v for v in vrms if v not in known_before]
+        # rewards managers found in this run: read their recent history too
+        jobs += [(backfill_from, prev, fresh[i:i + batch]) for i in range(0, len(fresh), batch) if backfill_from <= prev]
+    t0 = time.time()
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        parts = list(ex.map(lambda j: list(rpc.get_logs(j[0], j[1], address=j[2], topics=[[C.T["fees"]]],
+                                                        chunk=10000)), jobs))
+    raw = [lg for p in parts for lg in p]
     state["vrm_scanned"] = vrms
     state["vrm_block"] = head
     seen, events = set(), []
@@ -131,9 +129,40 @@ def fetch_reward_events(rpc, state, head, log, batch=80):
         e = C.decode_log(lg)
         if e:
             events.append(e)
-    log(f"reward events: {len(raw)} logs from {len(vrms)} rewards managers, {time.time() - t0:.1f}s "
-        f"({_count(events, 'fees')} fee transfers, {_count(events, 'incentive')} incentive programs)")
+    log(f"fee events: {len(raw)} logs from {len(vrms)} rewards managers in {len(jobs)} queries, "
+        f"{time.time() - t0:.1f}s")
     return events
+
+
+def refresh_incentives(rpc, state, now, log):
+    """Incentive programs read straight from each rewards manager; returns the ids found in this run."""
+    vrms = sorted(state["vrm_map"])
+    counts = state.setdefault("inc_count", {})
+    res = rpc.multicall([(v, C.S["incentiveCount"]) for v in vrms]) if vrms else []
+    todo = []
+    for v, r in zip(vrms, res):
+        n = C._dec(["uint256"], *r)
+        if n is None:
+            continue
+        for pid in range(int(counts.get(v, 0)) + 1, int(n) + 1):
+            todo.append((v, pid))
+        counts[v] = int(n)
+    out = rpc.multicall([(v, C.S["incentive"] + encode(["uint256"], [pid])) for v, pid in todo]) if todo else []
+    new = []
+    for (v, pid), r in zip(todo, out):
+        p = C._dec(["(address,uint256,uint256,uint48,uint48,address)"], *r)
+        if not p:
+            continue
+        tok, amount, _rate, start, end, creator = p
+        if int(end) <= now - FEE_WINDOW:
+            continue
+        key = f"{v}:{pid}"
+        state["incentives"][key] = {"g": state["vrm_map"][v], "tok": tok.lower(), "amt": str(amount),
+                                    "start": int(start), "end": int(end), "created": now,
+                                    "creator": creator.lower()}
+        new.append(key)
+    log(f"incentives: {len(todo)} new programs read, {len(new)} still running or recent")
+    return new
 
 
 # ---------------------------------------------------------------- metadata
@@ -270,7 +299,7 @@ def refresh_tokens(rpc, state, cfg, log):
 def settle_rewards(state, prices, now, log):
     """Validates fee transfers and incentive programs against the gauge's rewards manager, then prices them."""
     vrm_map = state["vrm_map"]
-    keep, priced, rejected = [], 0, 0
+    keep, priced, rejected, fresh = [], 0, 0, []
     for ts, gauge, tok, amount, emitter in state["fees_pending"]:
         if ts < now - FEE_WINDOW:
             continue
@@ -288,6 +317,7 @@ def settle_rewards(state, prices, now, log):
             keep.append([ts, gauge, tok, amount, emitter])
             continue
         usd = int(amount) / 10 ** dec * p
+        fresh.append((ts, key, usd))
         hour = str(ts - ts % HOUR)
         bucket = state["fees"].setdefault(key, {})
         bucket[hour] = round(bucket.get(hour, 0) + usd, 4)
@@ -313,7 +343,7 @@ def settle_rewards(state, prices, now, log):
     state["incentives"] = {k: v for k, v in state["incentives"].items() if v["end"] > now - FEE_WINDOW}
     log(f"rewards: priced {priced} fee transfers, {len(state['fees_pending'])} waiting for a price, "
         f"rejected {rejected}; {len(state['incentives'])} incentive programs tracked")
-    return new_inc
+    return new_inc, fresh
 
 
 def incentive_usd(state, prices, key, start, end):
@@ -335,3 +365,26 @@ def incentive_usd(state, prices, key, start, end):
 
 def fees_usd(state, key, start, end):
     return sum(v for h, v in (state["fees"].get(key) or {}).items() if start <= int(h) < end)
+
+
+def refresh_eligibility(rpc, state, now, log, every=6 * HOUR):
+    """Marks gauges an ordinary position can vote: activated on the leaf and with a non-zero emission cap."""
+    if now - state.get("eligibility_at", 0) < every:
+        return
+    keys = [k for k, m in state["gauges"].items() if k.startswith("8453:") and m.get("vrm")]
+    calls = []
+    for k in keys:
+        g = k.split(":", 1)[1]
+        calls.append((C.LEAF, C.S["isActivated"] + encode(["address"], [g])))
+        calls.append((C.FACTORY_REGISTRY, C.S["emissionCap"] + encode(["address"], [g])))
+    res = rpc.multicall(calls) if calls else []
+    blocked = 0
+    for i, k in enumerate(keys):
+        act = C._dec(["bool"], *res[2 * i])
+        cap = C._dec(["uint128"], *res[2 * i + 1])
+        if act is None or cap is None:
+            continue
+        state["gauges"][k]["ok"] = bool(act) and cap > 0
+        blocked += 0 if state["gauges"][k]["ok"] else 1
+    state["eligibility_at"] = now
+    log(f"eligibility: {len(keys)} gauges checked, {blocked} not votable by ordinary positions")
