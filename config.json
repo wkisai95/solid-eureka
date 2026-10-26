@@ -1,0 +1,37 @@
+{
+  "ntfy_topic": "",
+  "ntfy_server": "https://ntfy.sh",
+  "timezone": "Europe/Rome",
+  "digest_hour": 8,
+  "my_positions": [],
+  "thresholds": {
+    "calendar_min_saero": 250000,
+    "wave_window_h": 3,
+    "wave_min_saero": 3000000,
+    "incentive_min_usd": 500,
+    "routing_change_pts": 20,
+    "flow_min_pct": 25,
+    "flow_min_saero": 1000000,
+    "apr_alert_min_alloc": 1000000,
+    "apr_alert_multiple": 2.0
+  },
+  "routing": {
+    "top_pools": 15,
+    "usd_sizes": [
+      1000,
+      10000
+    ],
+    "pinned_gauges": []
+  },
+  "rpc": {
+    "base": [
+      "https://base-rpc.publicnode.com",
+      "https://mainnet.base.org",
+      "https://base.drpc.org",
+      "https://base.llamarpc.com",
+      "https://1rpc.io/base",
+      "https://base.meowrpc.com"
+    ]
+  },
+  "page_url": "https://wkisai95.github.io/solid-eureka/"
+}

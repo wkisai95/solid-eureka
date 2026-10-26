@@ -1,0 +1,79 @@
+name: Radar sAERO monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "monitor/**"
+      - "site/**"
+      - "config.json"
+      - "requirements.txt"
+      - ".github/workflows/monitor.yml"
+  workflow_dispatch:
+    inputs:
+      test_notify:
+        description: "Invia una notifica di prova"
+        type: boolean
+        default: false
+
+concurrency:
+  group: radar-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Restore data from the data branch
+        run: |
+          mkdir -p out
+          if git fetch --depth=1 origin data:refs/remotes/origin/data 2>/dev/null; then
+            git archive refs/remotes/origin/data | tar -x -C out
+            rm -f out/.keepalive_needed
+          else
+            echo "No data branch yet: first run"
+          fi
+
+      - name: Run monitor
+        env:
+          TEST_NOTIFY: ${{ inputs.test_notify }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          MY_POSITIONS: ${{ secrets.MY_POSITIONS }}
+        run: python -m monitor.main --out out
+
+      - name: Publish data branch
+        run: |
+          cd out
+          rm -rf .git
+          git init -q
+          git checkout -q -b data
+          git add -A
+          git -c user.name="radar-saero-bot" -c user.email="radar-saero-bot@users.noreply.github.com" \
+            commit -qm "data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+
+      - name: Keep the schedule alive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # GitHub pauses scheduled workflows after 60 days without activity: re-enabling resets the timer
+          if [ -f out/.keepalive_needed ]; then
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/monitor.yml/enable" && echo "Schedule refreshed"
+          fi
