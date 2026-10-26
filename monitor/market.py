@@ -70,15 +70,28 @@ def _kyber(t_in, t_out, amount):
            f"?tokenIn={t_in}&tokenOut={t_out}&amountIn={amount}&gasInclude=true")
     res = http_json(url, headers={"x-client-id": "radar-saero"}, timeout=20)
     rs = (res.get("data") or {}).get("routeSummary") or {}
-    total = int(rs.get("amountIn") or 0)
+    paths = [p for p in (rs.get("route") or []) if p]
+    # each path starts from the input token; its first swap carries the share of the trade
+    first = [(int(p[0].get("swapAmount") or 0), p) for p in paths
+             if (p[0].get("tokenIn") or "").lower() == t_in.lower()] or [(int(p[0].get("swapAmount") or 0), p) for p in paths]
+    total = sum(a for a, _ in first)
     legs = []
-    for path in rs.get("route") or []:
-        if not path or not total:
+    for amt, path in first:
+        if total <= 0:
             continue
-        frac = int(path[0].get("swapAmount") or 0) / total
-        legs.append({"frac": frac, "swaps": [[s.get("pool", "").lower()] for s in path],
+        legs.append({"frac": amt / total, "swaps": [[(s.get("pool") or "").lower()] for s in path],
                      "dex": sorted({s.get("exchange") or "?" for s in path})})
+    _sample("kyber", legs)
     return legs
+
+
+SAMPLES = {}
+
+
+def _sample(agg, legs):
+    """Keeps one routed trade per aggregator for the run log."""
+    if agg not in SAMPLES and legs:
+        SAMPLES[agg] = [(round(l["frac"], 3), l["dex"], [p for sw in l["swaps"] for p in sw][:3]) for l in legs[:6]]
 
 
 def _velora(t_in, d_in, t_out, d_out, amount):
@@ -89,11 +102,20 @@ def _velora(t_in, d_in, t_out, d_out, amount):
     legs = []
     for route in (res.get("priceRoute") or {}).get("bestRoute") or []:
         rp = float(route.get("percent") or 0) / 100
-        for sw in route.get("swaps") or []:
+        swaps = route.get("swaps") or []
+        # every hop of a route carries the whole route share: count the route once, through all its pools
+        pools, dexes = [], set()
+        for sw in swaps:
             for ex in sw.get("swapExchanges") or []:
-                legs.append({"frac": rp * float(ex.get("percent") or 0) / 100, "route": id(route),
-                             "swaps": [[a.lower() for a in (ex.get("poolAddresses") or [])]],
-                             "dex": [ex.get("exchange") or "?"]})
+                pools += [a.lower() for a in (ex.get("poolAddresses") or [])]
+                dexes.add(ex.get("exchange") or "?")
+        if swaps:
+            first = swaps[0].get("swapExchanges") or []
+            for ex in first:
+                share = rp * float(ex.get("percent") or 0) / 100
+                legs.append({"frac": share, "swaps": [[a.lower() for a in (ex.get("poolAddresses") or [])], pools],
+                             "dex": sorted(dexes)})
+    _sample("velora", legs)
     return legs
 
 
@@ -144,5 +166,7 @@ def routing_share(targets, aero_pools, prices, erc20, sizes, log):
         if res:
             out[key] = res
     log(f"routing: {len(out)} pools quoted, errors {errors}, venues seen "
-        f"{sorted(dexes.items(), key=lambda kv: -kv[1])[:8]}")
+        f"{sorted(((d, round(v, 2)) for d, v in dexes.items()), key=lambda kv: -kv[1])[:10]}")
+    for agg, smp in SAMPLES.items():
+        log(f"routing sample {agg}: {smp}")
     return out, errors
