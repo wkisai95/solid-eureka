@@ -373,9 +373,12 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
     pools.sort(key=lambda r: -(r.get("m1000_7d") or r.get("m1000_24h") or 0))
     universe, ok = MD.new_chain_universe(state, RULES.get("nuove"))
     rules = {**MD.NEW_CHAIN_RULES, **(RULES.get("nuove") or {})}
+    mk = MD.market_state(state)
     new_chains = {"chains": [C.chain_short(c) for c in sorted(ok)], "pools": len(universe),
+                  "shares": {C.chain_short(c): (round(MD.chain_share(mk, c), 4)
+                                                if MD.chain_share(mk, c) is not None else None) for c in sorted(ok)},
                   "max_share": rules["max_chain_share"], "pairs_per_chain": rules["pairs_per_chain"],
-                  "min_pair_volume_usd": rules["min_pair_volume_usd"]}
+                  "min_pair_volume_usd": rules["min_pair_volume_usd"], "max_pair_share": rules["max_pair_share"]}
     return {"generated": now, "size": size, "start": tr["start"], "collected_h": round(collected_h, 1),
             "new_chains": new_chains,
             "cooldown_h": round(cooldown / HOUR, 2), "aero_usd": aero_usd, "strategies": strategies,

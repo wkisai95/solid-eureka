@@ -227,6 +227,7 @@ def run(args):
     # hourly market snapshot (pool volumes, pair volume on every DEX, Aero share per chain), kept as history
     if not args.no_market:
         try:
+            MD.discover(state, now, log)
             MD.refresh(state, chains_cfg, now, log)
         except Exception as e:
             status["errors"].append(f"market: {e}")

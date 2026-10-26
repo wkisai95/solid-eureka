@@ -192,6 +192,7 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
         pref = cid_s + ":"
         crow = [r for r in rows if r["cid"] == cid]
         st = cs.get("status") or {}
+        mrow = (list((mkt.get("chains") or {}).get(cid_s) or []) + [None] * 4)[:4]
         aprs_c = [r["apr"] for r in crow if r.get("apr") is not None and r["ap"] >= 100_000]
         chains.append({
             "id": cid, "name": C.chain_name(cid), "short": C.chain_short(cid),
@@ -203,8 +204,9 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             "synced": bool(cs.get("synced")), "fee_hours": cs.get("fee_hours"),
             "ok": st.get("ok", False), "error": st.get("error"), "checked": st.get("at"),
             "head": cs.get("head"), "cooldown_h": round(chain_cooldown(state, cid, cooldown) / HOUR, 2),
-            "aero_vol24h": ((mkt.get("chains") or {}).get(cid_s) or [None, None])[0],
-            "dex_vol24h": ((mkt.get("chains") or {}).get(cid_s) or [None, None])[1],
+            # DefiLlama for both, so the share compares like with like; DexScreener's sum of the Aero pools aside
+            "aero_vol24h": mrow[2], "legacy_vol24h": mrow[3], "dex_vol24h": mrow[1], "aero_pools_vol24h": mrow[0],
+            "top_pairs": (mkt.get("top") or {}).get(cid_s) or [],
             "share": _r4(MD.chain_share(mkt, cid)),
             "share_24h": _r4(MD.chain_share(mkt, cid, ago=24 * HOUR, now=now)),
             "share_7d": _r4(MD.chain_share(mkt, cid, ago=7 * 24 * HOUR, now=now)),

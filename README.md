@@ -12,9 +12,10 @@ Ogni giro:
 - una volta all'ora chiede a KyberSwap e Velora una quotazione da $1.000 e $10.000 sui pool più allocati e misura
   quanta parte passa dal pool Aero (quota di routing);
 - calcola il calendario dei cooldown: quante sAERO escono dal cooldown ora per ora e da quali pool;
-- una volta all'ora registra il volume e la liquidità di ogni pool Aero (DexScreener), il volume della stessa coppia
-  su tutti i DEX della chain e il volume DEX di ogni chain (DefiLlama), quindi la quota di Aero per coppia e per chain;
-  lo storico (orario per qualche giorno, poi giornaliero per 4 mesi) serve a costruire più avanti una vera previsione;
+- una volta all'ora registra il volume e la liquidità di ogni pool Aero, il volume della stessa coppia su tutti i DEX
+  della chain (DexScreener, più i 20 pool più grandi di ogni chain da GeckoTerminal) e il volume DEX di ogni chain
+  con la parte di Aero (DefiLlama), quindi la quota di Aero per coppia e per chain; lo storico (orario per qualche
+  giorno, poi giornaliero per 4 mesi) serve a costruire più avanti una vera previsione;
 - pubblica i dati sul ramo `data` e manda le notifiche sull'app **ntfy**.
 
 ## Simulazione
@@ -28,7 +29,7 @@ con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione reale 
 | Ultime 48 ore | Fee delle ultime 48 ore più gli incentivi programmati |
 | Tendenza 12 ore | Metà peso alle ultime 48 ore, metà alle ultime 12 |
 | Prudente | Come il primo, ma prevede che gli altri allocatori arrivino sui pool che rendono molto più della media |
-| Chain nuove | Come il primo, ma solo sulle coppie più grosse (per volume su tutti i DEX) delle chain fuori da Base e OP dove Aero ha meno del 15% del volume DEX |
+| Chain nuove | Come il primo, ma solo sulle coppie più grosse (per volume su tutti i DEX) delle chain fuori da Base e OP dove Aero ha meno del 15% del volume DEX, e solo dove Aero ha meno della metà del volume della coppia |
 
 Il consiglio di ogni metodo è in percentuale della posizione, pool per pool (con il tipo di pool) e per chain.
 Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown. I risultati sono in `tracker.json`
@@ -101,6 +102,7 @@ NTFY_TOPIC=... python -m monitor.main --out out
 
 - Contratti e indirizzi: [Dromos-Labs/metadex-public](https://github.com/Dromos-Labs/metadex-public)
 - Prezzi: DexScreener
+- Volumi: DexScreener, GeckoTerminal, DefiLlama
 - Quote: KyberSwap, Velora (ParaSwap)
 
 Non è una consulenza finanziaria.

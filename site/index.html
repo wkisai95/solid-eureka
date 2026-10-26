@@ -152,6 +152,7 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
 .reco .kd2 { color: var(--ink-2); font-size: 11px; margin-left: 5px; }
 .reco .pc { flex: none; font: 500 13px var(--f-num); font-variant-numeric: tabular-nums; }
 details.more summary { cursor: pointer; color: var(--accent); font-size: 13px; padding: 2px 0; }
+.row > details.pairs { grid-column: 1 / -1; margin-top: 4px; }
 details.more[open] summary { margin-bottom: 3px; }
 @media (max-width: 520px) { h1 { font-size: 26px; } .stat .v { font-size: 18px; } }
 @media (prefers-reduced-motion: no-preference) { .sweep { transform-origin: 14px 14px; animation: sweep 6s linear infinite; } }
@@ -590,7 +591,8 @@ details.more[open] summary { margin-bottom: 3px; }
       if (c.share != null) {
         const was = c.share_7d != null ? c.share_7d : c.share_24h;
         parts.push(`quota Aero del volume DEX ${sharePct(c.share)}` +
-          (was != null ? ` (${c.share_7d != null ? "7 giorni fa" : "ieri"} ${sharePct(was)})` : ""));
+          (was != null ? ` (${c.share_7d != null ? "7 giorni fa" : "ieri"} ${sharePct(was)})` : "") +
+          (c.legacy_vol24h && c.dex_vol24h ? `, più ${sharePct(c.legacy_vol24h / c.dex_vol24h)} sui vecchi Aerodrome e Velodrome` : ""));
       }
       if (c.new) parts.push("chain nuova per la simulazione");
       let st = "";
@@ -601,6 +603,21 @@ details.more[open] summary { margin-bottom: 3px; }
       const det = el("div", "d", parts.join(" · "));
       if (st) { det.append(document.createElement("br"), el("span", c.ok ? "" : "bad-text", st)); }
       w.append(det);
+      // the chain's biggest pairs on every DEX and Aero's part of each: where Aero still has room to grow
+      const tp = (c.top_pairs || []).filter(p => p[1] > 0).slice(0, 8);
+      if (tp.length) {
+        const more = el("details", "more pairs");
+        more.append(el("summary", null, "Coppie più scambiate su tutti i DEX (24 ore)"));
+        const ul = el("ul", "reco");
+        for (const [n, vol, , av, g] of tp) {
+          const li = document.createElement("li");
+          li.append(el("span", "nm", n),
+            el("span", "pc", `${fmtUsdShort(vol)} · ${g ? "Aero " + sharePct(Math.min(1, av / vol)) : "nessun pool Aero"}`));
+          ul.append(li);
+        }
+        more.append(ul);
+        w.append(more);
+      }
       box.append(w);
     }
     if (!list.length) {
@@ -641,6 +658,9 @@ details.more[open] summary { margin-bottom: 3px; }
     (s.holding || []).map(h => ({ n: h[0], c: "", p: h[2] != null ? h[2] : Math.round(h[1] / size * 100) }));
   const pctOf = (r, size) => r[2] != null ? r[2] : Math.round(r[1] / size * 100);
   const sharePct = x => x == null ? "—" : (x * 100 >= 10 ? Math.round(x * 100) : (x * 100).toFixed(1).replace(".", ",")) + "%";
+  const fmtUsdShort = x => x == null ? "—" : x >= 1e9 ? "$" + (x / 1e9).toFixed(1).replace(".", ",") + " mld"
+    : x >= 1e6 ? "$" + (x >= 1e8 ? Math.round(x / 1e6) : (x / 1e6).toFixed(1).replace(".", ",")) + "M"
+    : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x);
   const usdCents = x => x == null ? "—" : x < 100 ? "$" + x.toFixed(2).replace(".", ",") : fmtUsd(x);
   function recoList(rows) {
     const ol = el("ol", "reco");
@@ -664,8 +684,11 @@ details.more[open] summary { margin-bottom: 3px; }
       const h = el("h3"); const sw = el("i"); sw.style.background = SCOL[i]; h.append(sw, s.label); c.append(h);
       if (s.id === "nuove" && t.new_chains) {
         const nc = t.new_chains;
+        const sh = nc.shares || {};
+        const names = nc.chains.map(n => sh[n] != null ? `${n} (Aero ${sharePct(sh[n])})` : n);
         c.append(el("div", "method", nc.chains.length
-          ? `Solo le ${nc.pairs_per_chain} coppie più grosse (volume su tutti i DEX) di ${nc.chains.join(", ")}: chain dove Aero ha meno del ${Math.round(nc.max_share * 100)}% del volume DEX.`
+          ? `Solo le ${nc.pairs_per_chain} coppie più grosse (volume su tutti i DEX) di ${names.join(", ")}: chain dove Aero ha meno del ${Math.round(nc.max_share * 100)}% del volume DEX.` +
+            (nc.max_pair_share != null ? ` Salta le coppie dove Aero ha già almeno il ${Math.round(nc.max_pair_share * 100)}% del volume.` : "")
           : "Nessuna chain sotto la soglia di quota di Aero per ora."));
       }
       // before a full day the real figure is the total so far: a daily rate from a few hours of lumpy fees misleads

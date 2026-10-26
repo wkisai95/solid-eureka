@@ -148,7 +148,8 @@
       ],
       "max_chain_share": 0.15,
       "pairs_per_chain": 10,
-      "min_pair_volume_usd": 250000
+      "min_pair_volume_usd": 250000,
+      "max_pair_share": 0.5
     }
   }
 }
