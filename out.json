@@ -1,0 +1,3737 @@
+{
+ "ds_tokens_usdt_eth": {
+  "status": 200,
+  "ms": 74,
+  "headers": {
+   "cf-cache-status": "HIT",
+   "Age": "13"
+  },
+  "error": null,
+  "count": 1,
+  "rows": [
+   [
+    "ethereum",
+    "metric",
+    "",
+    "USDT",
+    "USDC",
+    "0xdAC17F95",
+    "0xA0b86991",
+    51061701,
+    1335357
+   ]
+  ]
+ },
+ "ds_tokenpairs_usdt_eth": {
+  "status": 200,
+  "ms": 62,
+  "headers": {
+   "cf-cache-status": "HIT"
+  },
+  "error": null,
+  "count": 30,
+  "rows": [
+   [
+    "ethereum",
+    "metric",
+    "",
+    "USDT",
+    "USDC",
+    "0xdAC17F95",
+    "0xA0b86991",
+    51061701,
+    1335357
+   ],
+   [
+    "ethereum",
+    "metric",
+    "",
+    "USDT",
+    "WETH",
+    "0xdAC17F95",
+    "0xC02aaA39",
+    1537342,
+    146146
+   ],
+   [
+    "ethereum",
+    "curve",
+    "stbl",
+    "USDT",
+    "USDC",
+    "0xdAC17F95",
+    "0xA0b86991",
+    4039,
+    1224
+   ],
+   [
+    "ethereum",
+    "curve",
+    "stbl",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0x6B175474",
+    802,
+    1165
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "ZAMA",
+    "USDT",
+    "0xA12CC123",
+    "0xdAC17F95",
+    581959,
+    608033
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "ETH",
+    "USDT",
+    "0x00000000",
+    "0xdAC17F95",
+    1321210,
+    684292
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WPRL",
+    "USDT",
+    "0x07696Dca",
+    "0xdAC17F95",
+    358151,
+    924315
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "ACN",
+    "USDT",
+    "0x3e76dd57",
+    "0xdAC17F95",
+    23848,
+    494299
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "GGBR",
+    "USDT",
+    "0x7e2ac793",
+    "0xdAC17F95",
+    30325,
+    246758
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WGNK",
+    "USDT",
+    "0x972a7A92",
+    "0xdAC17F95",
+    53604,
+    774659
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "LINK",
+    "USDT",
+    "0x51491077",
+    "0xdAC17F95",
+    67564,
+    120072
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "PRD",
+    "USDT",
+    "0xc8478285",
+    "0xdAC17F95",
+    1933,
+    619097
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "AYNI",
+    "USDT",
+    "0x9d70baE2",
+    "0xdAC17F95",
+    26234,
+    109236
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "APEX",
+    "USDT",
+    "0x52A8845D",
+    "0xdAC17F95",
+    18224,
+    276471
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v2",
+    "MOCA",
+    "USDT",
+    "0xF944e35f",
+    "0xdAC17F95",
+    16703,
+    379007
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v2",
+    "YELLOW",
+    "USDT",
+    "0x236eB848",
+    "0xdAC17F95",
+    49544,
+    87482
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "EMT",
+    "USDT",
+    "0xeB7A9ad5",
+    "0xdAC17F95",
+    571,
+    155121
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "SECT",
+    "USDT",
+    "0x8C9984B0",
+    "0xdAC17F95",
+    23448,
+    1051370
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "RLB",
+    "USDT",
+    "0x046EeE2c",
+    "0xdAC17F95",
+    37643,
+    2511081
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "HUNT",
+    "USDT",
+    "0x9AAb071B",
+    "0xdAC17F95",
+    10202,
+    521440
+   ],
+   [
+    "ethereum",
+    "supernova",
+    "",
+    "SUPER",
+    "USDT",
+    "0xe53EC727",
+    "0xdAC17F95",
+    12871,
+    92907
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WLFI",
+    "USDT",
+    "0xdA5e1988",
+    "0xdAC17F95",
+    37,
+    1264042
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "sato",
+    "USDT",
+    "0x829f4B62",
+    "0xdAC17F95",
+    10978,
+    91639
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "ZEST",
+    "USDT",
+    "0xf326C8c9",
+    "0xdAC17F95",
+    44,
+    192645
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "GULD",
+    "USDT",
+    "0x14D6C649",
+    "0xdAC17F95",
+    8920,
+    89304
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "CLONE",
+    "USDT",
+    "0xC9fAEbA8",
+    "0xdAC17F95",
+    10,
+    67102
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "ASTEROID",
+    "USDT",
+    "0xf280B16E",
+    "0xdAC17F95",
+    184,
+    57872
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "OBI",
+    "USDT",
+    "0xBb3A8FD6",
+    "0xdAC17F95",
+    11205,
+    36846
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "ZIK",
+    "USDT",
+    "0xD4419C2d",
+    "0xdAC17F95",
+    526,
+    46770
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "ERA",
+    "USDT",
+    "0xE2AD0BF7",
+    "0xdAC17F95",
+    10622,
+    10147
+   ]
+  ]
+ },
+ "ds_tokens_4_eth": {
+  "status": 200,
+  "ms": 72,
+  "headers": {
+   "cf-cache-status": "MISS"
+  },
+  "error": null,
+  "count": 4,
+  "rows": [
+   [
+    "ethereum",
+    "metric",
+    "",
+    "USDT",
+    "USDC",
+    "0xdAC17F95",
+    "0xA0b86991",
+    51061701,
+    1335357
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    47761580,
+    8736241
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "USDC",
+    "USDT",
+    "0xA0b86991",
+    "0xdAC17F95",
+    51775813,
+    3413237
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WBTC",
+    "USDT",
+    "0x2260FAC5",
+    "0xdAC17F95",
+    47599285,
+    28616314
+   ]
+  ]
+ },
+ "ds_tokenpairs_weth_eth": {
+  "status": 200,
+  "ms": 55,
+  "headers": {
+   "cf-cache-status": "HIT"
+  },
+  "error": null,
+  "count": 30,
+  "rows": [
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    47761580,
+    8736241
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    9108627,
+    3154118
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    42777898,
+    81089986
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    985443,
+    2759092
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    877525,
+    1872916
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    16126070,
+    9524269
+   ],
+   [
+    "ethereum",
+    "aero",
+    "",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    10110031,
+    767478
+   ],
+   [
+    "ethereum",
+    "pancakeswap",
+    "v3",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    1814135,
+    452703
+   ],
+   [
+    "ethereum",
+    "pancakeswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    506787,
+    110917
+   ],
+   [
+    "ethereum",
+    "aero",
+    "",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    10455506,
+    898159
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    35422715,
+    87854960
+   ],
+   [
+    "ethereum",
+    "curve",
+    "",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    2484882,
+    7251837
+   ],
+   [
+    "ethereum",
+    "pancakeswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    359771,
+    205055
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "DAI",
+    "0xC02aaA39",
+    "0x6B175474",
+    269813,
+    1033423
+   ],
+   [
+    "ethereum",
+    "supernova",
+    "",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    282788,
+    300814
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    95903,
+    45268
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    9163683,
+    53696137
+   ],
+   [
+    "ethereum",
+    "pancakeswap",
+    "v3",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    122177,
+    251607
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v2",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    683229,
+    19437111
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v2",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    471019,
+    14036475
+   ],
+   [
+    "ethereum",
+    "sushiswap",
+    "v3",
+    "WETH",
+    "DAI",
+    "0xC02aaA39",
+    "0x6B175474",
+    1902727,
+    8815003
+   ],
+   [
+    "ethereum",
+    "pancakeswap",
+    "",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    9942,
+    284276
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v2",
+    "WETH",
+    "DAI",
+    "0xC02aaA39",
+    "0x6B175474",
+    433656,
+    8809685
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "DAI",
+    "0xC02aaA39",
+    "0x6B175474",
+    501790,
+    3294674
+   ],
+   [
+    "ethereum",
+    "pancakeswap",
+    "",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    10564,
+    294945
+   ],
+   [
+    "ethereum",
+    "balancer",
+    "",
+    "WETH",
+    "DAI",
+    "0xC02aaA39",
+    "0x6B175474",
+    23617,
+    157730
+   ],
+   [
+    "ethereum",
+    "sushiswap",
+    "v3",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    289014,
+    2203915
+   ],
+   [
+    "ethereum",
+    "sushiswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    148555,
+    1068212
+   ],
+   [
+    "ethereum",
+    "sushiswap",
+    "",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    18326,
+    601103
+   ],
+   [
+    "ethereum",
+    "sushiswap",
+    "",
+    "WETH",
+    "USDC",
+    "0xC02aaA39",
+    "0xA0b86991",
+    7497,
+    267664
+   ]
+  ]
+ },
+ "ds_old_tokens_usdt": {
+  "status": 200,
+  "ms": 27,
+  "headers": {
+   "cf-cache-status": "HIT",
+   "Age": "12"
+  },
+  "error": null,
+  "count": 30,
+  "rows": [
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "TREASURY BILL \u327e",
+    "0xdAC17F95",
+    "0x463413c5",
+    1211,
+    121900
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "\u0281 \u326d",
+    "0xdAC17F95",
+    "0x557F7e30",
+    1442,
+    65230
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v1",
+    "USDT",
+    "WPLS",
+    "0xdAC17F95",
+    "0xA1077a29",
+    3084,
+    15443
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0x6B175474",
+    1806,
+    18523
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v1",
+    "USDT",
+    "ATROPA",
+    "0xdAC17F95",
+    "0xCc78A0ac",
+    447,
+    15765
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "\u09aa\u0981\u09a6\u09be\u09c7\u09bc\u09a8\u09c1\u09bf\u0982",
+    "0xdAC17F95",
+    "0xf69e9f94",
+    79,
+    13607
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v1",
+    "USDT",
+    "TREASURY BILL \u327e",
+    "0xdAC17F95",
+    "0x463413c5",
+    137,
+    11613
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "scissors \u327e",
+    "0xdAC17F95",
+    "0x1b8F9E19",
+    79,
+    8992
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "\u321e",
+    "0xdAC17F95",
+    "0x16951Ce6",
+    133,
+    6362
+   ],
+   [
+    "pulsechain",
+    "9mm",
+    "V3",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0x6B175474",
+    528,
+    3832
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0xefD766cC",
+    190,
+    933
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "WBTC",
+    "0xdAC17F95",
+    "0x2260FAC5",
+    15,
+    1622
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "WPLS",
+    "0xdAC17F95",
+    "0xA1077a29",
+    31,
+    354
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "USDT",
+    "0xdAC17F95",
+    "0x0Cb6F5a3",
+    39,
+    622
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v1",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0x6B175474",
+    6,
+    256
+   ],
+   [
+    "pulsechain",
+    "uniswap",
+    "",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0x6B175474",
+    8,
+    162
+   ],
+   [
+    "pulsechain",
+    "uniswap",
+    "",
+    "USDT",
+    "HEX",
+    "0xdAC17F95",
+    "0x2b591e99",
+    3,
+    92
+   ],
+   [
+    "pulsechain",
+    "9mm",
+    "V3",
+    "USDT",
+    "WPLS",
+    "0xdAC17F95",
+    "0xA1077a29",
+    1,
+    210
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "dOWN",
+    "0xdAC17F95",
+    "0x2556F7f8",
+    0,
+    203
+   ],
+   [
+    "pulsechain",
+    "uniswap",
+    "",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0x6B175474",
+    1,
+    61
+   ],
+   [
+    "pulsechain",
+    "0xa7028337D3DA1F04d638Cc3B4dD09411486b49EA",
+    "",
+    "USDT",
+    "WBTC",
+    "0xdAC17F95",
+    "0x2260FAC5",
+    0,
+    58
+   ],
+   [
+    "ethereum",
+    "metric",
+    "",
+    "USDT",
+    "USDC",
+    "0xdAC17F95",
+    "0xA0b86991",
+    51061701,
+    1335357
+   ],
+   [
+    "ethereum",
+    "metric",
+    "",
+    "USDT",
+    "WETH",
+    "0xdAC17F95",
+    "0xC02aaA39",
+    1537342,
+    146146
+   ],
+   [
+    "pulsechain",
+    "pdex",
+    "v3",
+    "USDT",
+    "WPLS",
+    "0xdAC17F95",
+    "0xA1077a29",
+    0,
+    0
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v1",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0xefD766cC",
+    1,
+    20
+   ],
+   [
+    "pulsechain",
+    "liberty-swap",
+    "",
+    "USDT",
+    "DAI",
+    "0xdAC17F95",
+    "0x6B175474",
+    2,
+    0
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v1",
+    "USDT",
+    "USDT",
+    "0xdAC17F95",
+    "0x0Cb6F5a3",
+    0,
+    4
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "F\u327eD",
+    "0xdAC17F95",
+    "0x1D177CB9",
+    0,
+    49
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v2",
+    "USDT",
+    "PLSX",
+    "0xdAC17F95",
+    "0x95B30398",
+    0,
+    23
+   ],
+   [
+    "pulsechain",
+    "pulsex",
+    "v1",
+    "USDT",
+    "WETH",
+    "0xdAC17F95",
+    "0x02DcdD04",
+    0,
+    10
+   ]
+  ]
+ },
+ "ds_search_weth_usdt": {
+  "status": 200,
+  "ms": 54,
+  "headers": {
+   "cf-cache-status": "HIT"
+  },
+  "error": null,
+  "count": 30,
+  "rows": [
+   [
+    "robinhood",
+    "uniswap",
+    "v3",
+    "BTCETHUSDTBNBUSDCXRPSOLTRXHYPEDOGERAINZECDELLEOXLMXMRLINKADACCDAIBCHUSD1USDEGRAMLTCUSDGSUIDEXEHBARPYUSDAVAXCRONEARXAUTSHIBUNITAOUSDYWLFIPAXGOKBASTERONDOMHTXRLUSDUSDDSKYDOTMNTAAVEWLDUSDFICPBGBPEPEETCUMORPHOUSDGOPIKCSCTMSTABLEPOLJLPJSTATOMQNTENARENDERKASALGOBEATGT\u5e01\u5b89\u4eba\u751fPUMPBDXJUPGHOFILXDCTBLLXFLRVVVLITARBUSD0USXINJAPTUSDAITUSDNEXONIGHTCAKEETHFIDASHAEROEURCVETVIRTUALTRUMPPENGUPYTHFETSUNFDUSDSEITIACRVSPXLUNCLDOSTXGNOZROJTOBSVBTTDUCKYPENDLENFTIMXMONXTZCFXBONKJASMYFRAXUB2ZDCRVELVETOPSTRCXKOGEXPLSYRUPKAIAKITEAUSDKAITOSTRKAPEPEFLOKIZBCNEIGENXECUSATGRTENSHWFIRAYFFPIEVERSECOMPTELAAPLXBIOTACHZAXSSPYXAKTWIFMXEDGEBORGMUXZANOGUSDTSLAXEURCVRUNEHOODXQQQXTWTAPETHETANEOXCNSANDMANABTWFARTCOININTCXRIFGOOGLXNVDAXTRACALEVSNARTBKBPCVXWEMIXCRCLXBATAWEAGOMININGTIBBIRUDSTAGSHFLFRXUSDRLBUSSFPGENIUSDUSDMRVLX1INCHNEXDYDXSOSOBMXEUSXGALAGLMREALSENTEGLDSMILEKABJSMCFGDATAAVVGLDXDEEPZKKMNOOCRCLONVCNTMETAXALLOSOONDRVYZYATHAMDXGRASSCHEEMSMSFTXGEODQUSDONSPCXBUAIFLUIDWOULDLIGHTMELANIASNDKBBANKRAVECSCOXBEAMSNXCOWZAMANMRANTFUNORDIRSRYFIZENKOXQTUMLISUSDZBUANSEMVTXLPTBANMSTRXLURMETXPRLINXLBTNXPCCOINXZRXORCAPLTRXWALHUMAARCBANANAS31MUBGASSFORMIVVONKTABASDGBGMXFTTCARDSMAXNILAUSDSUIRIVERBILLCVXXSHXIEMGXAIOZFIDDQFISAFEUSELESSHOTCHIPVXPLUMERVNGSXPFEXREDOGQUBICVBUSDPRESPCXZIGXPINAIHKSMLABVELOTFUELGCOINPGXSCHFXCOAIMINATURBOBIOWCASHCATMAGMAZILABBVXENJVTIXEWUXBERAAVGOXDHNBABYDOGEIOSUPERJELLYJELLYLINEAAPRDIEMGWEISYNHDXAZNXXPNPCZETASPKBRETTXOMXUNHXELFBRK.BXBABYTONXXGPSPROSGMEXIDHONXKUBMEGABRAXLTOSHISKHYXCYSSOXXXKAVAXNOCRCLBUPOPENLIONHOLOXVSSUSHISN4AKEIWMXSN51CCDOMIJCTCKBTQQQXXAUMREDVVSCOPXXMNGOMOVECTCONTASTRTROLLBLURBTBTXELGCRWDXTCELOSMHXAPPXFLOWREQPURRASSETACHROSEBDCATRBARRRDHRXSRXMRKXRONZCHFALTMUONPOPCATAPEXIBITONXYOBARDSUTJNJXEWYXSPYONNOCKPNUTLLYXRPLYUSDSKRFUNAGTPEAQPCIPMXBACXICNTAMZNXXUSDNVDAONMOGSENTISMYMASKJPMXEURIPOLYXAMPGHNTFBBUSDAZTECSTARVTHOPROVEESPMOODENGNOTMEVAMGLIDRMMTBIMORCLXAMBRXGOHOMEBNKRKGENB2ATAMPLCUSD0GMOCAANKRTMOXSOXLXWMTXPRONVOXKLACXSNTFOGOMEMETGBPNFLXXPEPXREKTBURNMANTRAUMAVANAXVGWAVESAIATSCQQQONZEREBRODUSKCOINONLOCUSCROSSHIMSONPMLUNASPACEDBRELONIRYSATOSZBTSSVBSBCMCSAXHSKUSDPOREMEWZESTNESSAHARAABTXDEGENARXKNTQACNXSQDCSPRSTORJLAYERAISN44MANTALUSDWKCCOREPRLHOMEUPCNOWACXUSTCMBGSKYAIDFDVXCAPBOLDAVNTBANDBMNRXBNTPLAYXANMCDXSUSDOPENXSERVUSDKDEPWHITETORNZORAMYXESPORTSEUSDHIVEBOMEUNSUQCLITEXB3PEOPLEBORASMARTTRUTHCATITAKLKWUSDMDTXGIGGLEETHWORBSFOLKSOSMOIBMXSWFTCSN9SLXAITCOLLECTASTEROIDCRMXICXRAILVRNEIRORLCUNPVANTAOPGSIRENPOWRAIOPROMAOPORBRATMARKMWOOSKLSOMICYBERALEONAORISMVLQANXHANAROBOHYPERCALCHAINEDUONGISIKCAUCTIONMERLKNCDAGSNEKEULIOSTGMTIOTXLCXSLVONGOOGLONWINSTEEMEVSLVXCOTIBBILVBASEDMUSDSLTFAIPREOPAIPUNDIXDODOFIDALONCOINDEPOSTRAXCTSIPYTHIAGIGAARKCHEELARDRMTLMLKPHAMETISROGLISTASIGNNOSSLPSATSREZCVCPYBOBOWOJAKSTGIQTLTONSNCYGGAIOTCLOAUDIOPMTANTTPTDKABLASTTXCNEETDOGSCARVXCHXYMLSKABTCPOOLAPI3TRIAMSTRONRIZEBREVPOKTSN3SAPIENERGAIXBTWAXPWBXCGOCBKSTRXIDOLAPTMLRCDRAMBPPLTXRTXWCTYNGFLUXCETUSCGPTOHOSOXLBBIGTIMESONICTACGAMEFULPOWERPIPPINAEVOKMDONEIEFAONSPELLACUEDENEGL1BLESSTAIKOMEDMOVRCTKGCBBOXNILUSUALMOBBTGOXBFCTNSRADSARARAABEYMGOMRVLON\u9f99\u867eTOKAMAKBIRBPIXELOXTLQTYZENTPARTIETNWETGOLDGRTSLAONXNYINAOCHRSTBLEPICFTRBXAIINTCONQUAISCRTONRMUHEZANIMEFRSNDKBTRSTNYMEVAAAGLDENSOXAUT0AGGONBLUAIRUJIGNSSN56MAGICQKCNMCBICOINXMETAAURORAMBLDFGGOATCLANKERCHEXELSABANANAMEYPDDONARROW\u54c8\u57fa\u7c73CELRIBSFLOCKUSDHZKCSTRCONSOFIONINTCBNEWTC98DESOZKPMMUIARPAQIELUCICWXTRADORDERITOTONHPGYENJOECTRRECALLUSDCVBITCOINMPLXUFDVANRYUSDBSLNDOGCORNSBBTCMIRADIAYBDIAMIAUONLUMIASAUCEBLENDHMSTRFIROIXSBCDXSGDBROCCOLIMUBARAKXRDISLMALICEOSAKOPNFUSDOGNAVATLMFELYREIKATTIPONKISHUDOODAVAILSOLVTUTMSFTONEFAONKCTPONKEWECANKAIOVENOMAMZNONALIAERGOINITREPWANMAVGLMRFARSXTBONEMWXTSFIAIARSCRAREACNBULLAABELESETSTHUNTSN62GODSMSTRBNSTGUNVEREMRBNTBOBAFARTBOYLAERATGCCWUCOLXKERNELSN5CATDOLONXAAPXRCRCLMANIFESTBERTHEGICCOLAMDONPORTALUSDMLYNARIAPROMPTIEMGONCHILLGUYNCTFHESTOFCTEVEREPSYELLOWCETBUTTCOINCLASHSOPHGLEECDESUHEIBOBAAPLONMETAONOWBIWFONVOWXIONLMTSROLLTT4VINEEWTAURATXRESOLVPSGCHECKPRIMEREPPOSANTOSTRUSTXU3O8EURRADXWALLETDYMGRIFFAINBELIAGGRSSPCXSHELLRAMPTAITRADOORDRIFTMOCUCNQQQBPPCWILDBMTQIAVICIREADYAICSPCXONUSDQDEXTSDACTHONEYGRNDDORASPCXX\u6211\u8e0f\u9a6c\u6765\u4e86BEEAGRSFORTGUAMCOINGALSKHYBNVDABSTCINVTKOBOUNTYASRASMPNKBARDADDYAGIBALHFTDEODIKAAHTNIMSOILNETXOMGLYXLOANSOLOVDAISLERFTHEMCBARTXEEMONDXIHAEDALPEPBTCLESQGROWSUPRAOLASMBXTSMONTAKETOWNSNUMIBADGERMAPOESIMSWARMSALPINEXSGOVONOUSDCREPECOOKIEACEWRXLOOMACSOGYFIGHTPIKAPEPECOINMNSRYPUFFERMAVIAREDOQUICKMUSNDKONWENKNNBISONELAAUKIL3ELKONETKGSTMPCBGSCPORTOPONDDIVIANYONENAVXBRISEUSDRBETATLOSRACAUSDPTKANAPUFUELGTCANTHROPICBTRSDEXTREETQQQONPOLSMAMOPAALUTKRIONARGAMOBTXIWNONVULTVATRENIDAOZRCSAVESPARKLETAVGOONMOBILECITYVNXAUBFGAQTEDELASPMAMEPHNIXJUVVLINKPPTCAWGPHDNMINTURTLESAGALLYONZKJCOQPITEWYBPOPMCDULLORCLONRIOXWCARMONSUREETHDYDXVCHFALPHRHEADNTKRLUSDUCARENAPNGWEXOBLUECRETAOMIKAMITOKEALCXLMWRRSS3LVLADYSPDTLAZIOATSPYRVICHOPRDEUSKYVEATLASSPAODOSDOGINMEBCNMLNXPLAMORIGSTMONANEONMIMGEARKOMACOREUMRMRVLANONPTBSPCMPAYAIBMNRONSCRSPSHEMIFWOGNOMGBYTESIXLINGOBOSONM87PZMWOLFREFWAIGALEONROAMHOODONSKIPIBDMDAUDDKEYCATELIZAOSTONICSWAPLAVASUNDOGSYMMPKOINBTSEGFALPORKOLORAIACMXEM$PURPEVLTCQCOMONLATRSPCXSCORSPACEXSNANDYVESTGMMTDGMAMITOQUQLMTONPIVXGHXSHAREASMLONEURQKLVPBTCMNTXTSLABSBDGRINLQKOONSEND\u54ed\u54ed\u9a6cCATEAFCKEKIUSIHCSWELLSPECTREPUSSBNBTIGERCRTSLOFIPOLISFEISWEATSTNKCESSWOLFONRMSTRFARMBTGNSJAGERGFIRINTCIWMONAVLSPCDRAMONWENDRGNBLZAIVMETFIALUVTCWODPUNDIAIRENVITABTSDJEDDMCRLS\u5ba2\u670d\u5c0f\u4f55DSYNCOCTAGEMSMVCFOXPALMIJHONWSPPXCPDIMOBUYPFEONNEURALA8CXTUBTBIFIRNBWBABAONNOBODYSN88XBGZTCOVPPMEASHDWKENDUIDIASUKUUSOONGROKASTSONWNCGFLMCOLSPROPCFREYAGMETETCULTCARDINGOVOOIGAIBMAJORMEVREEFBFMANYUYEEEMTIBMONRMETAQAITDENTXFCNBISBCSCOONNAKAMIGGLESJPMONALTSZNAVTPGONXEPPLTRONBELLSZYPTOUSDC(WORMHOLE)NATIXCTXCLVTSMBNIZAMATHGOLDAOPXPAINA47PEIPEIABBCALEPHINTERCVXONROAOASIMPTPRCLRAMDIRFEGVARAMINIMA\u96ea\u7403NVOONOBSRMYROUSDVPANWONLOTRDRAMOFCKOSYSMCDONCLOAKVALFORESTQSTRNVDANEXASHIDOVFYGHSTHEARTLEASHVAIDMTRBOOEFORTHVOLTLNQARWOORTWMTONLIBERTYAECOOKGMEESWCHKARRATDJI6930RTSLABAYNODLTRUAZEROSNSSTREAMZEUSPORNROCKETLQRIDRTPEPONSTATUSAVONDLHEROEURTMRVLBALTTTOKENBZZSBUXONCEEKPARTPBRONTRUFRWALUCKYCAFOXSYBIDDOBOSISSHARPSDTTRUUHIGHGLWBBORGYSTUFFMANEKISRMRTSMTAROTPLUDCEATYURUPXCFTRDRXAMDBPINRUSSELLRQQQKIBSHIRYULMBRNFTYECCEURXTNJESUSCUBERMSFTPUPSNXRAVNOMDTEPTBLKONTMONMYSTXSWAPVERSEMYTHDEUROJOBYAIDOGESOLCEXNUMGOALASKPAPARAZZIKUJIAURYMSFTBTAOBOTMCMBXNWHALEBOTTORAVGORGOOGLLINONBIOTBOTGMCOINTEMCOMOBYOBTXPMGOOGLBLIBRAKINDBIDZHOOKEQIXONLIMEMTADNNUBINDYTHQREGENTRARIGEONHOLDBOOPRZRCSWAPKWENTAIDEXCOPXONVERTAIADPLUCA401JKPROPSKDABENJIMIABITCIP2PWHITEWHALETTNSTIKHIUOSCWEBHAROLDQCOMBVEURTRIASSTRIKEVEXTRA0X0AST67WINRXTERHOSKYSNOWONMETAVGOATEDBTC2TRWARBNNOWONSOULCHATMOEWCUMMIESBFICSMTOPENAIDAMMCHCRYPTOZCLHOGESAROSCRPTMAYCRPNMTMONKYTAVAUNHONKORIALXELNOKBDEVVEBILLYEGGZTXOVROCICATDOPUCAGAQUACKFANCBYTESHPINGCEREHTREVDCSCAABTONRVFNYACTPXFIRETARDIOMLCPALUMERYLUMINTAXMXDBAREAIOTRISEWFCONGAFIPENGUINHODLSOXXONRENECMULTICAMP$HACHIXMNGSONCOINBCROWN10SETSTORMTRADESCSSKEYMCADEMDAOBAONABNBONSPURSGHUBNKEONBIDUONAIXDDXSNDKOGPUBULLSHIBDOGESMCIONPERPDHTRICEBSAIRSOXLSHRBABYASTEROIDHACHIKOHOUSERNBISCYCHGPTSERAPHASTRACHEQRHOODBABYSHARKSIGMAPYPLONADMMAONEURAUANDURILSIGNACOHRONMETABCOSALONHIPPOIRENONCOSTONPUBLICVRTONECHOGHOSTLXVLXJDONGAIXQCADBCOINRKLBONNAPMAIGAPIPESLRSRXDATTSTARLAACDLLUXCRWVONHASHAIPORHOPPYKARATEAZITHAIGOGAEURRAIVADERAOL\u4e00KAITKPALEXGOCHUIZIROBOTSRDDTONDEFXDTECPLTRBWELFPXL1PHOTONSKHYPEPEONTRONXPASSBEB1MGXACMGONBLOCKWEPE3ULLLITEBMCNPANDORAXAVIERBUILDOUTXTPJMPTIDRXSKHYONWARDAAOIBCRMONFLQLONINCEONCELLNIBIPSYOPANIMENEOCLOUDMYRIATOPEWYONAXPONSPGIONSOV\u4eba\u751fK\u7ebfKIMAEQBJAILSTOOLARIA20WAGMIGAMESTSUKAOPUSUNCXROARYFIIHELLOOBOLHYGONLITKEYMAGAWIKENNRGARIOGRGRWAINCIMUNODESQQQONBSTSOXLONPHBPAWSSLXMEZOVSYSWUFTEAGORKPIGGYMGPDBCNOICENIKOTPTUHNSXDAGGPUSHOGGOTHSWASHFUTUONSOGNISALTADBEONFRICURANUSHEHEBXEDISONSBETVRAICHIGROWACNONDASHONRNOKITABESTSTCREAMSLAPCHKNVINUFIONFLXONSTRDCPHRMVXRPHSHRAPOPTIGAIATOWERHYDRANTXDNXUBERONSPYBPUNCHAARTMOTHERDEROCBRSBHOSICOCORALLRDSFACTVOXELNOKONZFISAMOGLDONCASPWEASEGRACYRDNTMOCHILOBOHTDBUNKERVISTAETNONSAITOCOCOROPSPSUPSHILITEONXCLFLIXMANCUDISSCPGLWONA2ZSOLVEXPEPUWCOTCOMRKLBBZKMLAPOONWDCBNFPFISQOMTXNONPXPMELIONCAHCOINBERRYPIRATEATRSHIRODUREVBCAAARKPEPE2.0NBT\u4fee\u4ed9OXYONAIPONBXXHYPCVBCHBOTONUFOUXLINKSLOTHWOZXKILOWHYROOT$1CLORESNDKXJYAIKATATMXUNIBOTAVGOBKOMPETEINTUONZEXTURBOSSHRUBKINICMATAWCFUSETERMINUSSHOPONCPRUSDNEMCMEMEFIBASEYOOSHITSPACEXCWIFRTQQQBABABIMGNIBMBHINTPVTKEXMOONGLQEXAAEROBUDGMRXSQTRRKLBFNCTPDAIRISASEQBTSONUNA\u8001\u5b50CHIRPHEGEJEWELNRNNAFTSCAMFLIXXMNWRASMLAGIALPHABNBHOLDERABYSSEXRDARMBBTC.\u210fRORCLZOONCHIATAWARXRPHAIBTCBAMSHFTTITDRTRBCRWSPKTGGRCOHRAXOLPUSHDPRBONDOKLOONKOINRINGSHMSGTHOODBENXAI3AMATONMAIVNURARSPYWSIMAKOSCARSPECRIFT1DEFIPACEMEFAISLAYSPOTONPOOHAAOIONFIGONEQTYIDNGBAXBNCLNWBAIMTVCEGONMSTRLKYNUTUSDSFOXYCHOXNACREOTOTOLMCSWAPQORPOGMMPNICPEPONKTC$MICHIFLHYONLOOKAPPONGAINMADREMXONMDXBCUTSDAOANOMEPATRIOTJETTONDFIGTAI\u5b89DUCKSLIMBC2WEFIFFOGONCIRCLEMEMESEAIBXCRAMZNVSGISLANDPINOCHAMPDOLANALLNITROFLTAIKEKSLC4EVERWDCONGOUTKMCELBCRASHOIIAOIIASNAIKPOPCAPTAINBNBBOSSWYACLVNCAPSU2UGOZENPHONHEMULEEFI42SMURFCATNOTHINGMNTCSTUPIDRAAOISTMXLOLXELSGEVONKEYCELRFOXBASEDAIFGDLONURAONRDWONARTYVKORABGLPLNSOLAMAHTSHAKKAMTRGFROGBABYPEPERIOTONISKNULSSTRMXPRTDEMOWL$WAFFLESFAIR3CREDIDELABSBOSTHLMENGOGMEONMIDASMLZSWAPCANNMSQHAPPYMUBARAKAHEFCLC\u9ed1\u9a6cKP3RBADRAAPLRFCRIBMNUXBUCKAZOIDSTROGLABUBUNPCSJAMDEGOSBETONDUKOHMNDDIPMBOXBCCOINBZRPORT3ENDVERTCKPTIMEGZONEBEONRITEPOXALPHARABITRVLMASQSAMBUZZSSGXCXSFUNDBRGOVLSABAIBHCBUBBLEEDGENMTDKUNCIRVVORCSIPHERVCFLUCEACAESBDOGITOHOODBEERDCDRBABAHOLYRPLTRMRXMYSTERYMCRTHONKXMONEYNAVINBLUTITNCARRXRBIOFIGLXYONGENEALVAVTIONTBULLHORDVDOT$TOADPOOLXAKITALTXLISATIMIROOBEEMILLIBUSYMPONSCFJUNODFSAUBERCHONKYONDSON",
+    "WETH",
+    "0xAE2Df3c1",
+    "0x0Bd7D308",
+    412,
+    41756
+   ],
+   [
+    "manta",
+    "quickswap",
+    "",
+    "WETH",
+    "USDT",
+    "0x0Dc808ad",
+    "0xf417F5A4",
+    27788,
+    150231
+   ],
+   [
+    "base",
+    "uniswap",
+    "v3",
+    "USDT",
+    "WETH",
+    "0xfde4C96c",
+    "0x42000000",
+    68157,
+    142819
+   ],
+   [
+    "scroll",
+    "0x1d25AF2b0992bf227b350860Ea80Bad47382CAf6",
+    "",
+    "WETH",
+    "USDT",
+    "0x53000000",
+    "0xf55BEC9c",
+    55448,
+    302242
+   ],
+   [
+    "base",
+    "uniswap",
+    "v3",
+    "USDT",
+    "WETH",
+    "0x46BA32D0",
+    "0x42000000",
+    0,
+    235096
+   ],
+   [
+    "base",
+    "uniswap",
+    "v3",
+    "USDT",
+    "WETH",
+    "0xfde4C96c",
+    "0x42000000",
+    46926,
+    39898
+   ],
+   [
+    "bsc",
+    "metric",
+    "",
+    "WETH",
+    "USDT",
+    "0x2170Ed08",
+    "0x55d39832",
+    562707,
+    66433
+   ],
+   [
+    "linea",
+    "syncswap",
+    "",
+    "WETH",
+    "USDT",
+    "0xe5D7C2a4",
+    "0xA2194392",
+    989,
+    27516
+   ],
+   [
+    "scroll",
+    "syncswap",
+    "",
+    "WETH",
+    "USDT",
+    "0x53000000",
+    "0xf55BEC9c",
+    365,
+    25073
+   ],
+   [
+    "cronos",
+    "vvsfinance",
+    "",
+    "WETH",
+    "USDT",
+    "0xe44Fd7fC",
+    "0x66e428c3",
+    481,
+    24906
+   ],
+   [
+    "scroll",
+    "syncswap",
+    "",
+    "WETH",
+    "USDT",
+    "0x53000000",
+    "0xf55BEC9c",
+    258,
+    21716
+   ],
+   [
+    "plasma",
+    "oku",
+    "",
+    "WETH",
+    "USDT0",
+    "0x9895D81b",
+    "0xB8CE59FC",
+    2585,
+    10369
+   ],
+   [
+    "mantle",
+    "fusionx",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xdEAddEaD",
+    "0x201EBa5C",
+    88,
+    14203
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    9111914,
+    3153662
+   ],
+   [
+    "base",
+    "uniswap",
+    "v4",
+    "USDTTRC20",
+    "WETH",
+    "0x796F177C",
+    "0x42000000",
+    0,
+    25092
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v4",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    877946,
+    1872916
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    16139241,
+    9523186
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v2",
+    "USDT",
+    "WETH",
+    "0x672848C2",
+    "0xC02aaA39",
+    143891,
+    379
+   ],
+   [
+    "optimism",
+    "uniswap",
+    "",
+    "WETH",
+    "USDT",
+    "0x42000000",
+    "0x94b008aA",
+    263173,
+    411988
+   ],
+   [
+    "base",
+    "pancakeswap",
+    "",
+    "USDT",
+    "WETH",
+    "0xfde4C96c",
+    "0x42000000",
+    1055,
+    9636
+   ],
+   [
+    "ethereum",
+    "pancakeswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    507304,
+    110917
+   ],
+   [
+    "polygon",
+    "uniswap",
+    "",
+    "WETH",
+    "USDT0",
+    "0x7ceB23fD",
+    "0xc2132D05",
+    607591,
+    341157
+   ],
+   [
+    "ethereum",
+    "aero",
+    "",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    10454341,
+    898033
+   ],
+   [
+    "robinhood",
+    "uniswap",
+    "v4",
+    "USDT",
+    "WETH",
+    "0x13a95E44",
+    "0x0Bd7D308",
+    2,
+    8119
+   ],
+   [
+    "linea",
+    "etherex",
+    "",
+    "WETH",
+    "USDT",
+    "0xe5D7C2a4",
+    "0xA2194392",
+    10822,
+    9940
+   ],
+   [
+    "ethereum",
+    "uniswap",
+    "v3",
+    "WETH",
+    "USDT",
+    "0xC02aaA39",
+    "0xdAC17F95",
+    35422715,
+    87854960
+   ],
+   [
+    "scroll",
+    "nuri",
+    "v2",
+    "WETH",
+    "USDT",
+    "0x53000000",
+    "0xf55BEC9c",
+    690,
+    9170
+   ],
+   [
+    "scroll",
+    "zebra",
+    "",
+    "WETH",
+    "USDT",
+    "0x53000000",
+    "0xf55BEC9c",
+    209,
+    9549
+   ],
+   [
+    "polygon",
+    "dfyn",
+    "",
+    "WETH",
+    "USDT0",
+    "0x4c28f484",
+    "0xc2132D05",
+    225,
+    9044
+   ],
+   [
+    "scroll",
+    "scrollswap",
+    "",
+    "WETH",
+    "USDT",
+    "0x53000000",
+    "0xf55BEC9c",
+    100,
+    7362
+   ]
+  ]
+ },
+ "ds_tokenpairs_wbtc_arb": {
+  "status": 200,
+  "ms": 71,
+  "headers": {
+   "cf-cache-status": "EXPIRED"
+  },
+  "error": null,
+  "count": 30,
+  "rows": [
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    20254767,
+    32346761
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "USDC",
+    "0x2f2a2543",
+    "0xaf88d065",
+    9382717,
+    8645835
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "USD\u20ae0",
+    "0x2f2a2543",
+    "0xFd086bC7",
+    3789249,
+    4043758
+   ],
+   [
+    "arbitrum",
+    "aero",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    1453138,
+    150963
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "USDC",
+    "0x2f2a2543",
+    "0xaf88d065",
+    31553,
+    163171
+   ],
+   [
+    "arbitrum",
+    "aero",
+    "",
+    "WBTC",
+    "USDC",
+    "0x2f2a2543",
+    "0xaf88d065",
+    730116,
+    89591
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    9733,
+    706454
+   ],
+   [
+    "arbitrum",
+    "sushiswap",
+    "v3",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    462,
+    81178
+   ],
+   [
+    "arbitrum",
+    "camelot",
+    "v3",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    76942,
+    66803
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "USDC",
+    "0x2f2a2543",
+    "0xFF970A61",
+    22530,
+    68940
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "WBTC",
+    "USD\u20ae0",
+    "0x2f2a2543",
+    "0xFd086bC7",
+    61238,
+    52505
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "DAI",
+    "0x2f2a2543",
+    "0xDA10009c",
+    6603,
+    49719
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "USD\u20ae0",
+    "0x2f2a2543",
+    "0xFd086bC7",
+    5230,
+    48438
+   ],
+   [
+    "arbitrum",
+    "sushiswap",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    40,
+    24450
+   ],
+   [
+    "arbitrum",
+    "aero",
+    "",
+    "WBTC",
+    "USD\u20ae0",
+    "0x2f2a2543",
+    "0xFd086bC7",
+    92044,
+    14874
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "v2",
+    "WBTC",
+    "USD\u20ae0",
+    "0x2f2a2543",
+    "0xFd086bC7",
+    155,
+    15609
+   ],
+   [
+    "arbitrum",
+    "swapr",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    26,
+    14842
+   ],
+   [
+    "arbitrum",
+    "ramses",
+    "v2",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    3033,
+    12562
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "WBTC",
+    "USD\u20ae0",
+    "0x2f2a2543",
+    "0xFd086bC7",
+    3738,
+    7874
+   ],
+   [
+    "arbitrum",
+    "deltaswap",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    5,
+    6986
+   ],
+   [
+    "arbitrum",
+    "sushiswap",
+    "v3",
+    "WBTC",
+    "USDC",
+    "0x2f2a2543",
+    "0xaf88d065",
+    2875,
+    4327
+   ],
+   [
+    "arbitrum",
+    "chronos",
+    "V1",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    4,
+    5427
+   ],
+   [
+    "arbitrum",
+    "spartadex",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    5,
+    4902
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "v2",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    3,
+    3773
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "v2",
+    "WBTC",
+    "USDC",
+    "0x2f2a2543",
+    "0xaf88d065",
+    37,
+    3118
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "USDC",
+    "0x2f2a2543",
+    "0xFF970A61",
+    148,
+    3016
+   ],
+   [
+    "arbitrum",
+    "arbidex",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    3,
+    2664
+   ],
+   [
+    "arbitrum",
+    "swapfish",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    2,
+    2360
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    3,
+    1877
+   ],
+   [
+    "arbitrum",
+    "camelot",
+    "",
+    "WBTC",
+    "WETH",
+    "0x2f2a2543",
+    "0x82aF4944",
+    4,
+    1946
+   ]
+  ]
+ },
+ "ds_tokenpairs_usdt0_arb": {
+  "status": 200,
+  "ms": 54,
+  "headers": {
+   "cf-cache-status": "HIT"
+  },
+  "error": null,
+  "count": 30,
+  "rows": [
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    464,
+    34229
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    924,
+    33909
+   ],
+   [
+    "arbitrum",
+    "zyberswap",
+    "v3",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    4268,
+    11212
+   ],
+   [
+    "arbitrum",
+    "camelot",
+    "v3",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    1235,
+    6378
+   ],
+   [
+    "arbitrum",
+    "camelot",
+    "",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    158,
+    6537
+   ],
+   [
+    "arbitrum",
+    "mmfinance",
+    "v3",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    103,
+    2636
+   ],
+   [
+    "arbitrum",
+    "traderjoe",
+    "v2.1",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    250,
+    868
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    2,
+    550
+   ],
+   [
+    "arbitrum",
+    "sushiswap",
+    "v3",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    2,
+    309
+   ],
+   [
+    "arbitrum",
+    "ramses",
+    "v1",
+    "USD\u20ae0",
+    "USDC",
+    "0xFd086bC7",
+    "0xFF970A61",
+    7,
+    87
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "STYLE",
+    "USD\u20ae0",
+    "0x9500Ba77",
+    "0xFd086bC7",
+    2,
+    62028
+   ],
+   [
+    "arbitrum",
+    "0x9B43e504d84aDcB7321DC2551a86bff1084AE2E5",
+    "",
+    "DIA",
+    "USD\u20ae0",
+    "0x6eFa9b88",
+    "0xFd086bC7",
+    291741,
+    3330064
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "PENDLE",
+    "USD\u20ae0",
+    "0x0c880f67",
+    "0xFd086bC7",
+    204395,
+    558456
+   ],
+   [
+    "arbitrum",
+    "0xc8B66E63976670d25fEEAad28Fe317212766d823",
+    "",
+    "OTM",
+    "USD\u20ae0",
+    "0xe93307B8",
+    "0xFd086bC7",
+    68568,
+    1581348
+   ],
+   [
+    "arbitrum",
+    "aero",
+    "",
+    "USDG",
+    "USD\u20ae0",
+    "0x004B5068",
+    "0xFd086bC7",
+    2011825,
+    350224
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "DGAI",
+    "USD\u20ae0",
+    "0x12C2dE43",
+    "0xFd086bC7",
+    33271,
+    248383
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "LINK",
+    "USD\u20ae0",
+    "0xf97f4df7",
+    "0xFd086bC7",
+    32140,
+    195371
+   ],
+   [
+    "arbitrum",
+    "0x9B43e504d84aDcB7321DC2551a86bff1084AE2E5",
+    "",
+    "AMD",
+    "USD\u20ae0",
+    "0x01296516",
+    "0xFd086bC7",
+    2685,
+    606870
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "v2",
+    "BARKX",
+    "USD\u20ae0",
+    "0x55279F3c",
+    "0xFd086bC7",
+    742,
+    662195
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "LAVA",
+    "USD\u20ae0",
+    "0x11e969e9",
+    "0xFd086bC7",
+    2125,
+    337290
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "WERC",
+    "USD\u20ae0",
+    "0x17d805a3",
+    "0xFd086bC7",
+    441,
+    4684196
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "UZDT",
+    "USD\u20ae0",
+    "0x3eF43bA6",
+    "0xFd086bC7",
+    330,
+    3413434
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "v2",
+    "BTCM",
+    "USD\u20ae0",
+    "0xE9f5a048",
+    "0xFd086bC7",
+    639,
+    633837
+   ],
+   [
+    "arbitrum",
+    "pancakeswap",
+    "",
+    "USDG",
+    "USD\u20ae0",
+    "0x82248D53",
+    "0xFd086bC7",
+    299,
+    300295
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "MXNB",
+    "USD\u20ae0",
+    "0xF197FFC2",
+    "0xFd086bC7",
+    4001,
+    155997
+   ],
+   [
+    "arbitrum",
+    "sushiswap",
+    "v3",
+    "#BB",
+    "USD\u20ae0",
+    "0x4e616D5d",
+    "0xFd086bC7",
+    2,
+    494312
+   ],
+   [
+    "arbitrum",
+    "sushiswap",
+    "v3",
+    "#BTB",
+    "USD\u20ae0",
+    "0x03236cE8",
+    "0xFd086bC7",
+    1,
+    858190
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "USDR",
+    "USD\u20ae0",
+    "0x007724B8",
+    "0xFd086bC7",
+    0,
+    105059
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "ZRO",
+    "USD\u20ae0",
+    "0x6985884C",
+    "0xFd086bC7",
+    1772,
+    11235
+   ],
+   [
+    "arbitrum",
+    "uniswap",
+    "",
+    "MEED",
+    "USD\u20ae0",
+    "0xe4dB3652",
+    "0xFd086bC7",
+    0,
+    50626
+   ]
+  ]
+ },
+ "gt_networks_err": [
+  {
+   "page": 4,
+   "status": 400,
+   "error": "{\"errors\":[{\"status\":\"400\",\"title\":\"expected :page in 1..3; got 4\"}],\"meta\":{\"ref_id\":\"1e29f4af-d88b-49ce-b08e-3aa432fd9762\"}}"
+  }
+ ],
+ "gt_networks_match": [
+  [
+   "eth",
+   "Ethereum",
+   "ethereum"
+  ],
+  [
+   "arbitrum",
+   "Arbitrum",
+   "arbitrum-one"
+  ],
+  [
+   "optimism",
+   "Optimism",
+   "optimistic-ethereum"
+  ],
+  [
+   "arbitrum_nova",
+   "Arbitrum Nova",
+   "arbitrum-nova"
+  ],
+  [
+   "ethereum_classic",
+   "Ethereum Classic",
+   "ethereum-classic"
+  ],
+  [
+   "ethw",
+   "EthereumPOW",
+   "ethereumpow"
+  ],
+  [
+   "base",
+   "Base",
+   "base"
+  ],
+  [
+   "opbnb",
+   "opBNB",
+   "opbnb"
+  ],
+  [
+   "lightlink-phoenix",
+   "LightLink Phoenix",
+   "lightlink"
+  ],
+  [
+   "zklink-nova",
+   "zkLink Nova",
+   "zklink-nova"
+  ],
+  [
+   "etherlink",
+   "Etherlink",
+   "etherlink"
+  ],
+  [
+   "ink",
+   "Ink",
+   "ink"
+  ],
+  [
+   "opengpu",
+   "OpenGPU",
+   null
+  ],
+  [
+   "megaeth",
+   "MegaETH",
+   "megaeth"
+  ],
+  [
+   "robinhood",
+   "Robinhood",
+   "robinhood"
+  ],
+  [
+   "arc",
+   "Arc",
+   "arc"
+  ]
+ ],
+ "gt_networks_total": 225,
+ "gt_top_eth": {
+  "status": 200,
+  "ms": 281,
+  "headers": {
+   "cf-cache-status": "EXPIRED"
+  },
+  "error": null,
+  "count": 20,
+  "rows": [
+   [
+    "RLUSD / USDS",
+    "uniswap-v4-ethereum",
+    "RLUSD",
+    "USDS",
+    162301016,
+    49887690,
+    "0x9035721b23"
+   ],
+   [
+    "USDC / USDT",
+    "fluid-ethereum",
+    "USDC",
+    "USDT",
+    146172677,
+    34947092,
+    "0x667701e51b"
+   ],
+   [
+    "USDC / USDT",
+    "uniswap-v4-ethereum",
+    "USDC",
+    "USDT",
+    111071435,
+    6154396,
+    "0x2b21c65d9a"
+   ],
+   [
+    "BULL / WETH",
+    "uniswap_v2",
+    "BULL",
+    "WETH",
+    57512487,
+    132,
+    "0x28cd762e49"
+   ],
+   [
+    "USDC / USDT",
+    "uniswap-v4-ethereum",
+    "USDC",
+    "USDT",
+    51674068,
+    3399404,
+    "0x0fb0e40cec"
+   ],
+   [
+    "USDC / WETH 0.01%",
+    "uniswap_v3",
+    "USDC",
+    "WETH",
+    47727520,
+    8732930,
+    "0xe0554a476a"
+   ],
+   [
+    "WBTC / USDT 0.05%",
+    "uniswap_v3",
+    "WBTC",
+    "USDT",
+    47490695,
+    28539532,
+    "0x56534741cd"
+   ],
+   [
+    "WETH / USDC 0.05%",
+    "uniswap_v3",
+    "WETH",
+    "USDC",
+    42810327,
+    81055477,
+    "0x88e6a0c2dd"
+   ],
+   [
+    "USDC / fxUSD",
+    "curve",
+    "USDC",
+    "fxUSD",
+    40651636,
+    9264224,
+    "0x5018be882d"
+   ],
+   [
+    "WETH / USDT 0.3%",
+    "uniswap_v3",
+    "WETH",
+    "USDT",
+    35384387,
+    87652459,
+    "0x4e68ccd3e8"
+   ],
+   [
+    "USDC / USDT 0.01%",
+    "uniswap_v3",
+    "USDC",
+    "USDT",
+    27580408,
+    33788100,
+    "0x3416cf6c70"
+   ],
+   [
+    "PYUSD / USDS",
+    "uniswap-v4-ethereum",
+    "PYUSD",
+    "USDS",
+    24212622,
+    100053471,
+    "0xe63e32b2ae"
+   ],
+   [
+    "USDe / USDC 0.003%",
+    "uniswap-v4-ethereum",
+    "USDe",
+    "USDC",
+    22596090,
+    1478854,
+    "0x56fc29b869"
+   ],
+   [
+    "USDC / USDT 0.002%",
+    "aero-slipstream-ethereum",
+    "USDC",
+    "USDT",
+    20886916,
+    2125977,
+    "0x2d90ebffc8"
+   ],
+   [
+    "WETH / USDT 0.05%",
+    "uniswap_v3",
+    "WETH",
+    "USDT",
+    16123295,
+    9499833,
+    "0x11b815efb8"
+   ],
+   [
+    "WBTC / WETH 0.05%",
+    "uniswap_v3",
+    "WBTC",
+    "WETH",
+    15908591,
+    41366444,
+    "0x4585fe7722"
+   ],
+   [
+    "USDG / USDC",
+    "uniswap-v4-ethereum",
+    "USDG",
+    "USDC",
+    15570037,
+    3361870,
+    "0xeda62d2906"
+   ],
+   [
+    "DAI / USDC / USDT",
+    "curve",
+    "DAI",
+    "USDC",
+    3308540,
+    159264952,
+    "0xbebc44782c"
+   ],
+   [
+    "cbBTC / WBTC",
+    "fluid-ethereum",
+    "cbBTC",
+    "WBTC",
+    13997347,
+    18715010,
+    "0x3c0441b421"
+   ],
+   [
+    "ETH / USDC",
+    "uniswap-v4-ethereum",
+    "ETH",
+    "USDC",
+    13302363,
+    5825682,
+    "0x98316e8405"
+   ]
+  ],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_arbitrum": {
+  "status": 200,
+  "ms": 327,
+  "headers": {
+   "cf-cache-status": "EXPIRED"
+  },
+  "error": null,
+  "count": 20,
+  "rows": [
+   [
+    "USDC / WETH 0.05%",
+    "uniswap_v3_arbitrum",
+    "USDC",
+    "WETH",
+    73012887,
+    37740979,
+    "0xc6962004f4"
+   ],
+   [
+    "WBTC / WETH 0.05%",
+    "uniswap_v3_arbitrum",
+    "WBTC",
+    "WETH",
+    20244295,
+    32291134,
+    "0x2f5e87c931"
+   ],
+   [
+    "USDC / WBTC 0.05%",
+    "uniswap_v3_arbitrum",
+    "USDC",
+    "WBTC",
+    9372499,
+    8632698,
+    "0x0e4831319a"
+   ],
+   [
+    "ETH / USDC 0.05%",
+    "uniswap-v4-arbitrum",
+    "ETH",
+    "USDC",
+    9133516,
+    5652894,
+    "0x864abca0a6"
+   ],
+   [
+    "USDC / USDT",
+    "fluid-arbitrum",
+    "USDC",
+    "USDT",
+    7591694,
+    6989566,
+    "0x3c0441b421"
+   ],
+   [
+    "USDC / USDT",
+    "uniswap-v4-arbitrum",
+    "USDC",
+    "USDT",
+    7102318,
+    638379,
+    "0xab05003a63"
+   ],
+   [
+    "WETH / USDT 0.05%",
+    "uniswap_v3_arbitrum",
+    "WETH",
+    "USDT",
+    4379116,
+    5603429,
+    "0x641c00a822"
+   ],
+   [
+    "WBTC / USDT 0.05%",
+    "uniswap_v3_arbitrum",
+    "WBTC",
+    "USDT",
+    3786597,
+    4037442,
+    "0x5969efdde3"
+   ],
+   [
+    "USDG / USDC 0.001%",
+    "aero-slipstream-arbitrum",
+    "USDG",
+    "USDC",
+    3743520,
+    557459,
+    "0x09328be718"
+   ],
+   [
+    "ARB / WETH 0.05%",
+    "uniswap_v3_arbitrum",
+    "ARB",
+    "WETH",
+    3614700,
+    1637454,
+    "0xc6f780497a"
+   ],
+   [
+    "USDai / USDC 0.001%",
+    "uniswap-v4-arbitrum",
+    "USDai",
+    "USDC",
+    3316179,
+    166985,
+    "0xf4873a85b1"
+   ],
+   [
+    "WETH / USDC 0.013%",
+    "aero-slipstream-arbitrum",
+    "WETH",
+    "USDC",
+    2424152,
+    167492,
+    "0x30c83aaecc"
+   ],
+   [
+    "USDC / USDT 0.01%",
+    "uniswap_v3_arbitrum",
+    "USDC",
+    "USDT",
+    2350922,
+    1249106,
+    "0xbe3ad6a566"
+   ],
+   [
+    "USDC / USDT",
+    "curve_arbitrum",
+    "USDC",
+    "USDT",
+    2328538,
+    378366,
+    "0x49b720f1aa"
+   ],
+   [
+    "sUSDai / USDC",
+    "fluid-arbitrum",
+    "sUSDai",
+    "USDC",
+    2287426,
+    9534547,
+    "0x86f8742123"
+   ],
+   [
+    "USDC / WETH 0.01%",
+    "camelot-v3",
+    "USDC",
+    "WETH",
+    2285523,
+    237230,
+    "0xb1026b8e72"
+   ],
+   [
+    "USDC / WETH 0.3%",
+    "uniswap_v3_arbitrum",
+    "USDC",
+    "WETH",
+    2160195,
+    5213753,
+    "0xc473e2aee3"
+   ],
+   [
+    "USDG / USDT 0.001%",
+    "aero-slipstream-arbitrum",
+    "USDG",
+    "USDT",
+    2009359,
+    349759,
+    "0x81659867a8"
+   ],
+   [
+    "sUSDai / USDC 0.01%",
+    "aero-slipstream-arbitrum",
+    "sUSDai",
+    "USDC",
+    1672506,
+    9559,
+    "0x319d28ce8f"
+   ],
+   [
+    "WBTC / WETH 0.051%",
+    "aero-slipstream-arbitrum",
+    "WBTC",
+    "WETH",
+    1452209,
+    148919,
+    "0x6938f149a2"
+   ]
+  ],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_base": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:10 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cfeddaa597fee-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_eth_p5": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:13 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cfeeb9f6c81b7-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_token_pools_usdt_eth": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:15 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cfef98f4be604-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_lightlink-phoenix": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:17 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cff076d7c9698-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_zklink-nova": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:19 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cff1548289116-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_etherlink": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:21 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cff233c9081b7-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_ink": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:24 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cff313c09cbf8-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_robinhood": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:26 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cff3f1cf6e604-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "gt_top_arc": {
+  "status": 429,
+  "ms": null,
+  "headers": {
+   "Date": "Mon, 26 Oct 2026 22:46:28 GMT",
+   "Content-Type": "application/json",
+   "Content-Length": "272",
+   "Connection": "close",
+   "Retry-After": "0",
+   "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+   "Expires": "Thu, 01 Jan 1970 00:00:01 GMT",
+   "Referrer-Policy": "same-origin",
+   "X-Frame-Options": "SAMEORIGIN",
+   "Speculation-Rules": "\"/cdn-cgi/speculation\"",
+   "Vary": "accept-encoding",
+   "Server": "cloudflare",
+   "CF-RAY": "a50cff4d1ac07fee-IAD",
+   "alt-svc": "h3=\":443\"; ma=86400"
+  },
+  "error": "{\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans for higher rate limits and use the onchain endpoints: https://docs.coingecko.com/reference/endpoint-overview\"}}",
+  "count": 0,
+  "rows": [],
+  "links": null,
+  "meta": null
+ },
+ "llama_status": 200,
+ "llama_allChains_match": [
+  "Ethereum",
+  "Base",
+  "Robinhood Chain",
+  "Arbitrum",
+  "Arc",
+  "OP Mainnet",
+  "Ink",
+  "Etherlink",
+  "LightLink",
+  "Arbitrum Nova",
+  "soonBase"
+ ],
+ "llama_aero_protocols": [
+  {
+   "name": "Velodrome V1 | Velodrome V1 | parent=parent#aero-protocol",
+   "chains": [
+    "OP Mainnet",
+    "Mode",
+    "BOB"
+   ],
+   "total24h": 18039,
+   "breakdown24h": {
+    "optimism": {
+     "Velodrome V1": 7723
+    }
+   }
+  },
+  {
+   "name": "Velocimeter V2 | Velocimeter V2 | parent=parent#velocimeter",
+   "chains": [
+    "Canto"
+   ],
+   "total24h": null,
+   "breakdown24h": null
+  },
+  {
+   "name": "FVM Exchange | FVM Exchange | parent=parent#velocimeter",
+   "chains": [
+    "Fantom"
+   ],
+   "total24h": 4.44,
+   "breakdown24h": {
+    "fantom": {
+     "FVM Exchange": 4.44
+    }
+   }
+  },
+  {
+   "name": "Velodrome V2 | Velodrome V2 | parent=parent#aero-protocol",
+   "chains": [
+    "OP Mainnet",
+    "Mode",
+    "Lisk",
+    "Fraxtal",
+    "Ink",
+    "Soneium",
+    "Unichain",
+    "Swellchain",
+    "BOB",
+    "Celo"
+   ],
+   "total24h": 136463,
+   "breakdown24h": {
+    "celo": {
+     "Velodrome V2": 0
+    },
+    "unichain": {
+     "Velodrome V2": 0
+    },
+    "lisk": {
+     "Velodrome V2": 104
+    },
+    "fraxtal": {
+     "Velodrome V2": 56.61
+    },
+    "ink": {
+     "Velodrome V2": 112
+    },
+    "soneium": {
+     "Velodrome V2": 15.32
+    },
+    "mode": {
+     "Velodrome V2": 107
+    },
+    "bob": {
+     "Velodrome V2": 313
+    },
+    "optimism": {
+     "Velodrome V2": 98322
+    }
+   }
+  },
+  {
+   "name": "Velocore V2 | Velocore V2 | parent=parent#velocore",
+   "chains": [
+    "Linea"
+   ],
+   "total24h": 0,
+   "breakdown24h": {
+    "linea": {
+     "Velocore V2": 0
+    }
+   }
+  },
+  {
+   "name": "Aerodrome V1 | Aerodrome V1 | parent=parent#aero-protocol",
+   "chains": [
+    "Base"
+   ],
+   "total24h": 3434574,
+   "breakdown24h": {
+    "base": {
+     "Aerodrome V1": 3294961
+    }
+   }
+  },
+  {
+   "name": "Velodrome V3 | Velodrome V3 | parent=parent#aero-protocol",
+   "chains": [
+    "OP Mainnet",
+    "Lisk",
+    "Fraxtal",
+    "Mode",
+    "Ink",
+    "Soneium",
+    "Unichain",
+    "Swellchain",
+    "Celo"
+   ],
+   "total24h": 3175855,
+   "breakdown24h": {
+    "celo": {
+     "Velodrome V3": 1967
+    },
+    "lisk": {
+     "Velodrome V3": 31.38
+    },
+    "unichain": {
+     "Velodrome V3": 135
+    },
+    "fraxtal": {
+     "Velodrome V3": 515
+    },
+    "ink": {
+     "Velodrome V3": 278999
+    },
+    "soneium": {
+     "Velodrome V3": 11525
+    },
+    "mode": {
+     "Velodrome V3": 8.73
+    },
+    "optimism": {
+     "Velodrome V3": 1745721
+    }
+   }
+  },
+  {
+   "name": "Aerodrome Slipstream | Aerodrome Slipstream | parent=parent#aero-protocol",
+   "chains": [
+    "Base"
+   ],
+   "total24h": 154635870,
+   "breakdown24h": {
+    "base": {
+     "Aerodrome Slipstream": 130928530
+    }
+   }
+  },
+  {
+   "name": "Velocimeter V4 | Velocimeter V4 | parent=parent#velocimeter",
+   "chains": [
+    "IOTA EVM"
+   ],
+   "total24h": 46.04,
+   "breakdown24h": {
+    "iotaevm": {
+     "Velocimeter V4": 36.21
+    }
+   }
+  },
+  {
+   "name": "Velox DEX | Velox DEX | parent=None",
+   "chains": [
+    "Base"
+   ],
+   "total24h": 0,
+   "breakdown24h": {
+    "base": {
+     "Velox DEX": 0
+    }
+   }
+  },
+  {
+   "name": "Aero Slipstream | Aero Slipstream | parent=parent#aero-protocol",
+   "chains": [
+    "Arc",
+    "Ethereum",
+    "OP Mainnet",
+    "Arbitrum",
+    "Robinhood Chain",
+    "Ink",
+    "Base"
+   ],
+   "total24h": 557893289,
+   "breakdown24h": {
+    "ink": {
+     "Aero Slipstream": 188731
+    },
+    "arc": {
+     "Aero Slipstream": 2894033
+    },
+    "ethereum": {
+     "Aero Slipstream": 15576715
+    },
+    "arbitrum": {
+     "Aero Slipstream": 3027247
+    },
+    "robinhood": {
+     "Aero Slipstream": 34026788
+    },
+    "optimism": {
+     "Aero Slipstream": 2943133
+    },
+    "base": {
+     "Aero Slipstream": 231920001
+    }
+   }
+  },
+  {
+   "name": "Velo Data Spot | Velo Data Spot | parent=parent#velo-data",
+   "chains": [
+    "Hyperliquid L1"
+   ],
+   "total24h": 0,
+   "breakdown24h": {
+    "hyperliquid": {
+     "Velo Data Spot": 0
+    }
+   }
+  },
+  {
+   "name": "Aero Basic | Aero Basic | parent=parent#aero-protocol",
+   "chains": [
+    "Ink",
+    "Arc",
+    "Ethereum",
+    "Arbitrum",
+    "Robinhood Chain",
+    "OP Mainnet",
+    "Base"
+   ],
+   "total24h": 3672755,
+   "breakdown24h": {
+    "robinhood": {
+     "Aero Basic": 132
+    },
+    "ethereum": {
+     "Aero Basic": 0
+    },
+    "arc": {
+     "Aero Basic": 0
+    },
+    "arbitrum": {
+     "Aero Basic": 0.86
+    },
+    "ink": {
+     "Aero Basic": 2.7
+    },
+    "optimism": {
+     "Aero Basic": 37058
+    },
+    "base": {
+     "Aero Basic": 2492545
+    }
+   }
+  }
+ ],
+ "llama_sum_by_chain": {
+  "base": 717104110,
+  "arbitrum": 107635223,
+  "ethereum": 727106928,
+  "optimism": 12936615,
+  "ink": 1036869,
+  "robinhood": 559933011,
+  "arc": 20244754
+ },
+ "llama_top_by_chain": {
+  "base": [
+   [
+    "Aero Slipstream",
+    231920001
+   ],
+   [
+    "Uniswap V3",
+    137819425
+   ],
+   [
+    "Aerodrome Slipstream",
+    130928530
+   ],
+   [
+    "BaiBai",
+    55086852
+   ],
+   [
+    "PancakeSwap AMM V3",
+    52169642
+   ],
+   [
+    "Uniswap V4",
+    33598574
+   ],
+   [
+    "Metric V1",
+    21888285
+   ],
+   [
+    "Tessera V",
+    21870385
+   ],
+   [
+    "Hanji Protocol",
+    6973349
+   ],
+   [
+    "ElfomoFi",
+    4302941
+   ],
+   [
+    "Aerodrome V1",
+    3294961
+   ],
+   [
+    "Solidly V3",
+    3228671
+   ]
+  ],
+  "arbitrum": [
+   [
+    "Uniswap V3",
+    62960297
+   ],
+   [
+    "Uniswap V4",
+    14332209
+   ],
+   [
+    "Fluid DEX",
+    6811329
+   ],
+   [
+    "Metric V1",
+    6141818
+   ],
+   [
+    "PancakeSwap AMM V3",
+    3338394
+   ],
+   [
+    "Aero Slipstream",
+    3027247
+   ],
+   [
+    "Joe V2.1",
+    2508524
+   ],
+   [
+    "Curve DEX",
+    1678198
+   ],
+   [
+    "Camelot V3",
+    1483333
+   ],
+   [
+    "GMX AMM",
+    1340016
+   ],
+   [
+    "WOOFi Swap",
+    1336262
+   ],
+   [
+    "Pendle V2",
+    752120
+   ]
+  ],
+  "ethereum": [
+   [
+    "Uniswap V4",
+    355762753
+   ],
+   [
+    "Uniswap V3",
+    181970431
+   ],
+   [
+    "Fluid DEX",
+    46329603
+   ],
+   [
+    "Curve DEX",
+    28024811
+   ],
+   [
+    "DODO AMM",
+    16002213
+   ],
+   [
+    "Aero Slipstream",
+    15576715
+   ],
+   [
+    "Metric V1",
+    14707672
+   ],
+   [
+    "FermiSwap",
+    8963931
+   ],
+   [
+    "Uniswap V2",
+    7654123
+   ],
+   [
+    "0x",
+    5772835
+   ],
+   [
+    "Native Swap",
+    5198392
+   ],
+   [
+    "Ring Swap",
+    4478827
+   ]
+  ],
+  "optimism": [
+   [
+    "EtherFi Cash Liquid",
+    3414818
+   ],
+   [
+    "Aero Slipstream",
+    2943133
+   ],
+   [
+    "Uniswap V3",
+    2591960
+   ],
+   [
+    "Velodrome V3",
+    1745721
+   ],
+   [
+    "WOOFi Swap",
+    1147813
+   ],
+   [
+    "Uniswap V4",
+    232491
+   ],
+   [
+    "Solidly V3",
+    219593
+   ],
+   [
+    "Overtime",
+    218275
+   ],
+   [
+    "Curve DEX",
+    113906
+   ],
+   [
+    "Velodrome V2",
+    98322
+   ],
+   [
+    "Superfluid",
+    54138
+   ],
+   [
+    "Aero Basic",
+    37058
+   ]
+  ],
+  "ink": [
+   [
+    "Uniswap V4",
+    366833
+   ],
+   [
+    "Velodrome V3",
+    278999
+   ],
+   [
+    "Aero Slipstream",
+    188731
+   ],
+   [
+    "Nado Spot",
+    119922
+   ],
+   [
+    "Uniswap V3",
+    75904
+   ],
+   [
+    "otomate.trade",
+    5857
+   ],
+   [
+    "Calamari",
+    180
+   ],
+   [
+    "Curve DEX",
+    179
+   ],
+   [
+    "Tsunami",
+    149
+   ],
+   [
+    "Velodrome V2",
+    112
+   ],
+   [
+    "Aero Basic",
+    3
+   ],
+   [
+    "Uniswap V2",
+    0
+   ]
+  ],
+  "robinhood": [
+   [
+    "Uniswap V4",
+    312239954
+   ],
+   [
+    "Uniswap V3",
+    132445293
+   ],
+   [
+    "Aero Slipstream",
+    34026788
+   ],
+   [
+    "Fables",
+    29180634
+   ],
+   [
+    "Ramses CL V2",
+    12386775
+   ],
+   [
+    "Metric V1",
+    10916297
+   ],
+   [
+    "GMGN",
+    4875248
+   ],
+   [
+    "Pons V2",
+    3702376
+   ],
+   [
+    "SushiSwap V3",
+    3060315
+   ],
+   [
+    "Tessera V",
+    2744880
+   ],
+   [
+    "up v3",
+    2705118
+   ],
+   [
+    "Alandale V3",
+    2299928
+   ]
+  ],
+  "arc": [
+   [
+    "Uniswap V4",
+    13047403
+   ],
+   [
+    "Uniswap V3",
+    3733734
+   ],
+   [
+    "Aero Slipstream",
+    2894033
+   ],
+   [
+    "Archery V3",
+    450645
+   ],
+   [
+    "Peach Launchpad",
+    53084
+   ],
+   [
+    "Topaz CL",
+    26883
+   ],
+   [
+    "GMGN",
+    15983
+   ],
+   [
+    "Uniswap V2",
+    10326
+   ],
+   [
+    "Synthra Core",
+    4791
+   ],
+   [
+    "Synthra V3",
+    4412
+   ],
+   [
+    "Unitflow Finance V3",
+    2135
+   ],
+   [
+    "Lunya DEX",
+    1001
+   ]
+  ]
+ },
+ "llama_breakdown_keys_sample": [
+  "0g",
+  "abstract",
+  "adi",
+  "aleo",
+  "alephium",
+  "algorand",
+  "alphasec",
+  "althea",
+  "apechain",
+  "aptos",
+  "arbitrum",
+  "arbitrum_nova",
+  "arc",
+  "assetchain",
+  "astar",
+  "aurora",
+  "avax",
+  "base",
+  "bcypher",
+  "berachain",
+  "bfc",
+  "bifrost",
+  "bitcoin",
+  "bitcoincash",
+  "bitgert",
+  "bitkub",
+  "blast",
+  "bob",
+  "boba",
+  "bot",
+  "bsc",
+  "bsquared",
+  "btr",
+  "camp",
+  "canton",
+  "cardano",
+  "celo",
+  "chainflip",
+  "chromia",
+  "chz",
+  "citrea",
+  "conflux",
+  "core",
+  "coti",
+  "cronos",
+  "cronos_zkevm",
+  "defichain",
+  "defichain_evm",
+  "derive_v3",
+  "dexalot",
+  "doma",
+  "eclipse",
+  "eden",
+  "edgex",
+  "elastos",
+  "elrond",
+  "energi",
+  "energyweb",
+  "eni",
+  "eos",
+  "era",
+  "ethereum",
+  "fantom",
+  "filecoin",
+  "flare",
+  "flow",
+  "fluent",
+  "fogo",
+  "fraxtal",
+  "fuel",
+  "fuse",
+  "gala",
+  "gatelayer",
+  "gensyn",
+  "goat",
+  "gravity",
+  "hedera",
+  "hela",
+  "hemi",
+  "hydradx",
+  "hydragon",
+  "hyperliquid",
+  "icon",
+  "icp",
+  "igra",
+  "imx",
+  "initia",
+  "injective",
+  "ink",
+  "iotaevm",
+  "iotex",
+  "karura",
+  "kasplex",
+  "katana",
+  "kava",
+  "kcc",
+  "klaytn",
+  "linea",
+  "lisk",
+  "litecoin",
+  "manta",
+  "mantle",
+  "map",
+  "massa",
+  "matchain",
+  "mayachain",
+  "megaeth",
+  "merlin",
+  "metis",
+  "mezo",
+  "mode",
+  "monad",
+  "morph",
+  "move",
+  "native_core",
+  "near",
+  "neo",
+  "nibiru",
+  "obyte",
+  "occ",
+  "off_chain",
+  "omax",
+  "op_bnb",
+  "optimism",
+  "orai",
+  "osmosis",
+  "paradex",
+  "peaq",
+  "plasma",
+  "plume_mainnet",
+  "polygon",
+  "proton",
+  "provenance",
+  "pulse",
+  "qiev3",
+  "quai",
+  "radixdlt",
+  "rbn",
+  "reya",
+  "ripple",
+  "rise",
+  "rls",
+  "robinhood",
+  "rollux",
+  "ronin",
+  "rsk",
+  "scroll",
+  "sei",
+  "shape",
+  "shibarium",
+  "shido",
+  "smartbch",
+  "solana",
+  "somnia",
+  "soneium",
+  "sonic",
+  "sophon",
+  "sora",
+  "spark",
+  "stable",
+  "stacks",
+  "starknet",
+  "stellar",
+  "sty",
+  "sui",
+  "supra",
+  "sxr",
+  "syscoin",
+  "tac",
+  "taiko",
+  "telos",
+  "tempo",
+  "terra",
+  "terra2",
+  "tezos",
+  "thorchain",
+  "tomochain",
+  "ton",
+  "tron",
+  "ultron",
+  "unichain",
+  "unit0",
+  "valuechain",
+  "vana",
+  "vara",
+  "vechain",
+  "vinu",
+  "wan",
+  "waves",
+  "wax",
+  "wc",
+  "wchain",
+  "xdai",
+  "xdc",
+  "xlayer",
+  "xo",
+  "xrplevm",
+  "zeta",
+  "zigchain",
+  "zilliqa",
+  "zircuit",
+  "zklighter",
+  "zora"
+ ],
+ "llama_chain_Arbitrum": {
+  "status": 200,
+  "total24h": 107635222.56,
+  "change_1d": -22.27,
+  "n_protocols": 156,
+  "error": null
+ },
+ "llama_chain_Ethereum": {
+  "status": 200,
+  "total24h": 725905406.9599999,
+  "change_1d": -20.09,
+  "n_protocols": 177,
+  "error": null
+ },
+ "llama_chain_Base": {
+  "status": 200,
+  "total24h": 715502541.7600001,
+  "change_1d": -11.05,
+  "n_protocols": 199,
+  "error": null
+ },
+ "llama_chain_OP Mainnet": {
+  "status": 200,
+  "total24h": 12936614.67,
+  "change_1d": -21.45,
+  "n_protocols": 71,
+  "error": null
+ },
+ "llama_chain_Optimism": {
+  "status": 200,
+  "total24h": 12936614.67,
+  "change_1d": -21.45,
+  "n_protocols": 71,
+  "error": null
+ },
+ "llama_chain_Robinhood": {
+  "status": 200,
+  "total24h": 552453390.6400001,
+  "change_1d": 8.23,
+  "n_protocols": 132,
+  "error": null
+ },
+ "llama_chain_Robinhood Chain": {
+  "status": 200,
+  "total24h": 552453390.6400001,
+  "change_1d": 8.23,
+  "n_protocols": 132,
+  "error": null
+ },
+ "llama_chain_Arc": {
+  "status": 200,
+  "total24h": 20175380.51,
+  "change_1d": 7.83,
+  "n_protocols": 37,
+  "error": null
+ },
+ "llama_chain_Ink": {
+  "status": 200,
+  "total24h": 1031011.7,
+  "change_1d": -31.33,
+  "n_protocols": 19,
+  "error": null
+ }
+}
