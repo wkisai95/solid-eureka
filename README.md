@@ -47,12 +47,12 @@ Il workflow parte ogni 15 minuti con lo schedule di GitHub (ai minuti 7, 22, 37 
 «best effort» e sui repository nuovi a volte non parte per ore. Per avere comunque un giro ogni 15 minuti circa,
 crea una volta l'ambiente di riserva:
 
-Settings → Environments → New environment → nome `attesa` → spunta **Wait timer** → `12` minuti →
+Settings → Environments → New environment → nome `attesa` → spunta **Wait timer** → `14` minuti →
 Save protection rules.
 
-Da quel momento, se lo schedule non ha girato nell'ultima mezz'ora, ogni giro ne prepara un altro che parte dopo la
-pausa dell'ambiente (senza occupare macchine durante l'attesa). Se lo schedule riprende, i giri di riserva si
-fermano da soli. I giri automatici troppo vicini a un altro (meno di 8 minuti) non rifanno la raccolta.
+Da quel momento ogni giro ne prepara un altro che parte dopo la pausa dell'ambiente (senza occupare macchine durante
+l'attesa), e un avvio manuale fa ripartire il ciclo se si è interrotto. Lo schedule di GitHub resta attivo: i giri
+automatici troppo vicini a un altro (meno di 8 minuti) non rifanno la raccolta.
 
 ## Dati privati (Settings → Secrets and variables → Actions)
 

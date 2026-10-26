@@ -112,8 +112,9 @@ jobs:
           fi
 
   next:
-    # Keeps exactly one automatic cycle waiting when GitHub's schedule is not firing and the 'attesa'
-    # environment has a wait timer. Runs after every run, so a manual run also restarts a broken cycle.
+    # Keeps exactly one automatic cycle waiting when the 'attesa' environment has a wait timer, whether or not
+    # GitHub's schedule fires (overlapping automatic runs skip themselves). Runs after every run, so a manual
+    # run also restarts a broken cycle.
     needs: monitor
     if: ${{ always() }}
     runs-on: ubuntu-latest
@@ -132,12 +133,6 @@ jobs:
           case "$wait_min" in ''|*[!0-9]*) wait_min=0 ;; esac
           if [ "$wait_min" -lt 5 ]; then
             echo "No wait timer on the 'attesa' environment: the next run is left to the schedule."
-            exit 0
-          fi
-          last_sched=$(gh api "repos/$REPO/actions/workflows/monitor.yml/runs?event=schedule&per_page=1" \
-            --jq '.workflow_runs[0].created_at // ""' 2>/dev/null | head -n1 || true)
-          if [ -n "$last_sched" ] && [ $(( $(date +%s) - $(date -d "$last_sched" +%s) )) -lt 2400 ]; then
-            echo "The schedule is firing (last run $last_sched): no cycle needed."
             exit 0
           fi
           pending=$(gh api "repos/$REPO/actions/workflows/monitor.yml/runs?event=workflow_dispatch&per_page=30" \
