@@ -1279,7 +1279,6 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const d = el("div", "strip"), left = el("div"); left.style.minWidth = "0";
       const nm = el("div", "nm", o.p.name);
       if (o.p.kind) nm.append(el("span", "kd", o.p.kind));
-      if (o.p.chain !== "Base") nm.append(el("span", "tag", o.p.chain));
       const bar = el("div", "bar"), bi = el("i"); bi.style.width = o.k + "%"; bar.append(bi);
       left.append(nm, el("div", "sb", `${o.p.chain} · ${fmtN(o.k * r.ap / 100)} sAERO · ${r$(r.earn(o, o.k))}/48 ore`), bar);
       d.append(left, el("div", "pct", o.k + "%"));
