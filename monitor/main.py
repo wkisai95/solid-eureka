@@ -236,6 +236,19 @@ def run(args):
     # paper allocation of a fixed size, followed through every cooldown
     T.RULES.clear()
     T.RULES.update(cfg.get("strategies") or {})
+    # options loaded from the page ("Carica queste opzioni nelle simulazioni"): kept until the next load
+    raw_opts = (os.environ.get("OPTIONS_JSON") or "").strip()
+    if raw_opts:
+        try:
+            state["options"] = {**T.parse_options(json.loads(raw_opts)), "at": now}
+            log("options: loaded from the page: " + T.describe_options(state["options"]))
+        except Exception as e:
+            status["errors"].append(f"options: {e}")
+            log(f"options: not loaded ({str(e)[:160]})")
+    T.OPTIONS.clear()
+    T.OPTIONS.update(state.get("options") or {})
+    if T.OPTIONS:
+        log("options: " + T.describe_options(T.options()))
     size, restart = tracker_settings(state, cfg, log)
     if restart:
         state["tracker"] = T.new_tracker(size, now)
@@ -249,6 +262,9 @@ def run(args):
         f"{x['id']} {x['usd_total']:.2f} USD in {x['hours']:.1f} h, now {x['now']['pred_47h']:.2f} USD/47h on "
         f"{len(x['now']['pools'])} pools (" + " ".join(f"{c} {pc}%" for c, _, pc in x["now"]["chains"]) + ")"
         for x in tracker_report["strategies"]))
+    log("tracker: realized per day by the allocations saved every run (" + tracker_report["rank_by"] + "): " + ", ".join(
+        f"{x['id']} {x['perf']['rate_' + tracker_report['rank_by']]}" for x in
+        sorted(tracker_report["strategies"], key=lambda x: tracker_report["ranking"].index(x["id"]))))
 
     routing, routing_errors = {}, {}
     if not args.no_routing and now - state.get("last_routing", 0) >= 55 * 60:

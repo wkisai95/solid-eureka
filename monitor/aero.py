@@ -13,7 +13,7 @@ from . import chain as C
 from .rpc import RpcError, TimeBudget
 
 HOUR = 3600
-FEE_WINDOW = 72 * HOUR
+FEE_WINDOW = 100 * HOUR   # fees and incentives kept: the last 48 hours and the 48 before, for the change
 FEE_HISTORY = 49 * HOUR
 VRM_SEL = {k: C.sel(v) for k, v in {
     "gauge": "gauge()",
@@ -327,6 +327,8 @@ def fetch_reward_events(rpc, cid, cs, head, log, deadline, now):
             events.append(e)
     left = max(0, (back or 0) - (target or 0)) if back and target else 0
     cs["fee_hours"] = round(min(FEE_HISTORY, (cs.get("head_ts") or now) - ts_of(back)) / HOUR, 1) if back else 49.0
+    if back:
+        cs["fee_from"] = int(ts_of(back))      # fee transfers are known from here on
     log(f"{C.chain_short(cid)}: fee events {len(events)} from {len(raw)} logs, {time.time() - t0:.1f}s, history "
         f"{cs['fee_hours']} h" + (f", {left} blocks still to read (~{left * bt / 3600:.1f} h)" if left else ""))
     return events
@@ -434,7 +436,7 @@ def refresh_allocation_power(rpc, cid, state, now, log):
             ap[k] = val / 1e18
     past = {}
     big = [k for k in keys if ap.get(k, 0) >= 1000]
-    for hours in (1, 6, 24):
+    for hours in (1, 6, 24, 48):
         ts = now - hours * HOUR
         res = rpc.multicall([(state["gauges"][k]["vrm"], VRM_SEL["supplyAt"] + encode(["uint256"], [ts]))
                              for k in big]) if big else []
@@ -506,6 +508,8 @@ def refresh_tokens(rpc, cid, state, cfg, log):
 
 def settle_rewards(state, prices, now, log):
     """Validates fee transfers and incentive programs against the gauge's rewards manager, then prices them."""
+    # fees used to be kept for 72 hours: anything older was already dropped when the window grew to 100 hours
+    state.setdefault("fee_complete_from", now - 72 * HOUR)
     vrm_map = state["vrm_map"]
     keep, priced, rejected, fresh = [], 0, 0, []
     for entry in state["fees_pending"]:
@@ -574,6 +578,23 @@ def incentive_usd(state, prices, key, start, end):
 
 def fees_usd(state, key, start, end):
     return sum(v for h, v in (state["fees"].get(key) or {}).items() if start <= int(h) < end)
+
+
+def fee_change(state, key, now):
+    """Fees of the last 48 hours against the 48 before: (change in percent, fees of the 48 before).
+
+    None while the chain's fee history is shorter than 96 hours, and the change is None when the earlier window
+    had less than $5 (a change from almost nothing says nothing).
+    """
+    cs = (state.get("chains") or {}).get(str(chain_of(key))) or {}
+    if not cs.get("fee_from"):
+        return None, None
+    start = max(int(cs["fee_from"]), int(state.get("fee_complete_from") or 0))
+    if now - start < 96 * HOUR - 1800:
+        return None, None
+    prev = fees_usd(state, key, now - 96 * HOUR, now - 48 * HOUR)
+    cur = fees_usd(state, key, now - 48 * HOUR, now + HOUR)
+    return (round((cur / prev - 1) * 100, 1) if prev >= 5 else None), prev
 
 
 def refresh_eligibility(rpc, cid, state, now, log, every=6 * HOUR):

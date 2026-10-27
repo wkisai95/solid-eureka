@@ -1,6 +1,7 @@
 name: Monitor sAERO
 run-name: >-
   ${{ inputs.cycle && 'Monitor sAERO · ciclo'
+  || inputs.options && 'Monitor sAERO · opzioni'
   || github.event_name == 'workflow_dispatch' && 'Monitor sAERO · avvio manuale'
   || github.event_name == 'schedule' && 'Monitor sAERO · programmato'
   || 'Monitor sAERO · aggiornamento' }}
@@ -27,6 +28,11 @@ on:
         description: "Uso interno: giro automatico dopo la pausa dell'ambiente 'attesa'"
         type: boolean
         default: false
+      options:
+        description: "Uso interno: opzioni delle simulazioni inviate dalla pagina (JSON)"
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -74,6 +80,8 @@ jobs:
       - name: Run monitor
         env:
           TEST_NOTIFY: ${{ inputs.test_notify }}
+          # set as an environment variable, never pasted into a script: the monitor parses and checks it
+          OPTIONS_JSON: ${{ inputs.options }}
           # automatic runs skip when another run collected less than 8 minutes ago; manual runs always collect
           MIN_INTERVAL_S: ${{ (github.event_name == 'schedule' || inputs.cycle) && '480' || '0' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}

@@ -138,7 +138,7 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
         m, r, fees48, inc48, inc_next = pool_row(key, ap)
         past = (state.get("ap_past") or {}).get(key) or {}
         rev48 = fees48 + inc48
-        for h in (1, 6, 24):
+        for h in (1, 6, 24, 48):
             v = past.get(h) if isinstance(past, dict) else None
             if v is None:
                 v = past.get(str(h)) if isinstance(past, dict) else None
@@ -147,6 +147,10 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
         r.update({k: round(v) for k, v in pp.items() if k != "positions"})
         r["positions"] = pp.get("positions", 0)
         r["fees48h"] = round(fees48, 2)
+        dfee, prev48 = A.fee_change(state, key, now)
+        if prev48 is not None:
+            r["fees_prev48h"] = round(prev48, 2)      # the 48 hours before: the radar's fee trend and volume spikes
+            r["dfee"] = dfee
         r["inc48h"] = round(inc48, 2)
         r["inc_next48h"] = round(inc_next, 2)
         r["rev48h"] = round(rev48, 2)
@@ -180,6 +184,10 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             continue
         r.update({"fees48h": round(fees48, 2), "inc48h": round(inc48, 2), "inc_next48h": round(inc_next, 2),
                   "rev48h": round(fees48 + inc48, 2), "positions": 0, "unallocated": True})
+        dfee, prev48 = A.fee_change(state, key, now)
+        if prev48 is not None:
+            r["fees_prev48h"] = round(prev48, 2)
+            r["dfee"] = dfee
         if m.get("ok") is False:
             r["blocked"] = True
         rows.append(r)
@@ -202,6 +210,8 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             "inc_next48h": round(sum(r.get("inc_next48h") or 0 for r in crow), 2),
             "median_apr": round(statistics.median(aprs_c), 2) if aprs_c else None,
             "synced": bool(cs.get("synced")), "fee_hours": cs.get("fee_hours"),
+            # fees are complete from here on: the 48-hour fee change needs 96 hours after it
+            "fee_from": max(int(cs["fee_from"]), int(state.get("fee_complete_from") or 0)) if cs.get("fee_from") else None,
             "ok": st.get("ok", False), "error": st.get("error"), "checked": st.get("at"),
             "head": cs.get("head"), "cooldown_h": round(chain_cooldown(state, cid, cooldown) / HOUR, 2),
             # DefiLlama for both, so the share compares like with like; DexScreener's sum of the Aero pools aside

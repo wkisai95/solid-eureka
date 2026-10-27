@@ -1,11 +1,13 @@
 """Paper allocation of a fixed sAERO size.
 
-Every run it records, for each strategy, the allocation it would recommend now and what that allocation is
-expected to earn during one cooldown. Each recommendation is then followed for the whole cooldown with the
-fees and incentives that really arrive, diluted by the real allocation of everybody else, so over time it
-shows which pools and which way of choosing them actually pay the most.
+Every run (about every 15 minutes) it records, for each method, the allocation it would recommend now and what that
+allocation is expected to earn during one cooldown. Each of these allocations is then followed for the whole cooldown
+with the fees and incentives that really arrive, diluted by the real allocation of everybody else, so over time it
+shows which pools and which way of choosing them actually pay the most. Every method follows the options loaded from
+the page: largest and smallest share per pool, chains, excluded pools and searches, volume spikes.
 """
 import heapq
+import re
 import statistics
 
 from . import aero as A
@@ -17,46 +19,183 @@ DAY = 86400
 HIST_HOURS = 8 * 24
 DAILY_DAYS = 90
 CLOSED_DAYS = 30
+PERF_DAYS = 30
 STRATEGIES = {
     "48h": "Ultime 48 ore",
     "trend": "Tendenza 12 ore",
     "prudente": "Prudente",
     "nuove": "Chain nuove",
+    "radar": "Radar",
 }
 RULES = {}          # per-strategy settings from config.json ("strategies"), set by main
+OPTIONS = {}        # the page's options loaded into the simulations (state["options"]), set by main
+DEFAULT_OPTIONS = {"cap": 100, "min": 0, "chains_off": [], "excl": [], "rules": [], "spike": False, "spike_k": 75,
+                   "trend": 0, "comp": 3}
+KEY_RE = re.compile(r"\d{1,7}:0x[0-9a-f]{40}")
 
 
 def new_tracker(size, now):
     return {"v": 1, "size": size, "start": now, "last": 0, "open": {s: [] for s in STRATEGIES},
             "closed": {s: [] for s in STRATEGIES}, "virtual": {}, "pool_hist": {}, "pool_daily": {},
-            "pool_reco": {}}
+            "pool_reco": {}, "perf": {}}
+
+
+# ---------------------------------------------------------------- options from the page
+
+def parse_options(raw):
+    """The page's options, checked: anything out of range is refused rather than guessed."""
+    if not isinstance(raw, dict):
+        raise ValueError("options must be an object")
+    o = {k: (list(v) if isinstance(v, list) else v) for k, v in DEFAULT_OPTIONS.items()}
+
+    def num(k, lo, hi, cast):
+        if raw.get(k) is None:
+            return
+        v = cast(raw[k])
+        if not lo <= v <= hi:
+            raise ValueError(f"{k} out of range")
+        o[k] = v
+
+    num("cap", 1, 100, int)
+    num("min", 0, 50, int)
+    num("spike_k", 0, 1000, float)
+    num("trend", 0, 100, float)
+    num("comp", 0, 50, float)
+    if "spike" in raw:
+        o["spike"] = bool(raw["spike"])
+    for k, limit in (("chains_off", 20), ("excl", 3000), ("rules", 100)):
+        v = raw.get(k)
+        if v is not None and (not isinstance(v, list) or len(v) > limit):
+            raise ValueError(f"{k} must be a list of at most {limit} items")
+    names = set(C.CHAIN_SHORT.values())
+    o["chains_off"] = sorted({str(x) for x in raw.get("chains_off") or [] if str(x) in names})
+    o["excl"] = sorted({str(x).lower() for x in raw.get("excl") or [] if KEY_RE.fullmatch(str(x).lower())})
+    rules = []
+    for x in raw.get("rules") or []:
+        t = " ".join(str(x).split())[:80]
+        if t and t.lower() not in [r.lower() for r in rules]:
+            rules.append(t)
+    o["rules"] = rules
+    return o
+
+
+def options():
+    return {**DEFAULT_OPTIONS, **{k: v for k, v in OPTIONS.items() if k in DEFAULT_OPTIONS}}
+
+
+def describe_options(o):
+    parts = [f"max {o['cap']}%" if o["cap"] < 100 else "no max", f"min {o['min']}%" if o["min"] else "no min"]
+    if o["chains_off"]:
+        parts.append("without " + ", ".join(o["chains_off"]))
+    if o["excl"] or o["rules"]:
+        parts.append(f"{len(o['excl'])} pools and {len(o['rules'])} searches excluded")
+    if o["spike"]:
+        parts.append(f"volume spikes excluded (tolerance {o['spike_k']:g}%)")
+    parts.append(f"radar trend {o['trend']:g}%, competition {o['comp']:g}x")
+    return ", ".join(parts)
+
+
+def _hay(state, k):
+    m = state["gauges"].get(k) or {}
+    kind = m.get("kind") if m.get("kind") not in (None, "?") else ""
+    return f"{A.gauge_name(state, k)} {kind} {C.chain_short(A.chain_of(k))}".lower()
+
+
+def rule_hit(hay, rule):
+    """The page's search: every word of it appears in the pool's name, kind or chain."""
+    words = rule.lower().split()
+    return bool(words) and all(w in hay for w in words)
+
+
+def excluded(state, keys, opts):
+    """Pools the options leave out: chains switched off, pools unticked, saved searches."""
+    off = set(opts.get("chains_off") or [])
+    excl = set(opts.get("excl") or [])
+    rules = opts.get("rules") or []
+    out = set()
+    for k in keys:
+        if k in excl or C.chain_short(A.chain_of(k)) in off:
+            out.add(k)
+        elif rules and any(rule_hit(_hay(state, k), r) for r in rules):
+            out.add(k)
+    return out
+
+
+def spikes(state, keys, now, tolerance):
+    """Pools whose fees of the last 48 hours rose more than the whole market's change plus the tolerance.
+
+    The threshold is the market's change plus tolerance% of it: market +50% and tolerance 75% exclude pools above
+    +87.5%. Pools without a change (short history, or almost no fees before) count as unchanged.
+    """
+    cur_sum = prev_sum = 0.0
+    changes = {}
+    for k in keys:
+        cur = A.fees_usd(state, k, now - 48 * HOUR, now + HOUR)
+        d, prev = A.fee_change(state, k, now)
+        cur_sum += cur
+        if d is not None and d > -100:
+            changes[k] = d
+            prev_sum += prev
+        else:
+            prev_sum += cur
+    if not changes or prev_sum <= 0:
+        return set(), None
+    dm = (cur_sum / prev_sum - 1) * 100
+    thr = dm + tolerance / 100 * abs(dm)
+    return {k for k, d in changes.items() if d > thr}, (round(dm, 1), round(thr, 1))
 
 
 # ---------------------------------------------------------------- recommendation
 
-def candidates(state, prices, now, cooldown, strategy):
-    """{gauge: (expected revenue during one cooldown in USD, allocation of everybody else)}."""
+_INPUTS = {}
+
+
+def _inputs(state, prices, now, cooldown):
+    """Per pool, once per run: fees of 48 and 12 hours, incentives over the next cooldown, fee change."""
+    tag = (id(state), now, cooldown)
+    if _INPUTS.get("tag") != tag:
+        keys = set(state["fees"]) | {p["g"] for p in state["incentives"].values()}
+        rows = {}
+        for k in keys:
+            rows[k] = (A.fees_usd(state, k, now - 48 * HOUR, now + HOUR),
+                       A.fees_usd(state, k, now - 12 * HOUR, now + HOUR),
+                       A.incentive_usd(state, prices, k, now, now + cooldown),
+                       A.fee_change(state, k, now)[0])
+        _INPUTS.clear()
+        _INPUTS.update({"tag": tag, "rows": rows})
+    return _INPUTS["rows"]
+
+
+def candidates(state, prices, now, cooldown, strategy, opts=None):
+    """{gauge: (expected revenue during one cooldown in USD, allocation of everybody else)}, within the options."""
+    opts = opts if opts is not None else options()
     ap = state["ap"]
-    keys = set(state["fees"]) | {p["g"] for p in state["incentives"].values()}
+    rows = _inputs(state, prices, now, cooldown)
+    allowed = set(rows) - excluded(state, rows, opts)
+    if opts.get("spike"):
+        allowed -= spikes(state, rows, now, float(opts.get("spike_k", 75)))[0]
     if strategy == "nuove":
         # only big pairs on the chains where Aero is still small, valued like "Ultime 48 ore"
         universe, _ = MD.new_chain_universe(state, RULES.get("nuove"))
-        keys &= universe
-    out = {}
-    for k in keys:
-        m = state["gauges"].get(k) or {}
-        if m.get("ok") is False:
-            continue  # not activated or zero emission cap: an ordinary position cannot vote it
-        f48 = A.fees_usd(state, k, now - 48 * HOUR, now + HOUR)
-        inc = A.incentive_usd(state, prices, k, now, now + cooldown)
+        allowed &= universe
+    out, mkt_rev, mkt_ap = {}, 0.0, 0.0
+    w = float(opts.get("trend", 0)) / 100
+    for k, (f48, f12, inc, d) in rows.items():
         if strategy == "trend":
-            f12 = A.fees_usd(state, k, now - 12 * HOUR, now + HOUR) * 4
-            base = 0.5 * f48 + 0.5 * f12
+            base = 0.5 * f48 + 0.5 * f12 * 4
+        elif strategy == "radar":
+            # the fee part follows its 48-hour change as much as the trend weight says; incentives are scheduled
+            base = f48 * (1 + w * max(-100.0, min(200.0, d or 0.0)) / 100)
         else:
             base = f48
-        rev = base * cooldown / (48 * HOUR) + inc
+        rev = max(0.0, base) * cooldown / (48 * HOUR) + inc
+        a = float(ap.get(k, 0.0))
+        mkt_rev += rev
+        mkt_ap += a
+        if k not in allowed or (state["gauges"].get(k) or {}).get("ok") is False:
+            continue  # left out by the options, or not activated / zero emission cap: cannot be voted
         if rev > 0.01:
-            out[k] = (rev, float(ap.get(k, 0.0)))
+            out[k] = (rev, a)
     if strategy == "prudente" and out:
         # pools far above the typical yield attract other allocators: assume their allocation grows
         ys = [r / a for r, a in out.values() if a >= 1_000_000]
@@ -65,33 +204,35 @@ def candidates(state, prices, now, cooldown, strategy):
             for k, (r, a) in list(out.items()):
                 y = r / max(a, 1.0)
                 out[k] = (r, a * (1 + 0.5 * min(2.0, max(0.0, y / med - 1))) if a > 0 else a)
+    if strategy == "radar" and out:
+        n = float(opts.get("comp", 0))
+        avg = mkt_rev / mkt_ap if mkt_ap > 0 else 0.0
+        if n > 0 and avg > 0:
+            # other allocators come where it pays: no pool keeps more than n times the market's yield per vote
+            out = {k: (r, max(a, r / (n * avg))) for k, (r, a) in out.items()}
     return out
 
 
-def recommend(cands, size, max_pools, slices=100):
-    """Greedy marginal allocation in 1% slices; returns ({gauge: amount}, expected USD).
+def _share(cands, k, x):
+    r, a = cands[k]
+    return r * x / (a + x) if x > 0 else 0.0
 
-    max_pools is the LeafVoter limit, which applies to each chain separately.
-    """
-    if not cands or size <= 0:
-        return {}, 0.0
+
+def _greedy(cands, keys, size, max_pools, cap_slices, slices):
     step = size / slices
-    alloc = {}
-    per_chain = {}
-
-    def share(k, x):
-        r, a = cands[k]
-        return r * x / (a + x) if x > 0 else 0.0
+    alloc, per_chain = {}, {}
 
     def gain(k):
         x = alloc.get(k, 0.0)
-        return share(k, x + step) - share(k, x)
+        return _share(cands, k, x + step) - _share(cands, k, x)
 
-    heap = [(-gain(k), k) for k in cands]
+    heap = [(-gain(k), k) for k in keys]
     heapq.heapify(heap)
     for _ in range(slices):
         while heap:
             neg, k = heapq.heappop(heap)
+            if alloc.get(k, 0.0) >= cap_slices * step - 1e-9:
+                continue                         # already at the largest share allowed per pool
             c = A.chain_of(k)
             if k not in alloc and per_chain.get(c, 0) >= max_pools:
                 continue
@@ -104,7 +245,33 @@ def recommend(cands, size, max_pools, slices=100):
             alloc[k] = alloc.get(k, 0.0) + step
             heapq.heappush(heap, (-gain(k), k))
             break
-    pred = sum(share(k, x) for k, x in alloc.items())
+    return alloc
+
+
+def recommend(cands, size, max_pools, cap=100, min_pct=0, slices=100):
+    """Greedy marginal allocation in 1% slices; returns ({gauge: amount}, expected USD).
+
+    max_pools is the LeafVoter limit, which applies to each chain separately. cap is the largest share of the
+    position in one pool, in percent; with too few pools to place everything it grows just enough. min_pct is the smallest
+    share: the pool with the smallest share under it is dropped and the slices placed again, until every pool
+    reaches it (as in the Radar app).
+    """
+    if not cands or size <= 0:
+        return {}, 0.0
+    keys = [k for k, (r, a) in cands.items() if r > 0]
+    alloc = {}
+    for _ in range(400):
+        # with too few pools for the largest share, it grows just enough to place everything
+        cap_slices = max(1, int(round(cap * slices / 100)), -(-slices // max(1, len(keys))))
+        alloc = _greedy(cands, keys, size, max_pools, cap_slices, slices)
+        if not min_pct or len(alloc) <= 1:
+            break
+        small = [k for k, x in alloc.items() if x / size * 100 < min_pct - 1e-6]
+        if not small:
+            break
+        drop = min(small, key=lambda k: (alloc[k], _share(cands, k, alloc[k])))
+        keys = [k for k in keys if k != drop]
+    pred = sum(_share(cands, k, x) for k, x in alloc.items())
     return alloc, pred
 
 
@@ -177,11 +344,17 @@ def accrue(tr, state, prices, fresh_fees, now, cooldown):
             tot += e
         return tot, per
 
+    perf = tr.setdefault("perf", {})
+    hour = str(now - now % HOUR)
     for s in STRATEGIES:
         still = []
-        for snap in tr["open"].get(s, []):
-            t, alloc, pred, real = snap
+        opened = tr["open"].get(s, [])
+        got = 0.0
+        for snap in opened:
+            t, alloc, pred, real = snap[:4]
+            opt_at = snap[4] if len(snap) > 4 else 0
             tot, per = earned(alloc)
+            got += tot
             for k, e in per.items():
                 alloc[k][2] = round(alloc[k][2] + e, 6)
             real = round(real + tot, 6)
@@ -193,10 +366,17 @@ def accrue(tr, state, prices, fresh_fees, now, cooldown):
                     b[1] = round(b[1] + rg, 6)
                     b[2] = round(b[2] + pg, 6)
                     b[3] += 1
-                tr["closed"].setdefault(s, []).append([t, round(pred, 4), round(real, 4), len(alloc)])
+                tr["closed"].setdefault(s, []).append([t, round(pred, 4), round(real, 4), len(alloc), opt_at])
             else:
-                still.append([t, alloc, pred, real])
+                still.append([t, alloc, pred, real, opt_at])
         tr["open"][s] = still
+        # what all the allocations saved every run earned in this interval, and for how many position-seconds
+        if opened:
+            b = perf.setdefault(s, {}).setdefault(hour, [0.0, 0.0])
+            b[0] = round(b[0] + got, 6)
+            b[1] = round(b[1] + len(opened) * dt, 1)
+        pcut = now - PERF_DAYS * DAY
+        perf[s] = {h: v for h, v in (perf.get(s) or {}).items() if int(h) >= pcut}
         cut = now - CLOSED_DAYS * DAY
         tr["closed"][s] = [c for c in tr["closed"].get(s, []) if c[0] >= cut]
         v = tr["virtual"].get(s)
@@ -218,12 +398,14 @@ def accrue(tr, state, prices, fresh_fees, now, cooldown):
 def snapshot(tr, state, prices, now, cooldown, max_pools):
     """Records the recommendation of every strategy; the virtual positions rebalance when their cooldown ends."""
     latest = {}
+    opts = options()
+    opt_at = int(OPTIONS.get("at") or 0)
     for s in STRATEGIES:
-        cands = candidates(state, prices, now, cooldown, s)
-        alloc, pred = recommend(cands, tr["size"], max_pools)
+        cands = candidates(state, prices, now, cooldown, s, opts)
+        alloc, pred = recommend(cands, tr["size"], max_pools, cap=opts["cap"], min_pct=opts["min"])
         rows = {k: [round(x, 2), round(cands[k][0] * x / (cands[k][1] + x), 6), 0.0] for k, x in alloc.items()}
         if rows:
-            tr["open"].setdefault(s, []).append([now, rows, round(pred, 6), 0.0])
+            tr["open"].setdefault(s, []).append([now, rows, round(pred, 6), 0.0, opt_at])
         latest[s] = {"pred": pred, "alloc": alloc, "cands": cands}
         v = tr["virtual"].get(s)
         if alloc and (not v or now >= v["until"]):
@@ -286,6 +468,60 @@ def _sum_hist(tr, k, start, now):
     return rev, m
 
 
+def _perf(tr, s, now, cooldown, size, aero_usd):
+    """How the allocations saved every run (about every 15 minutes) really paid, in USD a day for one position.
+
+    24 hours and 7 days: revenue that reached every allocation still in its cooldown during that time, divided by
+    the time each was held. Since the start: every saved allocation's revenue over its age.
+    """
+    hours = sorted((int(h), v) for h, v in ((tr.get("perf") or {}).get(s) or {}).items())
+
+    def window(span, need_h):
+        inc = pos = 0.0
+        covered = 0
+        for h, (i, ps) in hours:
+            if h >= now - span:
+                inc += i
+                pos += ps
+                covered += 1 if ps > 0 else 0
+        return (round(inc / pos * DAY, 2) if pos > 0 and covered >= need_h else None), covered
+
+    def apr(rate):
+        return round(rate * 365 / (size * aero_usd) * 100, 2) if rate is not None and aero_usd and size else None
+
+    r24, h24 = window(DAY, 3)
+    r7, h7 = window(7 * DAY, 24)
+    real = age = pred = 0.0
+    saved = 0
+    for snap in tr["open"].get(s, []):
+        a = max(0, now - snap[0])
+        real += snap[3]
+        age += a
+        pred += snap[2] * a / cooldown
+        saved += 1
+    for c in tr["closed"].get(s, []):
+        real += c[2]
+        age += cooldown
+        pred += c[1]
+        saved += 1
+    r_all = round(real / age * DAY, 2) if age >= 3 * HOUR else None
+    series = []
+    for i, (h, _) in enumerate(hours):
+        if h < now - 7 * DAY:
+            continue
+        inc = pos = 0.0
+        for h2, (a, b) in hours[max(0, i - 23):i + 1]:
+            if h2 > h - DAY:
+                inc += a
+                pos += b
+        if pos > 0:
+            series.append([h, round(inc / pos * DAY, 2)])
+    return {"rate_24h": r24, "hours_24h": h24, "rate_7d": r7, "hours_7d": h7, "rate_all": r_all,
+            "apr_24h": apr(r24), "apr_7d": apr(r7), "apr_all": apr(r_all),
+            "real_vs_pred_all": round(real / pred, 3) if pred > 0 and age >= 3 * HOUR else None,
+            "saved": saved, "series": series}
+
+
 def summary(tr, state, now, aero_usd, cooldown, latest):
     size = tr["size"]
     collected_h = (now - tr["start"]) / HOUR
@@ -325,6 +561,7 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
             "hold": _pool_list(state, v.get("alloc") or {}, size),
             "chains": _chain_split(v.get("alloc") or {}, size),
             "curve": [[h, round(c, 2)] for h, c in curve][-24 * 30:],
+            "perf": _perf(tr, s, now, cooldown, size, aero_usd),
             "closed_7d": len(closed),
             "real_vs_pred": round(statistics.median(ratio), 3) if ratio else None,
             "avg_real_47h": round(statistics.mean(c[2] for c in closed), 2) if closed else None,
@@ -379,7 +616,18 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
                                                 if MD.chain_share(mk, c) is not None else None) for c in sorted(ok)},
                   "max_share": rules["max_chain_share"], "pairs_per_chain": rules["pairs_per_chain"],
                   "min_pair_volume_usd": rules["min_pair_volume_usd"], "max_pair_share": rules["max_pair_share"]}
+    # the ranking: the longest window every method has data for
+    def best(st):
+        p = st["perf"]
+        return p["rate_7d"] if rank_by == "7d" else p["rate_24h"] if rank_by == "24h" else p["rate_all"]
+    perfs = [st["perf"] for st in strategies]
+    rank_by = ("7d" if all(p["rate_7d"] is not None for p in perfs) else
+               "24h" if all(p["rate_24h"] is not None for p in perfs) else "all")
+    ranking = [st["id"] for st in sorted(strategies, key=lambda st: -(best(st) or -1e9))]
+    opts = options()
     return {"generated": now, "size": size, "start": tr["start"], "collected_h": round(collected_h, 1),
+            "options": {**opts, "at": OPTIONS.get("at")} if OPTIONS else None,
+            "ranking": ranking, "rank_by": rank_by,
             "new_chains": new_chains,
             "cooldown_h": round(cooldown / HOUR, 2), "aero_usd": aero_usd, "strategies": strategies,
             "pools": pools[:150]}
