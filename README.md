@@ -29,7 +29,7 @@ diluisce ogni pool. Tutte le opzioni della vecchia app:
 | Allocation Power, prezzo AERO | La tua posizione (resta solo sul dispositivo); il prezzo serve solo per l'APR |
 | Peso del trend fee | Corregge le fee delle ultime 48 ore della loro variazione rispetto alle 48 prima |
 | Concorrenza attesa | Nessun pool rende più del multiplo scelto della media del mercato (o «voti fermi») |
-| Escludi i picchi di volume | Toglie i pool le cui fee sono salite più del mercato oltre la tolleranza |
+| Taglia i picchi di volume | Nei pool le cui fee sono salite più del mercato oltre la tolleranza conta le fee delle 48 ore prima, mosse come il mercato; gli incentivi programmati restano |
 | Minimo e massimo per pool | Quota minima e massima di ogni pool, in percentuale |
 | Reti, pool e ricerche scartati | Le reti spente, i pool senza spunta e le ricerche salvate restano fuori |
 

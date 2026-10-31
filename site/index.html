@@ -331,7 +331,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field"><label for="rd-price">Prezzo AERO $</label><input id="rd-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="rd-price-s">Solo per l'APR. Vuoto: il prezzo letto dal monitor</small></div>
       <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
       <div class="field"><label for="rd-comp">Concorrenza attesa</label><select id="rd-comp"><option value="0">Nessuna: voti fermi</option><option value="8">Max 8× la media del mercato</option><option value="5">Max 5× la media del mercato</option><option value="3">Max 3× la media del mercato</option><option value="2">Max 2× la media del mercato</option><option value="1.5">Max 1,5× la media del mercato</option></select><small>Gli altri allocatori arrivano dove si guadagna di più</small></div>
-      <div class="field"><span class="flabel">Escludi i picchi di volume</span><label class="switch"><input id="rd-spk" type="checkbox" role="switch"><span id="rd-spk-s">Spento</span></label>
+      <div class="field"><span class="flabel">Taglia i picchi di volume</span><label class="switch"><input id="rd-spk" type="checkbox" role="switch"><span id="rd-spk-s">Spento</span></label>
         <div class="inline"><small>Tolleranza</small><input id="rd-spkK" class="short" type="text" inputmode="decimal" autocomplete="off" aria-label="Tolleranza in percento del Δ mercato"><small>% del Δ mercato</small></div>
         <small id="rd-spk-info"></small></div>
       <div class="field"><label for="rd-min">Minimo per pool</label><select id="rd-min"><option value="0">Nessun minimo</option><option value="2">2%</option><option value="3">3%</option><option value="5">5% (max 20 pool)</option><option value="10">10% (max 10 pool)</option><option value="15">15% (max 6 pool)</option><option value="20">20% (max 5 pool)</option><option value="25">25% (max 4 pool)</option><option value="34">34% (max 2 pool)</option></select><small>I pool sotto il minimo vengono esclusi e i loro voti ridistribuiti</small></div>
@@ -400,7 +400,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p><b>Revenue proiettata.</b> Per ogni pool prende le fee arrivate agli allocatori nelle ultime 48 ore e le corregge della loro variazione rispetto alle 48 ore prima, moltiplicata per il peso del trend. Aggiunge gli incentivi già programmati per le prossime 48 ore, letti dalla chain.</p>
         <p><b>Quota proporzionale.</b> Chi alloca a un pool si divide la sua revenue in proporzione ai voti. La tua quota è la tua Allocation Power divisa per l'allocazione esistente più la tua.</p>
         <p><b>Concorrenza.</b> I pool con pochi voti e molte fee o incentivi non restano così: gli altri allocatori ci arrivano. Il radar tratta ogni pool come se avesse abbastanza voti da rendere al massimo il multiplo scelto della media del mercato (o li lascia fermi con «voti fermi»).</p>
-        <p><b>Picchi di volume (interruttore).</b> Calcola la variazione delle fee 48 ore di tutto il mercato rispetto alle 48 ore prima, e quella di ogni pool. Esclude i pool saliti oltre il Δ del mercato più la tolleranza: con mercato +50% e tolleranza 75%, la soglia è +50% + 0,75 × 50% = +87,5%. Un picco così raramente si ripete nelle 47 ore dopo.</p>
+        <p><b>Picchi di volume (interruttore).</b> Calcola la variazione delle fee 48 ore di tutto il mercato rispetto alle 48 ore prima, e quella di ogni pool. Un pool è in picco se sale oltre il Δ del mercato più la tolleranza: con mercato +50% e tolleranza 75%, la soglia è +50% + 0,75 × 50% = +87,5%. Un picco così raramente si ripete nelle 47 ore dopo, quindi il radar non conta le sue fee attuali ma quelle delle 48 ore prima, mosse come il mercato (+50% nell'esempio). Il pool non sparisce: gli incentivi programmati per le prossime 47 ore arrivano comunque e restano nel conto.</p>
         <p><b>Minimo e massimo per pool.</b> Con un minimo del 10% ogni pool scelto riceve almeno il 10% dei voti, quindi al massimo 10 pool: il radar toglie il pool con la quota più piccola sotto il minimo e ridistribuisce, finché tutti lo rispettano. Il massimo limita la quota di ogni pool; se i pool rimasti sono troppo pochi per arrivare al 100%, sale quanto basta. Su ogni rete si votano al massimo 20 pool.</p>
         <p><b>Autodiluizione.</b> Ogni voto che aggiungi abbassa il rendimento del successivo. Il radar distribuisce la tua AP a fette dell'1%, ogni volta al pool che rende di più sulla fetta successiva.</p>
         <p><b>Simulazioni.</b> «Carica queste opzioni nelle simulazioni» le manda al monitor: da quel giro in poi tutti e cinque i metodi della simulazione rispettano massimo, minimo, reti, pool e ricerche scartati e picchi di volume; trend e concorrenza definiscono il metodo «Radar». La dimensione della simulazione resta la sua: la tua Allocation Power resta solo su questo dispositivo.</p>
@@ -1203,8 +1203,14 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const Dm = prev > 0 ? (now / prev - 1) * 100 : 0, K = Math.max(0, rdNum(RD.spkK, 0)) / 100, thr = Dm + K * Math.abs(Dm);
       spike = { Dm, thr, n: withD.length, ids: new Set(withD.filter(p => p.d > thr).map(p => p.key)) };
     }
-    const act = list.filter(p => p.on && !(spike && spike.ids.has(p.key))).map(p => {
-      const R = projected(p, w), A0 = Math.max(0, p.alloc);
+    // a spike does not drop the pool: its fees go back to the 48 hours before, moved like the market; incentives stay
+    const value = p => {
+      const R = projected(p, w);
+      if (!(spike && spike.ids.has(p.key))) return R;
+      return p.inc + Math.min(R - p.inc, Math.max(0, p.prev * (1 + spike.Dm / 100)));
+    };
+    const act = list.filter(p => p.on).map(p => {
+      const R = value(p), A0 = Math.max(0, p.alloc);
       return { p, R, A0, A: N && avg > 0 ? Math.max(A0, R / (N * avg)) : A0, k: 0 };
     });
     const slice = ap / 100;
@@ -1286,9 +1292,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     }
     $("rd-spk-s").textContent = RD.spk ? "Acceso" : "Spento";
     const sp = r.spike, si = $("rd-spk-info");
-    if (!sp) si.textContent = "Esclude i pool la cui variazione delle fee 48 ore supera quella del mercato di oltre la tolleranza";
+    if (!sp) si.textContent = "Riporta al livello di prima le fee dei pool saliti più del mercato oltre la tolleranza; gli incentivi programmati restano";
     else if (!sp.n) si.textContent = "Nessuna variazione delle fee ancora: il filtro non ha nulla da confrontare";
-    else si.textContent = `Mercato ${sPct(sp.Dm)} · esclusi i pool sopra ${sPct(sp.thr)}: ${sp.ids.size}`;
+    else si.textContent = `Mercato ${sPct(sp.Dm)} · fee tagliate nei pool sopra ${sPct(sp.thr)}: ${sp.ids.size} (incentivi tenuti)`;
     const mk = $("rd-mkt");
     if (r.avg > 0 && r.ap > 0) {
       const day = r.avg * r.ap / 2, mine = r.total / 2;
@@ -1347,7 +1353,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const tr = document.createElement("tr");
       const isSp = !!(r.spike && r.spike.ids.has(p.key));
       tr.className = (p.on ? "" : "off") + (isSp ? " spike" : "");
-      if (isSp) tr.title = "Escluso: picco di volume rispetto al mercato";
+      if (isSp) tr.title = "Picco di volume: fee riportate al livello delle 48 ore prima mosse come il mercato, incentivi tenuti";
       const td0 = el("td", "ck"), cb = document.createElement("input");
       cb.type = "checkbox"; cb.checked = p.on; cb.setAttribute("aria-label", "Usa " + p.name + " " + p.chain);
       const rl = ruleFor(p);
@@ -1552,7 +1558,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const nx = (o.excl || []).length, nr = (o.rules || []).length;
     if (nx) parts.push(`${nx} ${nx === 1 ? "pool scartato" : "pool scartati"}`);
     if (nr) parts.push(`${nr === 1 ? "scartata la ricerca" : "scartate le ricerche"} ${o.rules.map(r => "«" + r + "»").join(", ")}`);
-    if (o.spike) parts.push(`picchi di volume esclusi (tolleranza ${String(o.spike_k).replace(".", ",")}%)`);
+    if (o.spike) parts.push(`picchi di volume tagliati (tolleranza ${String(o.spike_k).replace(".", ",")}%)`);
     return parts.join(", ");
   }
   let optsRun = false;

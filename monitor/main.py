@@ -254,6 +254,9 @@ def run(args):
         state["tracker"] = T.new_tracker(size, now)
         log(f"tracker: new collection with {size:,.0f} sAERO")
     tr = state["tracker"]
+    if "broken_prices_1" not in state.setdefault("repairs", []):
+        T.repair_broken_prices(tr, now, log)
+        state["repairs"].append("broken_prices_1")
     aero_key = A.tkey(C.BASE_CHAIN, params["aero"])
     T.accrue(tr, state, prices, fresh_fees, now, params["cooldown"])
     latest_reco = T.snapshot(tr, state, prices, now, params["cooldown"], params["max_gauges"])

@@ -90,7 +90,7 @@ def describe_options(o):
     if o["excl"] or o["rules"]:
         parts.append(f"{len(o['excl'])} pools and {len(o['rules'])} searches excluded")
     if o["spike"]:
-        parts.append(f"volume spikes excluded (tolerance {o['spike_k']:g}%)")
+        parts.append(f"volume spikes trimmed, incentives kept (tolerance {o['spike_k']:g}%)")
     parts.append(f"radar trend {o['trend']:g}%, competition {o['comp']:g}x")
     return ", ".join(parts)
 
@@ -124,25 +124,27 @@ def excluded(state, keys, opts):
 def spikes(state, keys, now, tolerance):
     """Pools whose fees of the last 48 hours rose more than the whole market's change plus the tolerance.
 
-    The threshold is the market's change plus tolerance% of it: market +50% and tolerance 75% exclude pools above
+    The threshold is the market's change plus tolerance% of it: market +50% and tolerance 75% flag pools above
     +87.5%. Pools without a change (short history, or almost no fees before) count as unchanged.
+    Returns ({pool: fees of the 48 hours before}, (market change, threshold)).
     """
     cur_sum = prev_sum = 0.0
-    changes = {}
+    changes, prevs = {}, {}
     for k in keys:
         cur = A.fees_usd(state, k, now - 48 * HOUR, now + HOUR)
         d, prev = A.fee_change(state, k, now)
         cur_sum += cur
         if d is not None and d > -100:
             changes[k] = d
+            prevs[k] = prev
             prev_sum += prev
         else:
             prev_sum += cur
     if not changes or prev_sum <= 0:
-        return set(), None
+        return {}, None
     dm = (cur_sum / prev_sum - 1) * 100
     thr = dm + tolerance / 100 * abs(dm)
-    return {k for k, d in changes.items() if d > thr}, (round(dm, 1), round(thr, 1))
+    return {k: prevs[k] for k, d in changes.items() if d > thr}, (round(dm, 1), round(thr, 1))
 
 
 # ---------------------------------------------------------------- recommendation
@@ -172,8 +174,10 @@ def candidates(state, prices, now, cooldown, strategy, opts=None):
     ap = state["ap"]
     rows = _inputs(state, prices, now, cooldown)
     allowed = set(rows) - excluded(state, rows, opts)
+    spiked, dm = {}, 0.0
     if opts.get("spike"):
-        allowed -= spikes(state, rows, now, float(opts.get("spike_k", 75)))[0]
+        spiked, mk = spikes(state, rows, now, float(opts.get("spike_k", 75)))
+        dm = mk[0] if mk else 0.0
     if strategy == "nuove":
         # only big pairs on the chains where Aero is still small, valued like "Ultime 48 ore"
         universe, _ = MD.new_chain_universe(state, RULES.get("nuove"))
@@ -188,6 +192,9 @@ def candidates(state, prices, now, cooldown, strategy, opts=None):
             base = f48 * (1 + w * max(-100.0, min(200.0, d or 0.0)) / 100)
         else:
             base = f48
+        if k in spiked:
+            # a spike rarely repeats: fees go back to the 48 hours before, moved like the market; incentives stay
+            base = min(base, max(0.0, spiked[k] * (1 + dm / 100)))
         rev = max(0.0, base) * cooldown / (48 * HOUR) + inc
         a = float(ap.get(k, 0.0))
         mkt_rev += rev
@@ -316,6 +323,42 @@ def _record_market(tr, state, rev, now):
             d.pop(day)
         if not d:
             del tr["pool_daily"][k]
+
+
+def repair_broken_prices(tr, now, log, limit=1e7):
+    """Removes what fees priced with a broken price left in the simulation (30 Oct 2026: WBTC/USDT on Ethereum).
+
+    No saved allocation of a few hundred thousand sAERO earns or expects 10 million USD: those snapshots, hours and
+    pool buckets go, and the virtual positions that moved on such a forecast may move again on the next run.
+    """
+    big = lambda *xs: any(isinstance(x, (int, float)) and x > limit for x in xs)
+    n = {"open": 0, "closed": 0, "perf": 0, "pool": 0, "virtual": 0}
+    for st, snaps in tr["open"].items():
+        keep = [x for x in snaps if not big(x[2], x[3]) and not any(big(r[1], r[2]) for r in x[1].values())]
+        n["open"] += len(snaps) - len(keep)
+        tr["open"][st] = keep
+    for st, rows in tr["closed"].items():
+        keep = [c for c in rows if not big(c[1], c[2])]
+        n["closed"] += len(rows) - len(keep)
+        tr["closed"][st] = keep
+    for st, hours in tr.get("perf", {}).items():
+        for h in [h for h, v in hours.items() if big(v[0])]:
+            del hours[h]
+            n["perf"] += 1
+    for name, col in (("pool_hist", (0, 2)), ("pool_daily", (0, 2)), ("pool_reco", (1, 2))):
+        for k, d in list(tr.get(name, {}).items()):
+            for t in [t for t, v in d.items() if big(*(v[i] for i in col))]:
+                del d[t]
+                n["pool"] += 1
+            if not d:
+                del tr[name][k]
+    for v in tr.get("virtual", {}).values():
+        if big(v.get("pred")):
+            v["until"] = now
+            v["moves"] = max(0, v.get("moves", 1) - 1)
+            n["virtual"] += 1
+    log("tracker: removed what broken prices left: " + ", ".join(f"{k} {x}" for k, x in n.items()))
+    return n
 
 
 def _reco_bucket(tr, k, day):

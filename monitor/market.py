@@ -32,6 +32,32 @@ REFERENCE = {"eth": "8453:0x4200000000000000000000000000000000000006",
              "btc": "8453:0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"}
 
 
+# A fresh price this far from the last one, or from the asset it stands for, is a broken pair and is not used.
+MAX_JUMP = 20.0
+MAJOR_BAND = (0.7, 1.4)       # wrapped ETH/BTC against the same asset on Base
+USD_BAND = (0.8, 1.25)        # stablecoins
+
+
+def _asset(k, erc20):
+    if k in STABLES:
+        return "usd"
+    return MAJORS.get(((erc20.get(k) or {}).get("sym") or "").upper())
+
+
+def sane(k, price, cache, erc20, ref, now):
+    """Why a freshly fetched price cannot be right, or None when it looks plausible."""
+    asset = _asset(k, erc20)
+    if asset == "usd" and not USD_BAND[0] <= price <= USD_BAND[1]:
+        return "stablecoin"
+    if asset in ("eth", "btc") and k not in REFERENCE.values() and ref.get(asset):
+        if not MAJOR_BAND[0] <= price / ref[asset] <= MAJOR_BAND[1]:
+            return f"{asset.upper()} at {ref[asset]:,.0f}"
+    old = cache.get(k)
+    if old and old[0] > 0 and now - old[1] < 86400 and not 1 / MAX_JUMP <= price / old[0] <= MAX_JUMP:
+        return f"last price {old[0]:.6g}"
+    return None
+
+
 def _split(key):
     cid, addr = key.split(":", 1)
     return int(cid), addr.lower()
@@ -67,7 +93,7 @@ def fetch_prices(token_keys, cache, now, log, chains_cfg, erc20, slugs, max_age=
             continue
         cid, addr = _split(k)
         by_chain.setdefault(cid, []).append(addr)
-    fails, looked = 0, 0
+    fails, looked, fetched = 0, 0, {}
     taken = {str(c.get("dexscreener")) for c in chains_cfg.values() if c.get("dexscreener")}
     for cid, addrs in by_chain.items():
         ccfg = chains_cfg.get(str(cid)) or {}
@@ -106,10 +132,17 @@ def fetch_prices(token_keys, cache, now, log, chains_cfg, erc20, slugs, max_age=
             for t in part:
                 best = as_base.get(t) if (as_base.get(t) or (0, 0))[1] >= 500 else as_quote.get(t)
                 if best and best[1] >= 500:
-                    k = f"{cid}:{t}"
-                    prices[k] = best[0]
-                    cache[k] = [best[0], now]
+                    fetched[f"{cid}:{t}"] = best[0]
             time.sleep(0.25)
+    # a broken pair (absurd priceNative, spoofed liquidity) must not price real fees: reference assets first
+    for k in sorted(fetched, key=lambda x: x not in REFERENCE.values()):
+        ref = {name: prices.get(r) or (cache.get(r) or [None])[0] for name, r in REFERENCE.items()}
+        why = sane(k, fetched[k], cache, erc20, ref, now)
+        if why:
+            log(f"prices: {k} at {fetched[k]:.6g} rejected ({why})")
+            continue
+        prices[k] = fetched[k]
+        cache[k] = [fetched[k], now]
     # fallbacks: old prices, $1 stables, the same asset on Base
     ref = {name: prices.get(k) or (cache.get(k) or [None])[0] for name, k in REFERENCE.items()}
     ref["usd"] = 1.0

@@ -506,6 +506,10 @@ def refresh_tokens(rpc, cid, state, cfg, log):
 
 # ---------------------------------------------------------------- fees and incentives
 
+MAX_TRANSFER_USD = 2_000_000
+MAX_HOUR_USD = 5_000_000
+
+
 def settle_rewards(state, prices, now, log):
     """Validates fee transfers and incentive programs against the gauge's rewards manager, then prices them."""
     # fees used to be kept for 72 hours: anything older was already dropped when the window grew to 100 hours
@@ -530,6 +534,11 @@ def settle_rewards(state, prices, now, log):
             keep.append(entry)
             continue
         usd = int(amount) / 10 ** dec * p
+        if usd > MAX_TRANSFER_USD:
+            # no Aero pool collects this much in one transfer: the price is wrong, try again next run
+            log(f"rewards: fee transfer of {usd:,.0f} USD on {key} held back (token {tk} at {p:.6g})")
+            keep.append(entry)
+            continue
         fresh.append((ts, key, usd))
         hour = str(ts - ts % HOUR)
         bucket = state["fees"].setdefault(key, {})
@@ -538,7 +547,8 @@ def settle_rewards(state, prices, now, log):
     state["fees_pending"] = keep[-40000:]
     cutoff = now - FEE_WINDOW
     for key in list(state["fees"]):
-        state["fees"][key] = {h: v for h, v in state["fees"][key].items() if int(h) >= cutoff}
+        # hours over the limit were priced with a broken price before the checks existed
+        state["fees"][key] = {h: v for h, v in state["fees"][key].items() if int(h) >= cutoff and v <= MAX_HOUR_USD}
         if not state["fees"][key]:
             del state["fees"][key]
     new_inc, waiting = [], []
