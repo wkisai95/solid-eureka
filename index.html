@@ -1,0 +1,2020 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Monitor sAERO</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Monitor sAERO">
+<meta name="theme-color" content="#0f1a1c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of instrument panels, summary first, the pool table last and widest. */
+:root {
+  --bg: #f3f5f2;
+  --panel: #ffffff;
+  --ink: #142022;
+  --ink-2: #4d5d5f;
+  --line: #d9e0dc;
+  --accent: #0f7b74;
+  --accent-soft: #d3ebe7;
+  --passive: #b9c6c2;
+  --good: #1e7d3c;
+  --warn: #a8640c;
+  --bad: #b3302a;
+  --chip: #e6ece8;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --s5: #e87ba4;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1517; --panel: #142023; --ink: #e4ecea; --ink-2: #9db0ad; --line: #26383b;
+    --accent: #3cc2b4; --accent-soft: #163c3a; --passive: #3b4f51; --good: #58c27a; --warn: #e3a34a;
+    --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1517; --panel: #142023; --ink: #e4ecea; --ink-2: #9db0ad; --line: #26383b;
+  --accent: #3cc2b4; --accent-soft: #163c3a; --passive: #3b4f51; --good: #58c27a; --warn: #e3a34a;
+  --bad: #ef6f66; --chip: #1b2c2f; --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) 40px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: grid; gap: 8px; }
+h1 { font: 700 30px/1.1 var(--f-display); margin: 0; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+h1 svg { flex: none; }
+h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
+.sub { color: var(--ink-2); font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--chip); border-radius: 999px; padding: 3px 10px; font-size: 13px; color: var(--ink-2); }
+.chip b { color: var(--ink); font-weight: 600; font-family: var(--f-num); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+.note { color: var(--ink-2); font-size: 13px; margin: 0; max-width: 68ch; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.banner { border: 1px solid var(--warn); color: var(--warn); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
+.grid2 { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
+.cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.card h3 { margin: 0; font: 600 15px/1.3 var(--f-body); display: flex; align-items: center; gap: 8px; }
+.card h3 i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.card .big { font: 500 24px/1.15 var(--f-num); }
+.card .big small { font: 400 13px var(--f-body); color: var(--ink-2); margin-left: 4px; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13px; }
+.kv span:nth-child(odd) { color: var(--ink-2); }
+.kv span:nth-child(even) { font-family: var(--f-num); text-align: right; }
+.holding { font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgb(0 0 0 / .12); white-space: nowrap; }
+.chartbox { position: relative; min-width: 0; }   /* the chart scrolls inside: it must not widen the panel */
+.pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill.free { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+.pill.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.pill.act { background: var(--accent-soft); color: var(--accent); }
+.pill.pas { background: var(--chip); color: var(--ink-2); }
+.list { display: grid; gap: 0; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .t { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.row .r { text-align: right; }
+.row .d { grid-column: 1 / -1; color: var(--ink-2); font-size: 13px; overflow-wrap: anywhere; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.stat .d { font-size: 12px; color: var(--ink-2); font-family: var(--f-num); }
+#me-addr { flex: 1 1 260px; font-family: var(--f-num); }
+.mepos { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.mepos h3 { margin: 0; font: 600 16px/1.3 var(--f-body); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.mepos h3 .sub { font-weight: 400; }
+.mepos .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.mepos table td.old { color: var(--ink-2); }
+.warnline { color: var(--warn); font-size: 13px; }
+.stat .k { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .06em; }
+.stat .v { font: 500 20px/1.2 var(--f-num); }
+.chart { width: 100%; overflow-x: auto; }
+.chart svg { display: block; min-width: 520px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
+.legend span { white-space: nowrap; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+input[type=search], input[type=text], select {
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 7px 10px; min-width: 0;
+}
+input[type=search], #mine-ids { flex: 1 1 180px; }
+button {
+  font: 600 14px/1 var(--f-body); color: var(--bg); background: var(--accent); border: 0;
+  border-radius: 10px; padding: 9px 16px; cursor: pointer;
+}
+button:hover { filter: brightness(1.08); }
+label.toggle { font-size: 14px; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tbl { overflow-x: auto; border-top: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--panel); }
+th { font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; user-select: none; }
+th[aria-sort] { color: var(--accent); }
+td .nm { font-weight: 600; }
+td .kd { color: var(--ink-2); font-size: 12px; margin-left: 6px; }
+td.ch, th[data-k=chain] { text-align: left; }
+.up { color: var(--good); } .down { color: var(--bad); } .muted { color: var(--ink-2); }
+.spark { vertical-align: middle; margin-left: 6px; }
+footer { color: var(--ink-2); font-size: 13px; display: grid; gap: 4px; }
+footer a { color: var(--accent); }
+.empty { color: var(--ink-2); font-size: 14px; padding: 6px 0; }
+.runbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+button:disabled { opacity: .55; cursor: default; filter: none; }
+.linkish { background: none; border: 0; padding: 0; color: var(--accent); font: 500 14px/1.4 var(--f-body); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.steps b { color: var(--ink); font-weight: 600; }
+.steps a, .note a, .runbar a { color: var(--accent); }
+.tag { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font-size: 11px;
+  color: var(--ink-2); margin-left: 6px; vertical-align: 1px; white-space: nowrap; }
+.bad-text { color: var(--bad); }
+.chainsplit, .method { font-size: 12px; color: var(--ink-2); }
+input[type=password] { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 7px 10px; min-width: 0; flex: 1 1 220px; }
+.reco-h { font: 600 13px/1.3 var(--f-body); margin-top: 4px; }
+.reco { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.reco li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.reco .nm { min-width: 0; overflow-wrap: anywhere; }
+.reco .kd2 { color: var(--ink-2); font-size: 11px; margin-left: 5px; }
+.reco .pc { flex: none; font: 500 13px var(--f-num); font-variant-numeric: tabular-nums; }
+details.more summary { cursor: pointer; color: var(--accent); font-size: 13px; padding: 2px 0; }
+.row > details.pairs { grid-column: 1 / -1; margin-top: 4px; }
+details.more[open] summary { margin-bottom: 3px; }
+/* folding: long sections open and close, and the page remembers which */
+details.fold > summary, details.sub-fold > summary { list-style: none; cursor: pointer; }
+details.fold > summary::-webkit-details-marker, details.sub-fold > summary::-webkit-details-marker { display: none; }
+details.panel { display: block; }
+details.panel > .fold-body { display: grid; gap: 12px; margin-top: 12px; min-width: 0; }
+details.fold > summary h2::before, details.sub-fold > summary .fold-t::before {
+  content: ""; display: inline-block; width: 0; height: 0; margin-right: 9px; vertical-align: 2px;
+  border-left: 6px solid var(--accent); border-top: 5px solid transparent; border-bottom: 5px solid transparent; transition: transform .15s; }
+details.fold[open] > summary h2::before, details.sub-fold[open] > summary .fold-t::before { transform: rotate(90deg); }
+details.sub-fold { border-top: 1px solid var(--line); padding-top: 10px; min-width: 0; }
+details.sub-fold > summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+details.sub-fold > summary .fold-t { font: 600 16px/1.3 var(--f-display); }
+details.sub-fold > .fold-body { display: grid; gap: 10px; margin-top: 10px; min-width: 0; }
+
+/* Radar */
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 14px; }
+.field { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.field > label, .flabel { font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; }
+.field small { font-size: 12px; color: var(--ink-2); }
+.field .inline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+input[type=number], input[type=datetime-local] {
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 7px 10px; min-width: 0; font-family: var(--f-num); }
+input.short { width: 76px; }
+input[type=range] { accent-color: var(--accent); width: 100%; }
+label.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: var(--ink);
+  text-transform: none; letter-spacing: 0; font-weight: 400; }
+label.switch input { appearance: none; width: 40px; height: 22px; border-radius: 11px; background: var(--line); position: relative;
+  margin: 0; cursor: pointer; flex: none; }
+label.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--panel); transition: left .15s; }
+label.switch input:checked { background: var(--accent); }
+label.switch input:checked::after { left: 21px; }
+.dd { position: relative; }
+.dd summary { list-style: none; cursor: pointer; border: 1px solid var(--line); border-radius: 10px; padding: 7px 28px 7px 10px;
+  background: var(--bg); font-size: 14px; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd summary::-webkit-details-marker { display: none; }
+.dd summary::after { content: "▾"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-2); }
+.dd[open] summary { border-color: var(--accent); }
+.ddlist { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; max-height: 260px; overflow-y: auto; padding: 4px 0; box-shadow: 0 6px 18px rgb(0 0 0 / .14); }
+.ddi { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 10px; cursor: pointer;
+  font-size: 14px; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 400; }
+.ddi:hover { background: var(--chip); }
+.ddi .n { font-family: var(--f-num); font-size: 11px; color: var(--ink-2); }
+.loadbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; }
+.loadbar.diff { border-color: var(--warn); }
+.rd-result { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .rd-result { grid-template-columns: 1fr; } }
+.rd-main, .rd-side { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.rd-main a { color: var(--accent); }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kpi { border-left: 3px solid var(--accent); padding: 2px 10px; min-width: 0; }
+.kpi .v { font: 500 20px/1.2 var(--f-num); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .k { font-size: 12px; color: var(--ink-2); }
+.strips { display: grid; gap: 6px; }
+.strip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--bg);
+  border-radius: 10px; padding: 8px 12px; border-left: 4px solid var(--accent); }
+.strip .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip .sb { font: 12px var(--f-num); color: var(--ink-2); overflow-wrap: anywhere; }
+.strip .pct { font: 700 26px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 5px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
+.lbl { font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; }
+.compare { font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; }
+.compare b { color: var(--ink); font-family: var(--f-num); font-weight: 500; }
+.big.num { font: 500 20px/1.2 var(--f-num); }
+.toast { min-height: 1.3em; font-size: 13px; color: var(--good); }
+.toast.bad { color: var(--bad); }
+.mine3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .mine3 { grid-template-columns: 1fr; } }
+.mtile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; align-content: start; }
+.mtile .v { font: 500 22px/1.2 var(--f-num); }
+.mtile .s { font-size: 12px; color: var(--ink-2); }
+.mtile .inline { display: flex; gap: 6px; min-width: 0; }
+.mtile .inline input { flex: 1 1 0; min-width: 0; width: 100%; }
+.mtile .inline button { flex: none; }
+.strip .kd, .mvcol .kd, .xchip .kd { color: var(--ink-2); font-size: 12px; margin-left: 6px; font-weight: 400; }
+.mdet { grid-column: 1 / -1; }
+.mdet ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; justify-self: start; }
+.seg button { background: transparent; color: var(--ink-2); border-radius: 0; padding: 7px 11px; font: 500 13px var(--f-body); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.mov { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 700px) { .mov { grid-template-columns: 1fr; } }
+.mvcol { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.mvcol ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; }
+.mvcol li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 5px 0;
+  border-top: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.mvcol li .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mvcol li .n b { font-weight: 600; }
+.mvcol li .v { font-family: var(--f-num); text-align: right; }
+.tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+@media (max-width: 600px) { .tools { grid-template-columns: 1fr; } }
+.xbox { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.xchip { display: inline-flex; align-items: center; gap: 2px; background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
+  padding: 2px 2px 2px 10px; max-width: 100%; }
+.xchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xchip button { background: none; color: var(--ink-2); padding: 2px 8px; font-weight: 500; }
+table.rd-tbl th { cursor: default; }
+table.rd-tbl th:nth-child(2), table.rd-tbl th:nth-child(3) { text-align: left; }
+table.rd-tbl tr.off td { opacity: .45; }
+table.rd-tbl tr.spike td { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+table.rd-tbl td.ck { position: sticky; left: 0; background: var(--panel); }
+table.rd-tbl td.ck + td { text-align: left; }
+.how p { margin: 0; max-width: 70ch; font-size: 14px; }
+.how p b { font-weight: 600; }
+table.rank th { cursor: default; }
+table.rank td:first-child { display: flex; align-items: center; gap: 8px; }
+table.rank td:first-child i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; flex: none; }
+table.rank tr.top td { font-weight: 600; }
+table.rank th { white-space: normal; vertical-align: bottom; }
+@media (max-width: 600px) { table.rank .x { display: none; } table.rank th, table.rank td { padding: 8px 5px; }
+  table.rank td:first-child { white-space: normal; } }
+@media (max-width: 520px) { h1 { font-size: 26px; } .stat .v { font-size: 18px; } }
+@media (prefers-reduced-motion: no-preference) { .sweep { transform-origin: 14px 14px; animation: sweep 6s linear infinite; } }
+@keyframes sweep { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+        <circle cx="14" cy="14" r="12.5" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="7" fill="none" stroke="var(--accent)" stroke-width="1" opacity=".5"/>
+        <g class="sweep"><path d="M14 14 L14 1.5 A12.5 12.5 0 0 1 24.8 7.8 Z" fill="var(--accent)" opacity=".28"/></g>
+        <circle cx="19" cy="9" r="1.8" fill="var(--accent)"/>
+      </svg>
+      Monitor sAERO
+    </h1>
+    <div class="sub" id="updated">Carico i dati…</div>
+    <div class="chips" id="chips"></div>
+    <div class="runbar">
+      <button type="button" id="run-now">Raccogli i dati adesso</button>
+      <span class="sub" id="run-state" role="status" aria-live="polite"></span>
+      <button type="button" class="linkish" id="gh-open">Collega GitHub</button>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+  </header>
+
+  <section class="panel" id="gh-panel" hidden>
+    <div class="panel-head"><h2>Avvia la raccolta da qui</h2><button type="button" class="linkish" id="gh-close">Chiudi</button></div>
+    <p class="note">Per far partire il monitor da questa pagina serve un token GitHub che può solo avviare il workflow del monitor. Si crea una volta e resta salvato solo su questo dispositivo.</p>
+    <ol class="steps">
+      <li>Apri <a id="gh-new" href="#" target="_blank" rel="noopener">la pagina di GitHub per il nuovo token</a>: nome, scadenza e permesso <b>Actions: Read and write</b> sono già compilati.</li>
+      <li>In <b>Repository access</b> scegli <b>Only select repositories</b> e seleziona <b id="gh-repo-name">solid-eureka</b>.</li>
+      <li>Premi <b>Generate token</b>, copia il token e incollalo qui sotto.</li>
+    </ol>
+    <form class="controls" id="gh-form">
+      <input type="password" id="gh-token" placeholder="github_pat_…" autocomplete="off" spellcheck="false" aria-label="Token GitHub">
+      <button type="submit">Salva</button>
+    </form>
+    <p class="note" id="gh-msg"></p>
+    <p class="note">Senza token puoi avviarla anche da GitHub: <a id="gh-actions" href="https://github.com/wkisai95/solid-eureka/actions/workflows/monitor.yml" target="_blank" rel="noopener">Actions → Monitor sAERO → Run workflow</a>.</p>
+    <div class="controls"><button type="button" class="ghost" id="gh-forget" hidden>Dimentica il token</button></div>
+  </section>
+
+  <section class="panel" id="me">
+    <div class="panel-head"><h2>I tuoi sAERO</h2><span class="sub" id="me-when"></span></div>
+    <form class="controls" id="me-form">
+      <input type="text" id="me-addr" autocomplete="off" spellcheck="false" placeholder="Il tuo indirizzo 0x…" aria-label="Indirizzo del wallet">
+      <button type="submit">Mostra</button>
+    </form>
+    <p class="note">L'indirizzo resta solo su questo dispositivo: la pagina legge da Base quali sAERO possiede e prende dal monitor quanto ha incassato ognuno. Gli incassi sono fee e incentivi dei pool, divisi in base alla quota di ogni posizione nel pool.</p>
+    <div class="stats" id="me-stats"></div>
+    <div class="chartbox"><div class="chart" id="me-chart"></div></div>
+    <div id="me-list"></div>
+    <details class="sub-fold" data-fold="me-ids">
+      <summary><span class="fold-t">Altre posizioni per numero</span><span class="sub" id="me-ids-sum"></span></summary>
+      <div class="fold-body">
+        <form class="controls" id="mine-form">
+          <input type="text" id="mine-ids" inputmode="numeric" autocomplete="off" placeholder="Es. 1234, 5678" aria-label="Numeri di altre posizioni">
+          <button type="submit">Aggiungi</button>
+        </form>
+        <p class="note">Per seguire posizioni che non sono su questo indirizzo, per esempio su un altro wallet.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="panel" id="radar">
+    <div class="panel-head"><h2>Radar sAERO</h2><span class="sub" id="rd-when"></span></div>
+    <p class="note">Dove allocare il tuo sAERO per incassare di più nelle prossime 48 ore. I pool arrivano dal monitor, con fee e incentivi letti dalla chain su tutte e sette le reti. Inserisci la tua Allocation Power: il radar divide il 100% tra i pool tenendo conto di quanto <b>la tua stessa allocazione diluisce</b> ogni pool.</p>
+
+    <details class="sub-fold" data-fold="rd-mine" open>
+      <summary><span class="fold-t">La tua allocazione</span><span class="sub" id="rd-mine-sum"></span></summary>
+      <div class="fold-body"><div class="mine3" id="rd-mine"></div></div>
+    </details>
+
+    <div class="opts" id="rd-opts">
+      <div class="field"><label for="rd-ap">Allocation Power</label><input id="rd-ap" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>I tuoi sAERO, dalla card del tuo stake</small></div>
+      <div class="field"><label for="rd-price">Prezzo AERO $</label><input id="rd-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="rd-price-s">Solo per l'APR. Vuoto: il prezzo letto dal monitor</small></div>
+      <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
+      <div class="field"><label for="rd-comp">Concorrenza attesa</label><select id="rd-comp"><option value="0">Nessuna: voti fermi</option><option value="8">Max 8× la media del mercato</option><option value="5">Max 5× la media del mercato</option><option value="3">Max 3× la media del mercato</option><option value="2">Max 2× la media del mercato</option><option value="1.5">Max 1,5× la media del mercato</option></select><small>Gli altri allocatori arrivano dove si guadagna di più</small></div>
+      <div class="field"><span class="flabel">Taglia i picchi di volume</span><label class="switch"><input id="rd-spk" type="checkbox" role="switch"><span id="rd-spk-s">Spento</span></label>
+        <div class="inline"><small>Tolleranza</small><input id="rd-spkK" class="short" type="text" inputmode="decimal" autocomplete="off" aria-label="Tolleranza in percento del Δ mercato"><small>% del Δ mercato</small></div>
+        <small id="rd-spk-info"></small></div>
+      <div class="field"><label for="rd-min">Minimo per pool</label><select id="rd-min"><option value="0">Nessun minimo</option><option value="2">2%</option><option value="3">3%</option><option value="5">5% (max 20 pool)</option><option value="10">10% (max 10 pool)</option><option value="15">15% (max 6 pool)</option><option value="20">20% (max 5 pool)</option><option value="25">25% (max 4 pool)</option><option value="34">34% (max 2 pool)</option></select><small>I pool sotto il minimo vengono esclusi e i loro voti ridistribuiti</small></div>
+      <div class="field"><span class="flabel" id="rd-chains-l">Reti</span><details class="dd" id="rd-chains-dd"><summary id="rd-chains-sum">Tutte le reti</summary><div class="ddlist" id="rd-chains" role="group" aria-labelledby="rd-chains-l"></div></details><small>Togli la spunta alle reti su cui non vuoi allocare</small></div>
+      <div class="field"><label for="rd-cap">Massimo per pool</label><select id="rd-cap"><option value="100">Nessun limite</option><option value="50">50%</option><option value="34">34%</option><option value="25">25%</option><option value="20">20%</option><option value="10">10%</option></select><small>Distribuisce il rischio di previsione</small></div>
+    </div>
+    <div class="loadbar" id="rd-loadbar">
+      <span class="sub" id="rd-load-state">Le simulazioni qui sotto non usano ancora queste opzioni.</span>
+      <button type="button" class="ghost" id="rd-load">Carica queste opzioni nelle simulazioni</button>
+    </div>
+
+    <div class="rd-result">
+      <div class="rd-main">
+        <div class="reco-h">Allocazione suggerita</div>
+        <p class="note">Percentuali intere che sommano esattamente a 100, il formato della card Allocate.</p>
+        <div class="kpis">
+          <div class="kpi"><div class="v" id="rd-k48">—</div><div class="k">stima prossime 48 ore</div></div>
+          <div class="kpi"><div class="v" id="rd-k1k">—</div><div class="k" id="rd-k1k-l">$ per 1.000 voti / 48 ore</div></div>
+          <div class="kpi"><div class="v" id="rd-kn">—</div><div class="k">pool usati</div></div>
+        </div>
+        <div class="strips" id="rd-strips"></div>
+        <div class="controls"><button type="button" id="rd-use">Usa questa allocazione</button><button type="button" class="ghost" id="rd-copy">Copia pesi</button><a href="https://app.aero.xyz" target="_blank" rel="noopener">Apri Aero ↗</a></div>
+        <div class="toast" id="rd-toast" role="status"></div>
+      </div>
+      <div class="rd-side">
+        <div class="box"><div class="lbl">Media del mercato</div><div class="compare" id="rd-mkt"></div><div class="lbl">Perché non tutto nel primo</div><div class="compare" id="rd-top"></div></div>
+        <div class="box"><div class="lbl">Cooldown 47 ore</div>
+          <div class="field"><label for="rd-saved">Ultimo salvataggio della tua allocazione</label><input id="rd-saved" type="datetime-local"></div>
+          <div class="big num" id="rd-cd">—</div>
+          <div class="compare" id="rd-cd-note">Le revenue continuano ad accumularsi durante il cooldown.</div></div>
+      </div>
+    </div>
+
+    <details class="sub-fold" data-fold="rd-mov">
+      <summary><span class="fold-t">Movimenti di allocazione</span><span class="sub" id="rd-mov-sum"></span></summary>
+      <div class="fold-body">
+        <div class="seg" id="rd-mov-seg" role="group" aria-label="Confronta con"><button type="button" data-h="1">1 ora fa</button><button type="button" data-h="6">6 ore fa</button><button type="button" data-h="24">24 ore fa</button><button type="button" data-h="48">48 ore fa</button></div>
+        <p class="note" id="rd-mov-note"></p>
+        <div class="mov" id="rd-mov"></div>
+      </div>
+    </details>
+
+    <details class="sub-fold" data-fold="rd-pools">
+      <summary><span class="fold-t">Pool del radar</span><span class="sub" id="rd-pools-sum"></span></summary>
+      <div class="fold-body">
+        <p class="note"><b>Rewards 48 ore</b>: fee e incentivi arrivati agli allocatori nelle ultime 48 ore. <b>Incentivi prossime 48 ore</b>: quelli già programmati. <b>Δ fee</b>: fee delle ultime 48 ore rispetto alle 48 prima. <b>Δ allocazione</b> segue il confronto scelto in Movimenti. Togli la spunta per escludere un pool: vale anche per i pool che riappaiono dopo.</p>
+        <div class="tools">
+          <div class="field"><label for="rd-q">Cerca pool</label><input id="rd-q" type="search" placeholder="es. PEPE, Robinhood, CL1, WETH/USDC" autocomplete="off"></div>
+          <div class="field"><label for="rd-sort">Ordina per</label><select id="rd-sort"><option value="apr">APR più alto (stima ÷ voti)</option><option value="proj">Stima proiettata più alta</option><option value="rew">Rewards 48 ore più alti</option><option value="alloc">Più voti</option><option value="dalloc">Più voti entrati</option></select></div>
+        </div>
+        <div class="controls" id="rd-q-actions" hidden><button type="button" class="ghost" id="rd-q-drop">Scarta i risultati (<span id="rd-q-n">0</span>)</button><button type="button" class="ghost" id="rd-q-rule">Scarta sempre questa ricerca</button><span class="note">La ricerca salvata scarta anche i pool nuovi che le corrispondono.</span></div>
+        <div class="xbox" id="rd-x" hidden></div>
+        <div class="tbl">
+          <table class="rd-tbl">
+            <thead><tr><th>Usa</th><th>Pool</th><th>Rete</th><th>Rewards 48 ore</th><th>di cui incentivi</th><th>Incentivi prossime 48 ore</th><th>Δ fee</th><th>Allocazione</th><th>Δ allocazione</th><th>Stima proiettata</th><th>$/1k voti ora</th><th>$/1k voti dopo di te</th><th>APR</th></tr></thead>
+            <tbody id="rd-rows"></tbody>
+          </table>
+        </div>
+        <div class="controls"><button type="button" class="ghost" id="rd-more">Mostra tutti</button></div>
+      </div>
+    </details>
+
+    <details class="sub-fold" data-fold="rd-how">
+      <summary><span class="fold-t">Come ragiona</span></summary>
+      <div class="fold-body how">
+        <p><b>Revenue proiettata.</b> Per ogni pool prende le fee arrivate agli allocatori nelle ultime 48 ore e le corregge della loro variazione rispetto alle 48 ore prima, moltiplicata per il peso del trend. Aggiunge gli incentivi già programmati per le prossime 48 ore, letti dalla chain.</p>
+        <p><b>Quota proporzionale.</b> Chi alloca a un pool si divide la sua revenue in proporzione ai voti. La tua quota è la tua Allocation Power divisa per l'allocazione esistente più la tua.</p>
+        <p><b>Concorrenza.</b> I pool con pochi voti e molte fee o incentivi non restano così: gli altri allocatori ci arrivano. Il radar tratta ogni pool come se avesse abbastanza voti da rendere al massimo il multiplo scelto della media del mercato (o li lascia fermi con «voti fermi»).</p>
+        <p><b>Picchi di volume (interruttore).</b> Calcola la variazione delle fee 48 ore di tutto il mercato rispetto alle 48 ore prima, e quella di ogni pool. Un pool è in picco se sale oltre il Δ del mercato più la tolleranza: con mercato +50% e tolleranza 75%, la soglia è +50% + 0,75 × 50% = +87,5%. Un picco così raramente si ripete nelle 47 ore dopo, quindi il radar non conta le sue fee attuali ma quelle delle 48 ore prima, mosse come il mercato (+50% nell'esempio). Il pool non sparisce: gli incentivi programmati per le prossime 47 ore arrivano comunque e restano nel conto.</p>
+        <p><b>Minimo e massimo per pool.</b> Con un minimo del 10% ogni pool scelto riceve almeno il 10% dei voti, quindi al massimo 10 pool: il radar toglie il pool con la quota più piccola sotto il minimo e ridistribuisce, finché tutti lo rispettano. Il massimo limita la quota di ogni pool; se i pool rimasti sono troppo pochi per arrivare al 100%, sale quanto basta. Su ogni rete si votano al massimo 20 pool.</p>
+        <p><b>Autodiluizione.</b> Ogni voto che aggiungi abbassa il rendimento del successivo. Il radar distribuisce la tua AP a fette dell'1%, ogni volta al pool che rende di più sulla fetta successiva.</p>
+        <p><b>Simulazioni.</b> «Carica queste opzioni nelle simulazioni» le manda al monitor: da quel giro in poi tutti e cinque i metodi della simulazione rispettano massimo, minimo, reti, pool e ricerche scartati e picchi di volume; trend e concorrenza definiscono il metodo «Radar». La dimensione della simulazione resta la sua: la tua Allocation Power resta solo su questo dispositivo.</p>
+        <p><b>Cosa non sa.</b> Non vede i movimenti degli altri allocatori durante le 47 ore di cooldown, non prevede incentivi nuovi o picchi di volume, e ignora i limiti di emissione dei gauge, che limitano le ricompense AERO di un pool ma non la revenue che ricevi. Non è una consulenza finanziaria: è aritmetica su dati pubblici.</p>
+      </div>
+    </details>
+  </section>
+
+  <details class="panel fold" data-fold="sim" open id="sim">
+    <summary class="panel-head"><h2>Simulazione <span id="sim-size">235k</span> sAERO</h2><span class="sub" id="sim-since"></span></summary>
+    <div class="fold-body">
+    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore con cinque metodi, la salva e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. A ogni giro misura quanto stanno rendendo tutte le allocazioni salvate: la classifica dice quale metodo rende di più nel tempo.</p>
+    <p class="note" id="sim-opts"></p>
+    <div class="tbl">
+      <table class="rank">
+        <thead><tr><th>Metodo</th><th id="sim-rank-h">Reso al giorno</th><th>APR</th><th class="x">Reale / previsto</th><th class="x">24 ore</th><th class="x">7 giorni</th><th class="x">Dall'inizio</th><th class="x">Allocazioni salvate</th></tr></thead>
+        <tbody id="sim-rank"></tbody>
+      </table>
+    </div>
+    <p class="note" id="sim-rank-note"></p>
+    <div class="seg" id="sim-mode" role="group" aria-label="Grafico"><button type="button" data-m="rate" aria-pressed="true">Reso al giorno</button><button type="button" data-m="virtual" aria-pressed="false">Posizioni virtuali</button></div>
+    <div class="legend" id="sim-legend"></div>
+    <div class="chartbox"><div class="chart" id="sim-chart"></div></div>
+    <details class="sub-fold" data-fold="sim-cards" open>
+      <summary><span class="fold-t">I cinque metodi nel dettaglio</span><span class="sub">consiglio di adesso e posizione virtuale</span></summary>
+      <div class="fold-body"><div class="cards" id="sim-cards"></div></div>
+    </details>
+    </div>
+  </details>
+
+  <details class="panel fold" data-fold="yield">
+    <summary class="panel-head"><h2>Pool che rendono di più nel tempo</h2><span class="sub" id="yield-count"></span></summary>
+    <div class="fold-body">
+    <p class="note">Quanto avrebbero reso 1000 sAERO in più su ogni pool, in dollari al giorno, e quanto hanno reso davvero le allocazioni consigliate lì rispetto alla previsione.</p>
+    <div class="controls"><label class="toggle"><input type="checkbox" id="yield-big" checked> Solo pool con almeno 10k sAERO allocati</label></div>
+    <div class="tbl">
+      <table>
+        <thead><tr>
+          <th data-y="name">Pool</th><th data-y="ap">Allocazione</th><th data-y="m1000_24h">$/g 24h</th><th data-y="m1000_7d">$/g 7g</th>
+          <th data-y="m1000_30d">$/g 30g</th><th data-y="apr_7d">APR 7g</th><th data-y="reco_n_7d">Consigliato</th>
+          <th data-y="reco_real_1000_day">Reso se consigliato</th><th data-y="reco_real_vs_pred">Reale / previsto</th>
+        </tr></thead>
+        <tbody id="yield-rows"></tbody>
+      </table>
+    </div>
+    <p class="note" id="yield-foot"></p>
+    </div>
+  </details>
+
+  <details class="panel fold" data-fold="waves" open>
+    <summary class="panel-head"><h2>Ondate di cooldown</h2><div class="legend"><span><i style="background:var(--accent)"></i>attive</span><span><i style="background:var(--passive)"></i>mai spostate</span></div></summary>
+    <div class="fold-body">
+    <p class="note">sAERO che escono dal cooldown di <span id="cd-h">47</span> ore, ora per ora. Le posizioni attive si sono già spostate almeno una volta dopo il lancio: sono quelle che probabilmente si muoveranno di nuovo e diluiranno i pool dove arrivano.</p>
+    <div class="stats" id="wave-stats"></div>
+    <div class="chart" id="waves"></div>
+    </div>
+  </details>
+
+  <div class="grid2">
+    <details class="panel fold" data-fold="calendar">
+    <summary class="panel-head"><h2>Posizioni grandi in uscita</h2></summary>
+    <div class="fold-body">
+      <p class="note">Sopra <span id="cal-min">250k</span> sAERO, nelle prossime 48 ore, più quelle attive già libere.</p>
+      <div class="list" id="calendar"></div>
+    </div>
+  </details>
+    <details class="panel fold" data-fold="incentives">
+    <summary class="panel-head"><h2>Incentivi in arrivo</h2></summary>
+    <div class="fold-body">
+      <p class="note">Programmi appena creati o che partono entro 48 ore. Nella scheda Markets di Aero compaiono solo dopo l'inizio.</p>
+      <div class="list" id="incentives"></div>
+    </div>
+  </details>
+  </div>
+
+  <details class="panel fold" data-fold="pools">
+    <summary class="panel-head"><h2>Pool</h2><span class="sub" id="pool-count"></span></summary>
+    <div class="fold-body">
+    <p class="note">APR 48h: fee e incentivi delle ultime 48 ore sull'allocazione attuale. APR atteso: fee delle ultime 48 ore più gli incentivi programmati nelle prossime 48. Volume 24h: scambi passati dal pool Aero. Quota coppia: parte del volume della stessa coppia su tutti i DEX della chain che passa da Aero. Routing: quota di uno swap da $10.000 che KyberSwap e Velora fanno passare dal pool Aero.</p>
+    <div class="controls">
+      <input type="search" id="q" placeholder="Cerca un pool o un token" aria-label="Cerca un pool">
+      <select id="chain-f" aria-label="Chain"><option value="">Tutte le chain</option></select>
+      <select id="sort" aria-label="Ordina per">
+        <option value="ap">Allocazione</option>
+        <option value="apr_next">APR atteso</option>
+        <option value="apr">APR 48h</option>
+        <option value="d6h">Variazione 6 ore</option>
+        <option value="free_24h_active">Liberi entro 24 ore</option>
+        <option value="rev48h">Revenue 48h</option>
+        <option value="vol24h">Volume 24h</option>
+        <option value="pair_vol24h">Volume della coppia su tutti i DEX</option>
+        <option value="route">Routing</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="big" checked> Solo sopra 100k</label>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr>
+          <th data-k="name">Pool</th><th data-k="chain">Chain</th><th data-k="ap">Allocazione</th><th data-k="d6h">6 ore</th><th data-k="d24h">24 ore</th>
+          <th data-k="apr">APR 48h</th><th data-k="apr_next">APR atteso</th><th data-k="free_24h_active">Liberi 24h</th>
+          <th data-k="rev48h">Revenue 48h</th><th data-k="inc_next48h">Incentivi 48h</th><th data-k="vol24h">Volume 24h</th><th data-k="pair_share">Quota coppia</th><th data-k="route">Routing K / V</th>
+        </tr></thead>
+        <tbody id="pools"></tbody>
+      </table>
+    </div>
+    </div>
+  </details>
+
+  <div class="grid2">
+    <details class="panel fold" data-fold="chains">
+    <summary class="panel-head"><h2>Chain</h2></summary>
+    <div class="fold-body">
+      <p class="note">Allocazione, pool e fee delle ultime 48 ore su ogni chain dove gira Aero, con lo stato dell'ultima lettura.</p>
+      <div class="list" id="chains"></div>
+    </div>
+  </details>
+    <details class="panel fold" data-fold="alerts">
+    <summary class="panel-head"><h2>Avvisi recenti</h2></summary>
+    <div class="fold-body">
+      <div class="list" id="alerts"></div>
+    </div>
+  </details>
+  </div>
+
+  <footer>
+    <span>Dati on-chain da Base, OP Mainnet, Ethereum, Arbitrum, Ink, Robinhood Chain e Arc (contratti Aero di Dromos Labs), prezzi DexScreener, quote KyberSwap e Velora. Aggiornamento ogni 15 minuti con GitHub Actions.</span>
+    <span>Non è una consulenza finanziaria.</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const TZ = "Europe/Rome";
+  const $ = id => document.getElementById(id);
+  let DATA = null, sortKey = "ap", sortDir = -1;
+  try { const s = JSON.parse(localStorage.getItem("radar-sort") || "null"); if (s) { sortKey = s.k; sortDir = s.d; } } catch (e) {}
+
+  const fmtN = x => {
+    if (x == null || isNaN(x)) return "—";
+    const a = Math.abs(x);
+    const s = a >= 1e6 ? (x / 1e6).toFixed(a >= 1e7 ? 1 : 2) + "M" : a >= 1e3 ? (x / 1e3).toFixed(a >= 1e5 ? 0 : 1) + "k" : Math.round(x).toString();
+    return s.replace(".", ",");
+  };
+  const fmtUsd = x => x == null ? "—" : "$" + (x >= 1e6 ? (x / 1e6).toFixed(2).replace(".", ",") + "M" : Math.round(x).toLocaleString("it-IT"));
+  const fmtPct = x => x == null ? "—" : (x >= 1000 ? Math.round(x).toLocaleString("it-IT") : x.toFixed(x >= 100 ? 0 : 1).replace(".", ",")) + "%";
+  const fmtSigned = x => x == null ? "—" : (x > 0 ? "+" : x < 0 ? "−" : "") + fmtN(Math.abs(x));
+  const timeFmt = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+  const dayFmt = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, weekday: "short" });
+  const dateKey = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+  const when = ts => {
+    const d = new Date(ts * 1000), now = new Date();
+    const diff = Math.round((new Date(dateKey.format(d).split("/").reverse().join("-")) - new Date(dateKey.format(now).split("/").reverse().join("-"))) / 864e5);
+    const t = timeFmt.format(d);
+    return diff === 0 ? t : diff === 1 ? "domani " + t : diff === -1 ? "ieri " + t : dayFmt.format(d) + " " + t;
+  };
+  const inT = s => {
+    const m = Math.max(0, Math.round(s / 60));
+    if (m < 60) return m + " min";
+    const h = Math.floor(m / 60);
+    return h < 24 ? h + " h " + String(m % 60).padStart(2, "0") : Math.floor(h / 24) + " g " + (h % 24) + " h";
+  };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const row = (t, r, d, rClass) => {
+    const w = el("div", "row");
+    w.append(el("div", "t", t));
+    const rr = el("div", "r num" + (rClass ? " " + rClass : ""));
+    if (r instanceof Node) rr.append(r); else rr.textContent = r;
+    w.append(rr);
+    if (d) w.append(el("div", "d", d));
+    return w;
+  };
+  const empty = (box, text) => { box.replaceChildren(el("div", "empty", text)); };
+
+  function header(d) {
+    const age = Date.now() / 1000 - d.generated;
+    const manual = (d.status || {}).trigger === "workflow_dispatch" ? " (raccolta manuale)" : "";
+    $("updated").textContent = `Aggiornato ${when(d.generated)}${manual} · ${age > 3600 ? "dati vecchi di " + inT(age) : "prossimo controllo entro 15 min"}`;
+    const chips = $("chips");
+    chips.replaceChildren();
+    const chip = (k, v) => { const c = el("span", "chip"); c.append(k + " "); c.append(el("b", null, v)); chips.append(c); };
+    if (d.aero_usd) chip("AERO", "$" + d.aero_usd.toFixed(3).replace(".", ","));
+    chip("Allocati", fmtN(d.totals.ap_total != null ? d.totals.ap_total : d.totals.ap_base));
+    const ch = d.chains || [];
+    if (ch.length) chip("Chain lette", `${ch.filter(c => c.ok).length} su ${ch.length}`);
+    chip("Posizioni", `${(d.totals.active_positions || 0).toLocaleString("it-IT")} attive su ${(d.totals.positions || 0).toLocaleString("it-IT")}`);
+    if (d.totals.median_apr_1m != null) chip("APR mediano >1M", fmtPct(d.totals.median_apr_1m));
+    if (d.personal_alerts) chip("Avvisi sulle tue posizioni", "attivi");
+    const st = d.status || {};
+    const b = $("banner");
+    if (st.consecutive_failures) {
+      b.hidden = false;
+      b.textContent = `Le ultime ${st.consecutive_failures} letture non sono riuscite: i numeri sotto sono dell'ultima lettura completa.`;
+    } else if (age > 3 * 3600) {
+      b.hidden = false;
+      b.textContent = `Nessun aggiornamento da ${inT(age)}: controlla che il workflow su GitHub sia attivo.`;
+    } else b.hidden = true;
+    $("cd-h").textContent = String(d.cooldown_h).replace(".", ",");
+  }
+
+  // ---------------------------------------------------------------- I tuoi sAERO
+  // The address stays on this device: the page reads from Base which sAERO it holds, and takes from the monitor's
+  // public export what each position number has allocated and earned.
+  const SAERO = "0xbf7977e1521e9a3032bf7243ee4712f311f13915";
+  const BASE_RPCS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com", "https://base.drpc.org", "https://1rpc.io/base"];
+  const BASE_GENESIS = 1686789347;           // Base has fixed 2-second blocks
+  let POS = null, SHARDS = {}, posLoading = null;
+  let myIds = [], meAddr = "", ME = null, meErr = null, meLoading = false;
+  try { myIds = JSON.parse(localStorage.getItem("radar-ids") || "[]"); } catch (e) { myIds = []; }
+  try { meAddr = localStorage.getItem("radar-addr") || ""; } catch (e) { meAddr = ""; }
+  $("mine-ids").value = myIds.join(", ");
+  $("me-addr").value = meAddr;
+
+  const hex64 = h => h.replace(/^0x/, "").toLowerCase().padStart(64, "0");
+  const u256 = n => hex64(BigInt(n).toString(16));
+  const word = (h, i) => BigInt("0x" + ((h || "0x").slice(2 + 64 * i, 66 + 64 * i) || "0"));
+  const e18 = b => Number(b / 10n ** 12n) / 1e6;
+
+  async function baseCalls(datas) {
+    let last = null;
+    for (const url of BASE_RPCS) {
+      try {
+        const body = datas.map((d, i) => ({ jsonrpc: "2.0", id: i, method: "eth_call", params: [{ to: SAERO, data: d }, "latest"] }));
+        const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json();
+        if (!Array.isArray(j)) throw new Error((j && j.error && j.error.message) || "risposta non valida");
+        const out = [];
+        for (const x of j) { if (x.error) throw new Error(x.error.message); out[x.id] = x.result; }
+        if (out.length !== datas.length || out.some(x => x == null)) throw new Error("risposta incompleta");
+        return out;
+      } catch (e) { last = e; }
+    }
+    throw last || new Error("nessun nodo raggiungibile");
+  }
+
+  // the sAERO of an address: number, staked AERO, end or perpetual, Allocation Power, owned since
+  async function readOwned(addr) {
+    const [bal] = await baseCalls(["0x70a08231" + hex64(addr)]);
+    const n = Number(word(bal, 0));
+    if (n > 100) throw new Error(`${n} posizioni: troppe da leggere qui`);
+    if (!n) return [];
+    const ids = (await baseCalls(Array.from({ length: n }, (_, i) => "0x2f745c59" + hex64(addr) + u256(i)))).map(h => Number(word(h, 0)));
+    const res = await baseCalls(ids.flatMap(id => ["0x5e1bef32" + u256(id), "0xe7e242d4" + u256(id), "0x23857d51" + u256(id)]));
+    return ids.map((id, i) => {
+      const st = res[3 * i], blk = Number(word(res[3 * i + 2], 0));
+      return { id, amount: e18(word(st, 0)), end: Number(word(st, 1)), perm: word(st, 2) !== 0n, ap: e18(word(res[3 * i + 1], 0)),
+        since: blk ? BASE_GENESIS + 2 * blk : 0 };
+    }).sort((a, b) => b.ap - a.ap);
+  }
+
+  async function meRefresh() {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(meAddr)) { ME = null; meErr = null; return meRender(); }
+    meLoading = true; meErr = null; meRender();
+    try { ME = { addr: meAddr.toLowerCase(), at: Date.now() / 1000, pos: await readOwned(meAddr) }; }
+    catch (e) { meErr = e.message || String(e); }
+    meLoading = false;
+    meRender();
+  }
+
+  const allIds = () => [...new Set([...(ME ? ME.pos.map(p => p.id) : []), ...myIds])];
+
+  function loadPositions() {
+    if (!posLoading) {
+      posLoading = (async () => {
+        if (!POS) {
+          const r = await fetch("positions.json?t=" + Date.now(), { cache: "no-store" });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          POS = await r.json(); SHARDS = {};
+        }
+        const size = POS.shard || 1000, have = new Set(POS.shards || []);
+        const need = [...new Set(allIds().map(id => Math.floor(id / size)))].filter(n => have.has(n) && !SHARDS[n]);
+        await Promise.all(need.map(async n => {
+          const rr = await fetch(`pos/${n}.json?t=${Date.now()}`, { cache: "no-store" });
+          if (!rr.ok) throw new Error("HTTP " + rr.status);
+          SHARDS[n] = await rr.json();
+        }));
+        posLoading = null; meRender();
+      })().catch(e => { posLoading = null; meErr = "Non riesco a leggere le posizioni: " + e.message; meRender(); });
+    }
+    return posLoading;
+  }
+
+  const datePlain = ts => new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(ts * 1000));
+  const apr = (usd, secs, base, price) => usd > 0 && secs > 3600 && base > 0 && price > 0 ? usd / secs * 365 * 86400 / (base * price) * 100 : null;
+  const stat = (k, v, d) => { const s = el("div", "stat"); s.append(el("div", "k", k), el("div", "v", v)); if (d) s.append(el("div", "d", d)); return s; };
+
+  function meChart(days) {
+    const box = $("me-chart");
+    if (!days.length) return box.replaceChildren();
+    const w = Math.max(520, Math.round(box.clientWidth || 720)), h = 150, padL = 46, padB = 24, padT = 8;
+    const max = Math.max(1, ...days.map(d => d[1]));
+    const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); const m = max / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+    const bw = Math.min(56, (w - padL - 4) / days.length), y = v => h - padB - v / nice * (h - padB - padT);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`); svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Dollari incassati ogni giorno dai tuoi sAERO");
+    const add = (name, attrs, text) => { const e = document.createElementNS(ns, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
+    for (let i = 0; i <= 2; i++) {
+      const v = nice * i / 2;
+      add("line", { x1: padL, x2: w, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": 1 });
+      add("text", { x: padL - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, "$" + fmtN(v));
+    }
+    const today = Math.floor(Date.now() / 864e5) * 86400;
+    days.forEach(([d, v], i) => {
+      const r = add("rect", { x: padL + i * bw + 2, y: y(v), width: Math.max(1, bw - 4), height: Math.max(0.5, h - padB - y(v)), rx: 2,
+        fill: d >= today ? "var(--passive)" : "var(--accent)" });
+      const t = document.createElementNS(ns, "title");
+      t.textContent = `${datePlain(d)}: $${v.toFixed(2).replace(".", ",")}${d >= today ? " (oggi, in corso)" : ""}`;
+      r.append(t);
+      if (days.length <= 8 || i % 2 === 0) add("text", { x: padL + i * bw + bw / 2, y: h - 7, "text-anchor": "middle", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" },
+        new Intl.DateTimeFormat("it-IT", { timeZone: "UTC", day: "numeric", month: "numeric" }).format(new Date(d * 1000)));
+    });
+    box.replaceChildren(svg);
+  }
+
+  function meRender() {
+    const stats = $("me-stats"), list = $("me-list");
+    $("me-ids-sum").textContent = myIds.length ? myIds.map(i => "#" + i).join(" ") : "";
+    stats.replaceChildren(); list.replaceChildren(); $("me-chart").replaceChildren(); $("me-when").textContent = "";
+    if (meErr) list.append(el("div", "warnline", meErr));
+    if (meLoading) return empty(stats, "Leggo i tuoi sAERO su Base…");
+    const ids = allIds();
+    if (!ids.length) return empty(stats, meAddr ? (meErr ? "" : "Nessun sAERO su questo indirizzo.") : "Scrivi il tuo indirizzo per vedere allocazione e APR reale dei tuoi sAERO.");
+    if (!POS || ids.some(id => (POS.shards || []).includes(Math.floor(id / (POS.shard || 1000))) && !SHARDS[Math.floor(id / (POS.shard || 1000))])) {
+      empty(stats, "Carico le posizioni…"); loadPositions(); return;
+    }
+    const now = Date.now() / 1000, price = (DATA && DATA.aero_usd) || 0, size = POS.shard || 1000;
+    const chainName = cid => (POS.chains || {})[cid] || "chain " + cid;
+    const pools = new Map(((DATA && DATA.pools) || []).map(p => [p.key, p]));
+    const onChain = new Map((ME ? ME.pos : []).map(p => [p.id, p]));
+    let T = { amount: 0, ap: 0, alloc: 0, u24: 0, r24: 0, u7: 0, r7: 0, tot: 0, base: 0, since: 0 };
+    const days = new Map();
+    const rows = [];
+    for (const id of ids) {
+      const sh = SHARDS[Math.floor(id / size)];
+      const ent = ((sh && sh.p[String(id)]) || []).slice().sort((a, b) => b[2] - a[2]);
+      const r = sh && sh.r && sh.r[String(id)];
+      const oc = onChain.get(id);
+      const alloc = ent.reduce((s, e) => s + e[2], 0);
+      const base = oc ? (oc.amount || oc.ap) : alloc;    // value of the staked AERO; manual numbers: what is allocated
+      rows.push({ id, sh, ent, r, oc, alloc, base });
+      T.alloc += alloc; T.base += base;
+      if (oc) { T.amount += oc.amount; T.ap += oc.ap; }
+      if (r) {
+        const [since, tot, u24, s24, u7, s7, d] = r;
+        T.tot += tot;
+        T.since = T.since ? Math.min(T.since, since) : since;
+        if (s24 > 0) T.r24 += u24 / s24;
+        if (s7 > 0) T.r7 += u7 / s7;
+        T.u24 += u24; T.u7 += u7;
+        for (const [day, v] of d) days.set(day, (days.get(day) || 0) + v);
+      }
+    }
+    const capital = T.base * price;
+    const a24 = capital > 0 ? T.r24 * 365 * 86400 / capital * 100 : null, a7 = capital > 0 ? T.r7 * 365 * 86400 / capital * 100 : null;
+    stats.append(
+      stat("sAERO", fmtN(ME ? T.amount : T.alloc), ME ? `AP ${fmtN(T.ap)} · ${price ? "$" + fmtN(T.amount * price) : ""}` : "allocati"),
+      stat("Allocati", T.ap > 0 ? fmtPct(Math.min(100, T.alloc / T.ap * 100)) : fmtN(T.alloc), T.ap > 0 ? fmtN(T.alloc) + " su " + fmtN(T.ap) : ""),
+      stat("APR reale 24 ore", fmtPct(a24), "$" + (T.r24 * 86400).toFixed(2).replace(".", ",") + " al giorno"),
+      stat("APR reale 7 giorni", fmtPct(a7), "$" + (T.r7 * 86400).toFixed(2).replace(".", ",") + " al giorno"),
+      stat("Incassato", "$" + T.tot.toFixed(2).replace(".", ","), T.since ? "dal " + datePlain(T.since) : ""));
+    if (ME) $("me-when").textContent = `letto da Base ${when(ME.at)}`;
+    if (ME && T.ap > 0 && T.alloc < T.ap * 0.995)
+      list.append(el("div", "warnline", `${fmtN(T.ap - T.alloc)} di Allocation Power non sono allocati: non incassano nulla.`));
+    meChart([...days.entries()].sort((a, b) => a[0] - b[0]));
+    if (ME) {
+      const b = el("button", "linkish", `Usa ${fmtN(T.ap)} come Allocation Power nel Radar`);
+      b.type = "button";
+      b.addEventListener("click", () => { const i = $("rd-ap"); i.value = String(Math.round(T.ap)); i.dispatchEvent(new Event("input")); document.getElementById("radar").scrollIntoView({ behavior: "smooth" }); });
+      if (T.ap > 0) list.append(b);
+    }
+    for (const { id, sh, ent, r, oc, alloc, base } of rows) {
+      const box = el("div", "mepos");
+      const h = el("h3", null, `#${id}`);
+      const bits = [];
+      if (oc) {
+        bits.push(`${fmtN(oc.amount)} AERO`, oc.perm ? "perpetuo" : (oc.end ? "fino al " + datePlain(oc.end) : ""));
+        if (oc.since) bits.push("tuo dal " + datePlain(oc.since));
+      } else bits.push("aggiunto a mano");
+      h.append(el("span", "sub", bits.filter(Boolean).join(" · ")));
+      box.append(h);
+      if (r) {
+        const [since, tot, u24, s24, u7, s7] = r;
+        const kv = el("div", "pills");
+        const p24 = apr(u24, s24, base, price), p7 = apr(u7, s7, base, price);
+        kv.append(el("span", "pill act", `APR 24 ore ${fmtPct(p24)}`), el("span", "pill act", `APR 7 giorni ${fmtPct(p7)}`),
+          el("span", "pill pas", `$${(s7 > 0 ? u7 / s7 * 86400 : 0).toFixed(2).replace(".", ",")}/giorno`),
+          el("span", "pill pas", `$${tot.toFixed(2).replace(".", ",")} dal ${datePlain(since)}`));
+        box.append(kv);
+      }
+      if (!ent.length) {
+        box.append(el("div", "empty", oc && oc.ap > 0 ? "Nessuna allocazione: questa posizione non incassa nulla finché non la allochi." : "Nessuna allocazione trovata per questo numero."));
+        list.append(box); continue;
+      }
+      const cds = el("div", "pills");
+      for (const [cid, ends] of ent) {
+        const free = ends <= now;
+        cds.append(el("span", "pill " + (free ? "free" : "wait"), `${chainName(cid)}: ${free ? "puoi riallocare" : "cooldown " + inT(ends - now)}`));
+      }
+      box.append(cds);
+      const earned = new Map((r ? r[7] : []).map(([i, v]) => [i, v]));
+      const tb = el("div", "tbl"), table = document.createElement("table");
+      const thr = document.createElement("tr");
+      for (const t of ["Pool", "Rete", "sAERO", "Quota", "Del pool", "APR pool 48h", "Incassato"]) thr.append(el("th", null, t));
+      const thead = document.createElement("thead"); thead.append(thr);
+      const tbody = document.createElement("tbody");
+      const ap = oc && oc.ap > 0 ? oc.ap : alloc;
+      const line = (name, chain, a, key, usd, old) => {
+        const tr = document.createElement("tr");
+        const pool = key ? pools.get(key) : null;
+        const td = el("td"); td.append(el("span", "nm", name)); if (pool && pool.kind && pool.kind !== "?") td.append(el("span", "kd", pool.kind));
+        tr.append(td, el("td", "ch muted", chain));
+        tr.append(el("td", "num" + (old ? " old" : ""), old ? "—" : fmtN(a)), el("td", "num", old ? "—" : fmtPct(a / ap * 100)));
+        tr.append(el("td", "num", !old && pool && pool.ap > 0 ? fmtPct(a / pool.ap * 100) : "—"));
+        tr.append(el("td", "num", pool && pool.apr != null ? fmtPct(pool.apr) : "—"));
+        tr.append(el("td", "num", usd != null ? "$" + usd.toFixed(2).replace(".", ",") : "—"));
+        tbody.append(tr);
+      };
+      const shown = new Set();
+      for (const [cid, , , , , pls] of ent) for (const [i, a] of pls) {
+        const key = sh.keys ? sh.keys[i] : null;
+        shown.add(i);
+        line(sh.names[i], chainName(cid), a, key, earned.has(i) ? earned.get(i) : null, false);
+      }
+      for (const [i, v] of earned) if (!shown.has(i) && v >= 0.01) {
+        const key = sh.keys ? sh.keys[i] : null, cid = key ? +key.split(":")[0] : null;
+        line(sh.names[i] + " (prima)", cid ? chainName(cid) : "", 0, key, v, true);
+      }
+      table.append(thead, tbody); tb.append(table); box.append(tb);
+      list.append(box);
+    }
+  }
+
+  $("me-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const v = $("me-addr").value.trim();
+    if (v && !/^0x[0-9a-fA-F]{40}$/.test(v)) { meErr = "L'indirizzo deve essere 0x seguito da 40 caratteri esadecimali."; ME = null; return meRender(); }
+    meAddr = v;
+    try { if (v) localStorage.setItem("radar-addr", v); else localStorage.removeItem("radar-addr"); } catch (x) {}
+    meRefresh();
+  });
+  $("mine-form").addEventListener("submit", e => {
+    e.preventDefault();
+    myIds = [...new Set(($("mine-ids").value.match(/\d+/g) || []).map(Number))];
+    $("mine-ids").value = myIds.join(", ");
+    try { localStorage.setItem("radar-ids", JSON.stringify(myIds)); } catch (x) {}
+    meRender();
+  });
+  meRefresh();
+
+  function waves(d) {
+    const W = d.waves || [];
+    const sum = (n, k) => W.slice(0, n).reduce((s, w) => s + (w[k] || 0), 0);
+    const stats = $("wave-stats");
+    stats.replaceChildren();
+    for (const [k, v] of [["Prossime 3 ore", sum(3, "active")], ["Prossime 24 ore", sum(24, "active")], ["Mai spostate, 24 ore", sum(24, "all") - sum(24, "active")]]) {
+      const s = el("div", "stat"); s.append(el("div", "k", k), el("div", "v", fmtN(v))); stats.append(s);
+    }
+    const w = Math.max(520, Math.round($("waves").clientWidth || 720)), h = 190, padL = 46, padB = 26, padT = 8;
+    const max = Math.max(1, ...W.map(x => x.all || 0));
+    const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); const m = max / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+    const bw = (w - padL - 4) / W.length;
+    const y = v => h - padB - (v / nice) * (h - padB - padT);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "sAERO che escono dal cooldown nelle prossime 48 ore");
+    const add = (name, attrs, text) => { const e = document.createElementNS(ns, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
+    for (let i = 0; i <= 4; i++) {
+      const v = nice * i / 4, yy = y(v);
+      add("line", { x1: padL, x2: w, y1: yy, y2: yy, stroke: "var(--line)", "stroke-width": 1 });
+      add("text", { x: padL - 6, y: yy + 4, "text-anchor": "end", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, fmtN(v));
+    }
+    W.forEach((x, i) => {
+      const x0 = padL + i * bw + 1, bwi = Math.max(1, bw - 2);
+      const passive = (x.all || 0) - (x.active || 0);
+      if (x.all > 0) {
+        add("rect", { x: x0, y: y(x.all), width: bwi, height: Math.max(0, y(x.active || 0) - y(x.all)), fill: "var(--passive)", rx: 1 });
+        if (x.active > 0) add("rect", { x: x0, y: y(x.active), width: bwi, height: Math.max(0.5, h - padB - y(x.active)), fill: "var(--accent)", rx: 1 });
+        const t = add("rect", { x: padL + i * bw, y: padT, width: bw, height: h - padB - padT, fill: "transparent" });
+        const tt = document.createElementNS(ns, "title");
+        tt.textContent = `${when(x.h)}: ${fmtN(x.active)} attive, ${fmtN(passive)} mai spostate`;
+        t.append(tt);
+      }
+      if (i % 6 === 0) add("text", { x: padL + i * bw + bw / 2, y: h - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, when(x.h).replace("domani ", "+1 "));
+    });
+    $("waves").replaceChildren(svg);
+  }
+
+  function calendar(d) {
+    const box = $("calendar");
+    box.replaceChildren();
+    const now = Date.now() / 1000;
+    const rows = (d.calendar || []).slice(0, 14);
+    if (!rows.length) return empty(box, "Nessuna posizione grande esce dal cooldown nelle prossime 48 ore.");
+    for (const c of rows) {
+      const pill = el("span", "pill " + (c.active ? "act" : "pas"), c.free ? "libera" : inT(c.ends - now));
+      const pools = c.pools.map(([n, a]) => `${n} ${fmtN(a)}`).join(" · ");
+      box.append(row(`#${c.id} · ${c.chain ? c.chain + " · " : ""}${fmtN(c.saero)}`, pill,
+        (c.free ? "Già libera, si è spostata " + c.moves + " volte. " : `Libera ${when(c.ends)}${c.active ? ", attiva" : ""}. `) + pools));
+    }
+  }
+
+  function incentives(d) {
+    const box = $("incentives");
+    box.replaceChildren();
+    const now = Date.now() / 1000;
+    const rows = (d.incentives_upcoming || []).slice(0, 14);
+    if (!rows.length) return empty(box, "Nessun programma in partenza nelle prossime 48 ore.");
+    for (const u of rows) {
+      const hrs = Math.round((u.end - u.start) / 3600);
+      const started = u.start <= now;
+      box.append(row(u.label || u.pool, fmtUsd(u.usd),
+        `${fmtN(u.amount)} ${u.token} in ${hrs} ore · ${started ? "partito " + when(u.start) : "parte " + when(u.start) + " (tra " + inT(u.start - now) + ")"} · allocazione ${fmtN(u.ap)}`));
+    }
+  }
+
+  function routeVal(p) {
+    const r = p.routing || {};
+    const k = r["kyber:10000"], v = r["velora:10000"];
+    const vals = [k && k.pool, v && v.pool].filter(x => x != null);
+    return vals.length ? Math.max(...vals) : null;
+  }
+
+  function spark(values) {
+    if (!values || values.length < 2) return null;
+    const ns = "http://www.w3.org/2000/svg", w = 56, h = 16;
+    const mn = Math.min(...values), mx = Math.max(...values), rg = mx - mn || 1;
+    const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - 1 - ((v - mn) / rg) * (h - 2)}`).join(" ");
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("width", w); s.setAttribute("height", h); s.setAttribute("class", "spark"); s.setAttribute("aria-hidden", "true");
+    const pl = document.createElementNS(ns, "polyline");
+    pl.setAttribute("points", pts); pl.setAttribute("fill", "none"); pl.setAttribute("stroke", "var(--accent)"); pl.setAttribute("stroke-width", "1.4");
+    s.append(pl);
+    return s;
+  }
+
+  function pools(d) {
+    const q = $("q").value.trim().toLowerCase();
+    const big = $("big").checked, cf = $("chain-f").value;
+    let rows = (d.pools || []).filter(p => (!cf || (p.chain || "Base") === cf) && (!big || p.ap >= 100000 || p.unallocated) && (!q || p.name.toLowerCase().includes(q) || (p.pool || "").includes(q)));
+    const val = p => sortKey === "route" ? routeVal(p) : sortKey === "name" ? p.name.toLowerCase() : sortKey === "chain" ? (p.chain || "Base") : p[sortKey];
+    rows.sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1;
+      return (va > vb ? 1 : va < vb ? -1 : 0) * sortDir;
+    });
+    $("pool-count").textContent = `${rows.length} pool`;
+    document.querySelectorAll("th[data-k]").forEach(th => {
+      if (th.dataset.k === sortKey) th.setAttribute("aria-sort", sortDir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort");
+    });
+    const tb = $("pools");
+    tb.replaceChildren();
+    for (const p of rows.slice(0, 250)) {
+      const tr = document.createElement("tr");
+      const c0 = document.createElement("td");
+      c0.append(el("span", "nm", p.name), el("span", "kd", p.kind && p.kind !== "?" ? p.kind : ""));
+      if (p.unallocated) c0.append(el("span", "kd", "nessuna allocazione"));
+      if (p.blocked) c0.append(el("span", "kd", "non votabile"));
+      if (p.new_chain_pair) c0.append(el("span", "tag", "chain nuova"));
+      tr.append(c0);
+      tr.append(el("td", "ch muted", p.chain || "Base"));
+      const cAp = el("td", "num", fmtN(p.ap));
+      const sp = spark(p.spark); if (sp) cAp.append(sp);
+      tr.append(cAp);
+      for (const k of ["d6h", "d24h"]) tr.append(el("td", "num " + (p[k] > 0 ? "up" : p[k] < 0 ? "down" : "muted"), fmtSigned(p[k])));
+      tr.append(el("td", "num", p.rev48h ? fmtPct(p.apr) : "—"));
+      tr.append(el("td", "num", p.rev48h || p.inc_next48h ? fmtPct(p.apr_next) : "—"));
+      tr.append(el("td", "num", fmtN(p.free_24h_active)));
+      tr.append(el("td", "num", p.rev48h ? fmtUsd(p.rev48h) : "—"));
+      tr.append(el("td", "num", p.inc_next48h ? fmtUsd(p.inc_next48h) : "—"));
+      tr.append(el("td", "num", p.vol24h != null ? fmtUsd(p.vol24h) : "—"));
+      const cShare = el("td", "num", p.pair_share != null ? sharePct(p.pair_share) : "—");
+      if (p.pair_vol24h) {
+        cShare.append(el("span", "kd", "di " + fmtUsd(p.pair_vol24h)));
+        cShare.title = "Volume del pool Aero sul volume della stessa coppia su tutti i DEX della chain, ultime 24 ore";
+      }
+      tr.append(cShare);
+      const r = p.routing || {};
+      const f = x => x == null ? "—" : Math.round(x * 100) + "%";
+      const k = r["kyber:10000"], v = r["velora:10000"];
+      const delta = x => x && x.pool_24h != null ? (x.pool - x.pool_24h) : null;
+      const dk = delta(k), dv = delta(v);
+      const td = el("td", "num", `${f(k && k.pool)} / ${f(v && v.pool)}`);
+      const moved = [dk, dv].filter(x => x != null && Math.abs(x) >= 0.1);
+      if (moved.length) td.classList.add(moved[0] > 0 ? "up" : "down");
+      tr.append(td);
+      tb.append(tr);
+    }
+    if (!rows.length) {
+      const tr = document.createElement("tr"); const td = el("td", "muted", "Nessun pool corrisponde alla ricerca."); td.colSpan = 13; tr.append(td); tb.append(tr);
+    }
+  }
+
+  function chains(d) {
+    const box = $("chains");
+    box.replaceChildren();
+    const list = d.chains || [];
+    const tot = list.reduce((s, c) => s + (c.ap || 0), 0) || 1;
+    for (const c of list) {
+      const parts = [((c.ap || 0) / tot * 100).toFixed(1).replace(".", ",") + "% del totale"];
+      if (c.pools) parts.push(c.pools + " pool");
+      if (c.positions) parts.push(c.positions.toLocaleString("it-IT") + " posizioni");
+      if (c.fees48h) parts.push("fee 48h " + fmtUsd(c.fees48h));
+      if (c.median_apr != null) parts.push("APR mediano " + fmtPct(c.median_apr));
+      if (c.share != null) {
+        const was = c.share_7d != null ? c.share_7d : c.share_24h;
+        parts.push(`quota Aero del volume DEX ${sharePct(c.share)}` +
+          (was != null ? ` (${c.share_7d != null ? "7 giorni fa" : "ieri"} ${sharePct(was)})` : "") +
+          (c.legacy_vol24h && c.dex_vol24h ? `, più ${sharePct(c.legacy_vol24h / c.dex_vol24h)} sui vecchi Aerodrome e Velodrome` : ""));
+      }
+      if (c.new) parts.push("chain nuova per la simulazione");
+      let st = "";
+      if (!c.ok) st = c.error === "chain non configurata" ? "Non ancora monitorata." : "Ultima lettura non riuscita" + (c.checked ? ": dati del " + when(c.checked) : "") + ".";
+      else if (!c.synced) st = "Sto ancora leggendo lo storico delle allocazioni.";
+      else if (c.fee_hours != null && c.fee_hours < 47) st = `Storico delle fee: ${Math.round(c.fee_hours)} ore su 48.`;
+      const w = row(c.name, fmtN(c.ap));
+      const det = el("div", "d", parts.join(" · "));
+      if (st) { det.append(document.createElement("br"), el("span", c.ok ? "" : "bad-text", st)); }
+      w.append(det);
+      // the chain's biggest pairs on every DEX and Aero's part of each: where Aero still has room to grow
+      const tp = (c.top_pairs || []).filter(p => p[1] > 0).slice(0, 8);
+      if (tp.length) {
+        const more = el("details", "more pairs");
+        more.append(el("summary", null, "Coppie più scambiate su tutti i DEX (24 ore)"));
+        const ul = el("ul", "reco");
+        for (const [n, vol, , av, g] of tp) {
+          const li = document.createElement("li");
+          li.append(el("span", "nm", n),
+            el("span", "pc", `${fmtUsdShort(vol)} · ${g ? "Aero " + sharePct(Math.min(1, av / vol)) : "nessun pool Aero"}`));
+          ul.append(li);
+        }
+        more.append(ul);
+        w.append(more);
+      }
+      box.append(w);
+    }
+    if (!list.length) {
+      const by = Object.entries(d.totals.by_chain || {}).sort((a, b) => b[1] - a[1]);
+      const t2 = by.reduce((s, [, v]) => s + v, 0) || 1;
+      for (const [c, v] of by) box.append(row(c, fmtN(v), (v / t2 * 100).toFixed(1).replace(".", ",") + "% del totale"));
+      if (!by.length) empty(box, "Nessun dato.");
+    }
+  }
+
+  let savedChain = "";
+  try { savedChain = localStorage.getItem("radar-chain") || ""; } catch (e) {}
+  function chainOptions(d) {
+    const sel = $("chain-f"), cur = sel.value || savedChain;
+    const names = (d.chains || []).filter(c => c.pools).map(c => c.short);
+    sel.replaceChildren(new Option("Tutte le chain", ""), ...names.map(n => new Option(n, n)));
+    sel.value = names.includes(cur) ? cur : "";
+  }
+
+  function alertsList(d) {
+    const box = $("alerts");
+    box.replaceChildren();
+    const rows = (d.alerts || []).slice(0, 12);
+    if (!rows.length) return empty(box, "Ancora nessun avviso.");
+    for (const a of rows) box.append(row(a.title, when(a.ts), a.body));
+  }
+
+
+  // ---------------------------------------------------------------- simulation
+  let SIM = null, ySort = "m1000_7d", yDir = -1;
+  const SCOL = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];   // follows the method, in the tracker's fixed order
+  let simMode = "rate";
+  try { simMode = localStorage.getItem("radar-sim-mode") || "rate"; } catch (e) {}
+  const kSize = n => n >= 1000 ? fmtN(n) : String(n);
+
+  // percent of the position per pool; tracker.json written before percentages had only sAERO amounts
+  const recoRows = (now, size) => (now && now.reco) ||
+    ((now && now.pools) || []).map(p => ({ n: p[0], c: "", p: p[4] != null ? p[4] : Math.round(p[1] / size * 100) }));
+  const holdRows = (s, size) => s.hold ||
+    (s.holding || []).map(h => ({ n: h[0], c: "", p: h[2] != null ? h[2] : Math.round(h[1] / size * 100) }));
+  const pctOf = (r, size) => r[2] != null ? r[2] : Math.round(r[1] / size * 100);
+  const sharePct = x => x == null ? "—" : (x * 100 >= 10 ? Math.round(x * 100) : (x * 100).toFixed(1).replace(".", ",")) + "%";
+  const fmtUsdShort = x => x == null ? "—" : x >= 1e9 ? "$" + (x / 1e9).toFixed(1).replace(".", ",") + " mld"
+    : x >= 1e6 ? "$" + (x >= 1e8 ? Math.round(x / 1e6) : (x / 1e6).toFixed(1).replace(".", ",")) + "M"
+    : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x);
+  const usdCents = x => x == null ? "—" : x < 100 ? "$" + x.toFixed(2).replace(".", ",") : fmtUsd(x);
+  function recoList(rows) {
+    const ol = el("ol", "reco");
+    for (const r of rows) {
+      const li = el("li"), nm = el("span", "nm", r.n);
+      if (r.k) nm.append(el("span", "kd2", r.k));
+      if (r.c && r.c !== "Base") nm.append(el("span", "tag", r.c));
+      li.append(nm, el("span", "pc", r.p + "%"));
+      ol.append(li);
+    }
+    return ol;
+  }
+
+  function simCards(t) {
+    $("sim-size").textContent = kSize(t.size);
+    $("sim-since").textContent = t.collected_h < 1 ? "raccolta appena iniziata" : `dati da ${inT(t.collected_h * 3600)}`;
+    const box = $("sim-cards");
+    box.replaceChildren();
+    t.strategies.forEach((s, i) => {
+      const c = el("div", "card");
+      const h = el("h3"); const sw = el("i"); sw.style.background = SCOL[i]; h.append(sw, s.label); c.append(h);
+      if (s.id === "radar") {
+        const o = t.options;
+        c.append(el("div", "method", o ? `Il metodo dell'app Radar con le opzioni caricate: trend ${String(o.trend).replace(".", ",")}%, concorrenza ${compText(o.comp)}.`
+          : "Il metodo dell'app Radar con trend 0% e concorrenza 3× la media, finché non carichi le tue opzioni."));
+      }
+      if (s.id === "nuove" && t.new_chains) {
+        const nc = t.new_chains;
+        const sh = nc.shares || {};
+        const names = nc.chains.map(n => sh[n] != null ? `${n} (Aero ${sharePct(sh[n])})` : n);
+        c.append(el("div", "method", nc.chains.length
+          ? `Solo le ${nc.pairs_per_chain} coppie più grosse (volume su tutti i DEX) di ${names.join(", ")}: chain dove Aero ha meno del ${Math.round(nc.max_share * 100)}% del volume DEX.` +
+            (nc.max_pair_share != null ? ` Salta le coppie dove Aero ha già almeno il ${Math.round(nc.max_pair_share * 100)}% del volume.` : "")
+          : "Nessuna chain sotto la soglia di quota di Aero per ora."));
+      }
+      // before a full day the real figure is the total so far: a daily rate from a few hours of lumpy fees misleads
+      const daily = s.usd_day != null && s.hours >= 24;
+      const big = el("div", "big", daily ? fmtUsd(s.usd_day) : usdCents(s.usd_total));
+      big.append(el("small", null, daily ? "al giorno, reale" : `finora, in ${Math.max(0, Math.round(s.hours))} h`));
+      c.append(big);
+      const kv = el("div", "kv");
+      const add = (k, v) => kv.append(el("span", null, k), el("span", null, v));
+      add("APR reale", daily && s.apr != null ? fmtPct(s.apr) : "dopo 24 h");
+      add("Ultime 24 ore", s.usd_24h != null ? usdCents(s.usd_24h) : "—");
+      add("Totale", `${usdCents(s.usd_total)} in ${Math.round(s.hours)} h`);
+      const perDay = s.now.pred_47h != null ? s.now.pred_47h / ((t.cooldown_h || 47) / 24) : null;
+      add("Previsione adesso", s.now.apr != null ? `${fmtUsd(perDay)}/g · APR ${fmtPct(s.now.apr)}` : "—");
+      add("Reale / previsto 7g", s.real_vs_pred != null ? (s.real_vs_pred * 100).toFixed(0) + "%" : "dopo 47 h");
+      add("Prossimo spostamento", s.until ? (s.until * 1000 > Date.now() ? when(s.until) : "ora") : "—");
+      c.append(kv);
+      const reco = recoRows(s.now, t.size);
+      if (reco.length) {
+        c.append(el("div", "reco-h", "Consiglio adesso"));
+        const split = (s.now && s.now.chains) || [];
+        if (split.length) c.append(el("div", "chainsplit", "Per chain: " + split.map(r => `${r[0]} ${pctOf(r, t.size)}%`).join(" · ")));
+        c.append(recoList(reco.slice(0, 8)));
+        if (reco.length > 8) {
+          const more = el("details", "more");
+          more.append(el("summary", null, `Altri ${reco.length - 8} pool`), recoList(reco.slice(8)));
+          c.append(more);
+        }
+      } else {
+        c.append(el("div", "holding", "Nessun consiglio per ora: servono fee o incentivi da confrontare."));
+      }
+      const hold = holdRows(s, t.size).slice(0, 5).map(r => `${r.n}${r.c && r.c !== "Base" ? " (" + r.c + ")" : ""} ${r.p}%`).join(" · ");
+      c.append(el("div", "holding", hold ? "Posizione virtuale ora su: " + hold : "La posizione virtuale non è ancora allocata."));
+      box.append(c);
+    });
+  }
+
+  function simLegend(t) {
+    const box = $("sim-legend");
+    box.replaceChildren();
+    t.strategies.forEach((s, i) => { const sp = el("span"), sw = el("i"); sw.style.background = SCOL[i]; sp.append(sw, s.label); box.append(sp); });
+    document.querySelectorAll("#sim-mode button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === simMode)));
+  }
+
+  function simChart(t) {
+    const host = $("sim-chart");
+    const rate = simMode === "rate";
+    const series = t.strategies.map(s => rate ? ((s.perf && s.perf.series) || []).map(([h, v]) => [h, v]) : (s.curve || []).map(([h, c]) => [h, c]));
+    const pts = series.flat();
+    // a line needs points at different times: until then the axis labels would all sit on one spot
+    if (pts.length < 4 || new Set(pts.map(p => p[0])).size < 3) {
+      host.replaceChildren(el("div", "empty", rate ? "Il grafico compare dopo qualche ora di misure: il reso di ogni metodo viene misurato a ogni giro." : "Il grafico compare dopo qualche ora di raccolta."));
+      return;
+    }
+    const w = Math.max(520, Math.round(host.clientWidth || 720)), h = 200, padL = 52, padR = 112, padB = 26, padT = 10;
+    const x0 = Math.min(...pts.map(p => p[0])), x1 = Math.max(...pts.map(p => p[0]));
+    const ymax = Math.max(1, ...pts.map(p => p[1]));
+    const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(ymax))); const m = ymax / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+    const X = v => padL + (x1 === x0 ? 0 : (v - x0) / (x1 - x0)) * (w - padL - padR);
+    const Y = v => h - padB - (v / nice) * (h - padB - padT);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", rate ? "Dollari al giorno incassati dalle allocazioni salvate di ogni metodo, media delle 24 ore" : "Dollari guadagnati dalle posizioni virtuali nel tempo");
+    const add = (name, attrs, text) => { const e = document.createElementNS(ns, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
+    for (let i = 0; i <= 4; i++) {
+      const v = nice * i / 4, yy = Y(v);
+      add("line", { x1: padL, x2: w - padR, y1: yy, y2: yy, stroke: "var(--line)", "stroke-width": 1 });
+      add("text", { x: padL - 6, y: yy + 4, "text-anchor": "end", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, fmtUsd(v));
+    }
+    const ticks = w < 700 ? 2 : 4;
+    for (let i = 0; i <= ticks; i++) {
+      const v = x0 + (x1 - x0) * i / ticks;
+      add("text", { x: X(v), y: h - 8, "text-anchor": i === 0 ? "start" : i === ticks ? "end" : "middle", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, when(v));
+    }
+    const ends = [];
+    series.forEach((ser, i) => {
+      if (ser.length < 2) return;
+      add("path", { d: ser.map((p, j) => `${j ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(""), fill: "none", stroke: SCOL[i], "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" });
+      const last = ser[ser.length - 1];
+      add("circle", { cx: X(last[0]), cy: Y(last[1]), r: 4, fill: SCOL[i], stroke: "var(--panel)", "stroke-width": 2 });
+      ends.push({ y: Y(last[1]), label: t.strategies[i].label.split(" ")[0] + " " + fmtUsd(last[1]), x: X(last[0]) });
+    });
+    ends.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+    ends.forEach(e => add("text", { x: e.x + 8, y: e.y + 4, "font-size": 11, fill: "var(--ink)", "font-family": "var(--f-body)" }, e.label));
+    const cross = add("line", { x1: 0, x2: 0, y1: padT, y2: h - padB, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 });
+    const tip = el("div", "tip"); tip.hidden = true;
+    const hit = add("rect", { x: padL, y: padT, width: w - padL - padR, height: h - padB - padT, fill: "transparent" });
+    hit.addEventListener("pointermove", ev => {
+      const r = svg.getBoundingClientRect();
+      const vx = x0 + ((ev.clientX - r.left) * (w / r.width) - padL) / (w - padL - padR) * (x1 - x0);
+      const vals = series.map(ser => { let best = null; for (const p of ser) if (p[0] <= vx + 1800) best = p; return best; });
+      const tx = vals.find(v => v) ? vals.find(v => v)[0] : vx;
+      cross.setAttribute("x1", X(tx)); cross.setAttribute("x2", X(tx)); cross.setAttribute("opacity", 1);
+      tip.replaceChildren(el("div", null, when(tx)));
+      t.strategies.forEach((s, i) => { if (vals[i]) { const line = el("div"); const sw = el("span"); sw.textContent = "■ "; sw.style.color = SCOL[i]; line.append(sw, `${s.label}: ${fmtUsd(vals[i][1])}${rate ? " al giorno" : ""}`); tip.append(line); } });
+      tip.hidden = false;
+      const left = (X(tx) / w) * r.width;
+      tip.style.left = Math.min(left + 12, r.width - 170) + "px"; tip.style.top = "8px";
+    });
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hidden = true; });
+    host.replaceChildren(svg);
+    host.parentElement.querySelectorAll(".tip").forEach(n => n.remove());
+    host.parentElement.append(tip);
+  }
+
+  function yieldTable(t) {
+    const big = $("yield-big").checked;
+    let rows = (t.pools || []).filter(p => !big || p.ap >= 10000);
+    const val = p => ySort === "name" ? p.name.toLowerCase() : p[ySort];
+    rows.sort((a, b) => { const va = val(a), vb = val(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; return (va > vb ? 1 : va < vb ? -1 : 0) * yDir; });
+    $("yield-count").textContent = `${rows.length} pool`;
+    document.querySelectorAll("th[data-y]").forEach(th => { if (th.dataset.y === ySort) th.setAttribute("aria-sort", yDir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort"); });
+    const tb = $("yield-rows");
+    tb.replaceChildren();
+    const usd4 = v => v == null ? "—" : "$" + (v >= 10 ? v.toFixed(1) : v.toFixed(2)).replace(".", ",");
+    for (const p of rows.slice(0, 120)) {
+      const tr = document.createElement("tr");
+      const c0 = document.createElement("td"); c0.append(el("span", "nm", p.name));
+      if (p.chain && p.chain !== "Base") c0.append(el("span", "tag", p.chain));
+      if (p.ap < 10000) c0.append(el("span", "kd", "quasi vuoto")); tr.append(c0);
+      tr.append(el("td", "num", fmtN(p.ap)));
+      for (const k of ["m1000_24h", "m1000_7d", "m1000_30d"]) tr.append(el("td", "num", usd4(p[k])));
+      tr.append(el("td", "num", fmtPct(p.apr_7d)));
+      tr.append(el("td", "num", p.reco_n_7d ? `${p.reco_n_7d} volte` : p.reco_open ? `in corso (${p.reco_open})` : "—"));
+      tr.append(el("td", "num", usd4(p.reco_real_1000_day)));
+      const r = p.reco_real_vs_pred;
+      tr.append(el("td", "num " + (r == null ? "muted" : r >= 0.9 ? "up" : r < 0.6 ? "down" : ""), r == null ? "—" : Math.round(r * 100) + "%"));
+      tb.append(tr);
+    }
+    if (!rows.length) { const tr = document.createElement("tr"); const td = el("td", "muted", "Dati in raccolta."); td.colSpan = 9; tr.append(td); tb.append(tr); }
+    const days = t.collected_h / 24;
+    $("yield-foot").textContent = (days < 30 ? `Le colonne 7g e 30g coprono ${days < 1 ? Math.round(t.collected_h) + " ore" : days.toFixed(1).replace(".", ",") + " giorni"}: la raccolta è iniziata ${when(t.start)}. ` : "") +
+      "«Reso se consigliato» è in dollari al giorno per 1000 sAERO, sulle allocazioni chiuse negli ultimi 7 giorni.";
+  }
+
+  function simRank(t) {
+    const tb = $("sim-rank");
+    tb.replaceChildren();
+    const by = t.rank_by || "all";
+    const order = t.ranking || t.strategies.map(s => s.id);
+    order.forEach((id, i) => {
+      const k = t.strategies.findIndex(x => x.id === id), s = t.strategies[k];
+      if (!s) return;
+      const p = s.perf || {};
+      const tr = el("tr");
+      if (i === 0 && p["rate_" + by] != null) tr.className = "top";
+      const td = el("td"), sw = el("i"); sw.style.background = SCOL[k]; td.append(sw, `${i + 1}. ${s.label}`); tr.append(td);
+      const main = p["rate_" + by], apr = p["apr_" + by];
+      tr.append(el("td", "num", main != null ? usdCents(main) : "—"));
+      tr.append(el("td", "num", apr != null ? fmtPct(apr) : "—"));
+      const rv = p.real_vs_pred_all;
+      tr.append(el("td", "num x " + (rv == null ? "muted" : rv >= 0.9 ? "up" : rv < 0.6 ? "down" : ""), rv == null ? "—" : Math.round(rv * 100) + "%"));
+      tr.append(el("td", "num x", p.rate_24h != null ? usdCents(p.rate_24h) : "—"));
+      tr.append(el("td", "num x", p.rate_7d != null ? usdCents(p.rate_7d) : "—"));
+      tr.append(el("td", "num x", p.rate_all != null ? usdCents(p.rate_all) : "—"));
+      tr.append(el("td", "num x", (p.saved || 0).toLocaleString("it-IT")));
+      tb.append(tr);
+    });
+    const byTxt = by === "7d" ? "gli ultimi 7 giorni" : by === "24h" ? "le ultime 24 ore" : "tutto il periodo";
+    $("sim-rank-h").textContent = "Al giorno, " + (by === "7d" ? "7 giorni" : by === "24h" ? "24 ore" : "dall'inizio");
+    $("sim-rank-note").textContent = `Dollari al giorno incassati in media dalle allocazioni che ogni metodo ha salvato a ogni giro, per una posizione di ${kSize(t.size)} sAERO. ` +
+      `24 ore e 7 giorni: quello che è arrivato in quel periodo; dall'inizio: ogni allocazione salvata dalla sua nascita. La classifica usa ${byTxt}, la finestra più lunga che tutti i metodi coprono. ` +
+      `«Reale / previsto» confronta l'incassato con la stima fatta al momento del salvataggio.`;
+    const o = t.options;
+    $("sim-opts").textContent = o ? `Tutti i metodi seguono le opzioni caricate dal Radar ${when(o.at)}: ${optsText(o)}.`
+      : "Nessuna opzione caricata dal Radar: per ora i metodi non hanno limiti per pool. Le carichi dal Radar in cima alla pagina.";
+  }
+
+  function simRender() { if (SIM) { simRank(SIM); simLegend(SIM); simCards(SIM); simChart(SIM); yieldTable(SIM); rdLoadState(); } }
+  document.querySelectorAll("#sim-mode button").forEach(b => b.addEventListener("click", () => {
+    simMode = b.dataset.m;
+    try { localStorage.setItem("radar-sim-mode", simMode); } catch (e) {}
+    if (SIM) { simLegend(SIM); simChart(SIM); }
+  }));
+
+  async function loadSim() {
+    try {
+      const r = await fetch("tracker.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      SIM = await r.json();
+      simRender();
+    } catch (e) {
+      empty($("sim-cards"), "La simulazione parte con il prossimo aggiornamento.");
+    }
+  }
+
+  $("yield-big").addEventListener("change", () => SIM && yieldTable(SIM));
+  document.querySelectorAll("th[data-y]").forEach(th => th.addEventListener("click", () => {
+    const k = th.dataset.y;
+    if (ySort === k) yDir = -yDir; else { ySort = k; yDir = k === "name" ? 1 : -1; }
+    SIM && yieldTable(SIM);
+  }));
+
+  // ---------------------------------------------------------------- Radar sAERO: the old app, on the monitor's data
+  const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } };
+  const RD_DEF = { ap: "235000", price: "", trend: "0", comp: "3", spk: false, spkK: "75", minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
+  let RD = { ...RD_DEF };
+  try { RD = { ...RD_DEF, ...(JSON.parse(lsGet("radar-rd") || "null") || {}) }; } catch (e) {}
+  let XS = { keys: new Set(), rules: [], chainsOff: [] };
+  try { const o = JSON.parse(lsGet("radar-rd-x") || "null"); if (o) XS = { keys: new Set(o.keys || []), rules: o.rules || [], chainsOff: o.chainsOff || [] }; } catch (e) {}
+  const saveRD = () => lsSet("radar-rd", JSON.stringify(RD));
+  const saveX = () => lsSet("radar-rd-x", JSON.stringify({ keys: [...XS.keys], rules: XS.rules, chainsOff: XS.chainsOff }));
+  const RD_CHAINS = ["Base", "OP", "Ethereum", "Arbitrum", "Robinhood", "Arc", "Ink"];
+  const PER_CHAIN = 20;           // the LeafVoter takes at most 20 pools per chain from one position
+  let rdShowAll = false, rdLast = null, rdRaf = 0;
+  const rdSchedule = () => { cancelAnimationFrame(rdRaf); rdRaf = requestAnimationFrame(rdRender); };
+
+  const r$ = v => {
+    if (v == null || !isFinite(v)) return "—";
+    const a = Math.abs(v);
+    if (a >= 1e6) return "$" + (v / 1e6).toFixed(2).replace(".", ",") + "M";
+    if (a >= 1e4) return "$" + (v / 1e3).toFixed(1).replace(".", ",") + "k";
+    return "$" + v.toLocaleString("it-IT", { maximumFractionDigits: a < 10 ? 2 : 0 });
+  };
+  const f1k = v => isFinite(v) ? "$" + v.toFixed(2).replace(".", ",") : "—";
+  const sPct = v => v == null || !isFinite(v) ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(Math.abs(v) < 10 ? 1 : 0).replace(".", ",") + "%";
+  const compText = n => +n ? `max ${String(+n).replace(".", ",")}× la media` : "voti fermi";
+  function numIn(v) {
+    let t = String(v == null ? "" : v).trim().replace(/[$\s]/g, "");
+    if (!t) return NaN;
+    let m = 1;
+    if (/k$/i.test(t)) { m = 1e3; t = t.slice(0, -1); } else if (/m$/i.test(t)) { m = 1e6; t = t.slice(0, -1); }
+    if (t.includes(",") && t.includes(".")) t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+    else if (t.includes(",")) t = /^-?\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
+    else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+    const x = parseFloat(t);
+    return isFinite(x) ? x * m : NaN;
+  }
+  const rdNum = (v, d) => { const x = numIn(v); return isFinite(x) ? x : d; };
+  const rdPrice = () => rdNum(RD.price, 0) > 0 ? rdNum(RD.price, 0) : ((DATA && DATA.aero_usd) || 0);
+  const hayOf = p => `${p.name} ${p.kind} ${p.chain}`.toLowerCase();
+  const qmatch = (p, q) => { const w = String(q).toLowerCase().split(/\s+/).filter(Boolean); return w.length > 0 && w.every(t => hayOf(p).includes(t)); };
+  const ruleFor = p => XS.rules.find(r => qmatch(p, r));
+  const chainOff = p => XS.chainsOff.includes(p.chain);
+  const projected = (p, w) => Math.max(0, p.inc + p.fee * (1 + w * Math.max(-100, Math.min(200, p.d || 0)) / 100));
+
+  function rdPools() {
+    return ((DATA && DATA.pools) || []).filter(p => p.key && !p.blocked && ((p.fees48h || 0) + (p.inc_next48h || 0) > 0 || (p.ap || 0) > 0))
+      .map(p => {
+        const q = { key: p.key, name: p.name, kind: p.kind && p.kind !== "?" ? p.kind : "", chain: p.chain || "Base",
+          fee: p.fees48h || 0, inc: p.inc_next48h || 0, incPast: p.inc48h || 0, rew: p.rev48h || 0,
+          d: p.dfee != null ? p.dfee : null, prev: p.fees_prev48h != null ? p.fees_prev48h : null,
+          alloc: p.ap || 0, dh: { 1: p.d1h, 6: p.d6h, 24: p.d24h, 48: p.d48h }, spark: p.spark };
+        q.on = !(XS.keys.has(q.key) || ruleFor(q) || chainOff(q));
+        return q;
+      });
+  }
+
+  // the Radar's allocation: 1% slices to the pool that pays most on the next slice, within the options
+  function rdAllocate(list) {
+    const ap = Math.max(0, rdNum(RD.ap, 0)), w = (+RD.trend || 0) / 100, cap = +RD.cap || 100, N = +RD.comp || 0, minA = Math.max(0, +RD.minA || 0);
+    let sR = 0, sA = 0;
+    for (const p of list) { sR += projected(p, w); sA += Math.max(0, p.alloc); }
+    const avg = sA > 0 ? sR / sA : 0;     // the whole market: the others vote on the pools you leave out too
+    let spike = null;
+    if (RD.spk) {
+      let now = 0, prev = 0; const withD = [];
+      for (const p of list) {
+        now += p.fee;
+        if (p.d != null && p.d > -100 && p.prev != null) { prev += p.prev; withD.push(p); } else prev += p.fee;
+      }
+      const Dm = prev > 0 ? (now / prev - 1) * 100 : 0, K = Math.max(0, rdNum(RD.spkK, 0)) / 100, thr = Dm + K * Math.abs(Dm);
+      spike = { Dm, thr, n: withD.length, ids: new Set(withD.filter(p => p.d > thr).map(p => p.key)) };
+    }
+    // a spike does not drop the pool: its fees go back to the 48 hours before, moved like the market; incentives stay
+    const value = p => {
+      const R = projected(p, w);
+      if (!(spike && spike.ids.has(p.key))) return R;
+      return p.inc + Math.min(R - p.inc, Math.max(0, p.prev * (1 + spike.Dm / 100)));
+    };
+    const act = list.filter(p => p.on).map(p => {
+      const R = value(p), A0 = Math.max(0, p.alloc);
+      return { p, R, A0, A: N && avg > 0 ? Math.max(A0, R / (N * avg)) : A0, k: 0 };
+    });
+    const slice = ap / 100;
+    const earn = (o, k) => { const x = k * slice; return x <= 0 ? 0 : o.R * x / (o.A + x); };
+    const run = cands => {
+      act.forEach(o => o.k = 0);
+      const n = cands.filter(o => o.R > 0).length;
+      const capK = Math.max(1, Math.round(cap), Math.ceil(100 / Math.max(1, n)));   // too few pools: just enough room
+      const per = {};
+      for (let s = 0; s < 100; s++) {
+        let best = null, bg = -1;
+        for (const o of cands) {
+          if (o.k >= capK || !(o.R > 0)) continue;
+          if (!o.k && (per[o.p.chain] || 0) >= PER_CHAIN) continue;
+          const g = earn(o, o.k + 1) - earn(o, o.k);
+          if (g > bg) { bg = g; best = o; }
+        }
+        if (!best) break;
+        if (!best.k) per[best.p.chain] = (per[best.p.chain] || 0) + 1;
+        best.k++;
+      }
+    };
+    if (ap > 0 && act.length) {
+      // smallest share: drop the pool with the smallest share under it and place the slices again, until all reach it
+      let cands = act.slice();
+      for (let it = 0; it < 400; it++) {
+        run(cands);
+        if (!minA) break;
+        const small = cands.filter(o => o.k > 0 && o.k < minA);
+        if (!small.length || cands.filter(o => o.k > 0).length <= 1) break;
+        small.sort((a, b) => a.k - b.k || earn(a, a.k) - earn(b, b.k));
+        cands = cands.filter(o => o !== small[0]);
+      }
+    }
+    const total = act.reduce((s, o) => s + earn(o, o.k), 0);
+    let top = null, topE = 0;
+    for (const o of act) { const e = earn(o, 100); if (e > topE) { topE = e; top = o; } }
+    return { ap, w, act, total, top, topE, earn, avg, N, spike };
+  }
+
+  function toast(text, bad) {
+    const t = $("rd-toast");
+    t.textContent = text; t.classList.toggle("bad", !!bad);
+    clearTimeout(toast.h);
+    if (!bad) toast.h = setTimeout(() => { if (t.textContent === text) t.textContent = ""; }, 5000);
+  }
+
+  function rdRender() {
+    if (!DATA) return;
+    const list = rdPools(), r = rdAllocate(list), price = rdPrice();
+    rdLast = { list, r };
+    $("rd-when").textContent = "dati del " + when(DATA.generated);
+    $("rd-trend-v").textContent = (+RD.trend || 0) + "%";
+    $("rd-price").placeholder = DATA.aero_usd ? DATA.aero_usd.toFixed(3).replace(".", ",") : "es. 0,80";
+    const nD = list.filter(p => p.d != null).length;
+    const ready = Math.min(...(DATA.chains || []).filter(c => c.fee_from && c.pools).map(c => c.fee_from + 96 * 3600));
+    $("rd-trend-s").textContent = nD ? `Segue la variazione delle fee rispetto alle 48 ore prima (disponibile per ${nD} pool)`
+      : `La variazione delle fee arriva con 96 ore di storico${isFinite(ready) ? ", " + when(ready) : ""}: fino ad allora il trend non cambia nulla`;
+    rdChains(list);
+
+    const used = r.act.filter(o => o.k > 0).sort((a, b) => b.k - a.k);
+    $("rd-k48").textContent = r$(r.total);
+    const per1k = r.ap > 0 ? r.total / r.ap * 1000 : NaN;
+    const apr = price > 0 && r.ap > 0 ? r.total / (r.ap * price) * 182.5 * 100 : NaN;
+    $("rd-k1k").textContent = isFinite(per1k) && r.total > 0 ? f1k(per1k) : "—";
+    $("rd-k1k-l").textContent = "$ per 1.000 voti / 48 ore" + (isFinite(apr) ? " · APR " + fmtPct(apr) : "");
+    $("rd-kn").textContent = used.length || "—";
+    const strips = $("rd-strips");
+    strips.replaceChildren();
+    if (!used.length) strips.append(el("p", "note", r.ap > 0 ? "Nessun pool utile con queste opzioni." : "Inserisci la tua Allocation Power."));
+    for (const o of used) {
+      const d = el("div", "strip"), left = el("div"); left.style.minWidth = "0";
+      const nm = el("div", "nm", o.p.name);
+      if (o.p.kind) nm.append(el("span", "kd", o.p.kind));
+      const bar = el("div", "bar"), bi = el("i"); bi.style.width = o.k + "%"; bar.append(bi);
+      left.append(nm, el("div", "sb", `${o.p.chain} · ${fmtN(o.k * r.ap / 100)} sAERO · ${r$(r.earn(o, o.k))}/48 ore`), bar);
+      d.append(left, el("div", "pct", o.k + "%"));
+      strips.append(d);
+    }
+    $("rd-spk-s").textContent = RD.spk ? "Acceso" : "Spento";
+    const sp = r.spike, si = $("rd-spk-info");
+    if (!sp) si.textContent = "Riporta al livello di prima le fee dei pool saliti più del mercato oltre la tolleranza; gli incentivi programmati restano";
+    else if (!sp.n) si.textContent = "Nessuna variazione delle fee ancora: il filtro non ha nulla da confrontare";
+    else si.textContent = `Mercato ${sPct(sp.Dm)} · fee tagliate nei pool sopra ${sPct(sp.thr)}: ${sp.ids.size} (incentivi tenuti)`;
+    const mk = $("rd-mkt");
+    if (r.avg > 0 && r.ap > 0) {
+      const day = r.avg * r.ap / 2, mine = r.total / 2;
+      mk.replaceChildren(`Tutti i pool insieme pagano `, el("b", null, f1k(r.avg * 1000)), ` ogni 1.000 voti per 48 ore. Con la tua posizione la media sarebbe `,
+        el("b", null, r$(day)), ` al giorno; la divisione suggerita stima `, el("b", null, r$(mine)), ` al giorno, cioè `,
+        el("b", null, (day > 0 ? mine / day : 0).toFixed(1).replace(".", ",") + "×"), ` la media. Oltre 2–3× la stima va presa con cautela.`);
+    } else mk.textContent = "—";
+    const c = $("rd-top");
+    if (r.top && r.total > 0) {
+      const gain = r.total - r.topE;
+      c.replaceChildren("Tutto su ", el("b", null, `${r.top.p.name}${r.top.p.kind ? " " + r.top.p.kind : ""} (${r.top.p.chain})`), " renderebbe ",
+        el("b", null, r$(r.topE)), " in 48 ore. La divisione suggerita rende ", el("b", null, r$(r.total)), ", cioè ",
+        el("b", null, (gain >= 0 ? "+" : "") + r$(gain)), ". Più grande è la tua posizione rispetto ai voti di un pool, più conviene distribuire.");
+    } else c.textContent = "Il confronto compare quando c'è almeno un pool valido.";
+    rdTable(list, r, price);
+    rdMov(list);
+    rdMine(list, r);
+    rdCooldown();
+    rdLoadState();
+  }
+
+  function rdChains(list) {
+    const box = $("rd-chains"), cnt = {};
+    list.forEach(p => cnt[p.chain] = (cnt[p.chain] || 0) + 1);
+    const names = [...new Set([...RD_CHAINS, ...list.map(p => p.chain)])];
+    box.replaceChildren();
+    for (const c of names) {
+      const l = el("label", "ddi"), cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = !XS.chainsOff.includes(c);
+      cb.addEventListener("change", () => { XS.chainsOff = cb.checked ? XS.chainsOff.filter(x => x !== c) : XS.chainsOff.concat([c]); saveX(); rdRender(); });
+      l.append(cb, el("span", null, c), el("span", "n", cnt[c] ? cnt[c] + " pool" : "nessun pool"));
+      box.append(l);
+    }
+    const on = names.filter(c => !XS.chainsOff.includes(c)).length;
+    $("rd-chains-sum").textContent = on === names.length ? `Tutte le reti (${names.length})` : `${on} reti su ${names.length}`;
+  }
+
+  function rdSorted(list, r) {
+    const w = r.w, arr = list.slice(), by = RD.sortBy, h = RD.movH;
+    const aprKey = p => p.alloc > 0 ? projected(p, w) / p.alloc : (projected(p, w) > 0 ? Infinity : 0);
+    if (by === "apr") arr.sort((a, b) => (aprKey(b) - aprKey(a)) || (b.rew - a.rew));
+    else if (by === "proj") arr.sort((a, b) => projected(b, w) - projected(a, w));
+    else if (by === "rew") arr.sort((a, b) => b.rew - a.rew);
+    else if (by === "alloc") arr.sort((a, b) => b.alloc - a.alloc);
+    else if (by === "dalloc") arr.sort((a, b) => (b.dh[h] || 0) - (a.dh[h] || 0));
+    return arr;
+  }
+
+  function rdTable(list, r, price) {
+    const q = $("rd-q").value.trim(), arr = rdSorted(list, r), hits = q ? arr.filter(p => qmatch(p, q)) : null;
+    const rows = hits || (rdShowAll ? arr : arr.slice(0, 40));
+    const byKey = new Map(r.act.map(o => [o.p.key, o]));
+    const tb = $("rd-rows");
+    tb.replaceChildren();
+    for (const p of rows) {
+      const tr = document.createElement("tr");
+      const isSp = !!(r.spike && r.spike.ids.has(p.key));
+      tr.className = (p.on ? "" : "off") + (isSp ? " spike" : "");
+      if (isSp) tr.title = "Picco di volume: fee riportate al livello delle 48 ore prima mosse come il mercato, incentivi tenuti";
+      const td0 = el("td", "ck"), cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = p.on; cb.setAttribute("aria-label", "Usa " + p.name + " " + p.chain);
+      const rl = ruleFor(p);
+      if (chainOff(p)) { cb.disabled = true; cb.title = "Rete esclusa dal menù Reti"; }
+      else if (rl) { cb.disabled = true; cb.title = `Scartato dalla ricerca «${rl}»`; }
+      cb.addEventListener("change", () => { if (cb.checked) XS.keys.delete(p.key); else XS.keys.add(p.key); saveX(); rdRender(); });
+      td0.append(cb); tr.append(td0);
+      const tdn = el("td"); tdn.append(el("span", "nm", p.name)); if (p.kind) tdn.append(el("span", "kd", p.kind)); tr.append(tdn);
+      tr.append(el("td", "ch muted", p.chain));
+      tr.append(el("td", "num", r$(p.rew)));
+      tr.append(el("td", "num", p.incPast ? r$(p.incPast) : "—"));
+      tr.append(el("td", "num", p.inc ? r$(p.inc) : "—"));
+      tr.append(el("td", "num " + (p.d > 0 ? "up" : p.d < 0 ? "down" : "muted"), p.d == null ? "—" : sPct(p.d)));
+      const tdA = el("td", "num", fmtN(p.alloc)); const sp = spark(p.spark); if (sp) tdA.append(sp); tr.append(tdA);
+      const dv = p.dh[RD.movH], isNew = dv != null && p.alloc > 0 && Math.abs(dv - p.alloc) < 1;
+      tr.append(el("td", "num " + (dv > 0 ? "up" : dv < 0 ? "down" : "muted"), dv == null ? "—" : isNew ? "nuovo" : dv ? fmtSigned(dv) : "="));
+      const R = projected(p, r.w), o = byKey.get(p.key);
+      tr.append(el("td", "num", r$(R)));
+      tr.append(el("td", "num", p.alloc > 0 ? f1k(R / p.alloc * 1000) : R > 0 ? "nessun voto" : "—"));
+      tr.append(el("td", "num", o && o.k > 0 ? f1k(R / (o.A + o.k * r.ap / 100) * 1000) : "—"));
+      tr.append(el("td", "num", price > 0 && p.alloc > 0 ? fmtPct(R / (p.alloc * price) * 182.5 * 100) : "—"));
+      tb.append(tr);
+    }
+    if (!rows.length) { const tr = document.createElement("tr"); const td = el("td", "muted", q ? "Nessun pool corrisponde alla ricerca." : "Nessun pool."); td.colSpan = 13; tr.append(td); tb.append(tr); }
+    $("rd-more").hidden = !!q || list.length <= 40;
+    $("rd-more").textContent = rdShowAll ? "Mostra solo i primi 40" : `Mostra tutti (${list.length})`;
+    $("rd-q-actions").hidden = !q;
+    $("rd-q-n").textContent = hits ? hits.filter(p => p.on).length : 0;
+    const off = list.filter(p => !p.on).length;
+    $("rd-pools-sum").textContent = `${list.length} pool${off ? " · " + off + " scartati" : ""}`;
+    rdX();
+  }
+
+  function rdX() {
+    const box = $("rd-x");
+    box.replaceChildren();
+    const keys = [...XS.keys];
+    if (!keys.length && !XS.rules.length && !XS.chainsOff.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.append(el("span", "lbl", "Scartati"));
+    const names = new Map(((DATA && DATA.pools) || []).map(p => [p.key, `${p.name}${p.kind && p.kind !== "?" ? " " + p.kind : ""} · ${p.chain}`]));
+    const chip = (txt, onx) => {
+      const c = el("span", "xchip"), b = el("button", null, "✕");
+      b.type = "button"; b.setAttribute("aria-label", "Rimetti " + txt); b.addEventListener("click", onx);
+      c.append(el("span", null, txt), b); box.append(c);
+    };
+    XS.chainsOff.forEach(c => chip("rete " + c, () => { XS.chainsOff = XS.chainsOff.filter(x => x !== c); saveX(); rdRender(); }));
+    XS.rules.forEach(r => chip(`ricerca «${r}»`, () => { XS.rules = XS.rules.filter(x => x !== r); saveX(); rdRender(); }));
+    keys.slice(0, 20).forEach(k => chip(names.get(k) || k.slice(0, 18) + "…", () => { XS.keys.delete(k); saveX(); rdRender(); }));
+    if (keys.length > 20) box.append(el("span", "lbl", "e altri " + (keys.length - 20)));
+    const all = el("button", "ghost", "Rimetti tutti");
+    all.type = "button";
+    all.addEventListener("click", () => { XS.keys.clear(); XS.rules = []; XS.chainsOff = []; saveX(); rdRender(); });
+    box.append(all);
+  }
+
+  function rdMov(list) {
+    const h = +RD.movH;
+    document.querySelectorAll("#rd-mov-seg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.h === h)));
+    const box = $("rd-mov"), note = $("rd-mov-note");
+    const L = list.filter(p => p.dh[h] != null && p.dh[h] !== 0).map(p => ({ p, d: p.dh[h], prev: p.alloc - p.dh[h] }));
+    if (!list.some(p => p.dh[h] != null)) {
+      box.replaceChildren(el("div", "empty", `Nessun confronto con ${h} ${h === 1 ? "ora" : "ore"} fa per ora.`));
+      note.textContent = ""; $("rd-mov-sum").textContent = ""; return;
+    }
+    const totNow = list.reduce((s, p) => s + p.alloc, 0);
+    const totPrev = list.reduce((s, p) => s + (p.dh[h] != null ? p.alloc - p.dh[h] : p.alloc), 0);
+    const nNew = L.filter(x => x.prev <= 0.5).length;
+    const pc = totPrev > 0 ? (totNow - totPrev) / totPrev * 100 : NaN;
+    note.textContent = `Rispetto a ${h} ${h === 1 ? "ora" : "ore"} fa. Allocazione totale ${fmtN(totPrev)} → ${fmtN(totNow)} (${sPct(pc)}).` + (nNew ? ` Pool nuovi: ${nNew}.` : "");
+    $("rd-mov-sum").textContent = `${h} ${h === 1 ? "ora" : "ore"}: ${sPct(pc)}`;
+    const col = (title, arr) => {
+      const c = el("div", "mvcol"); c.append(el("div", "lbl", title));
+      if (!arr.length) { c.append(el("p", "note", "Nessun movimento.")); return c; }
+      const ul = el("ul");
+      for (const x of arr) {
+        const li = el("li"), n = el("span", "n");
+        n.append(el("b", null, x.p.name), ` ${x.p.kind ? x.p.kind + " · " : "· "}${x.p.chain}`);
+        const cls = x.d > 0 ? "v up" : "v down";
+        li.append(n, el("span", cls, fmtSigned(x.d)), el("span", cls, x.prev > 0.5 ? sPct(x.d / x.prev * 100) : "nuovo"));
+        ul.append(li);
+      }
+      c.append(ul);
+      return c;
+    };
+    box.replaceChildren(col("Entrate di voti", L.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 8)),
+      col("Uscite di voti", L.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 8)));
+  }
+
+  // ---- your allocation: saved only with "Usa questa allocazione", on this device
+  const MKEY = "radar-rd-mine";
+  function loadMine() { try { const m = JSON.parse(lsGet(MKEY) || "null"); return m && Array.isArray(m.rows) ? m : null; } catch (e) { return null; } }
+  const storeMine = m => lsSet(MKEY, m ? JSON.stringify(m) : null);
+  const fmtWhen = ts => new Date(ts).toLocaleString("it-IT", { timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const fmtH = h => h < 1 ? Math.round(h * 60) + " min" : h < 48 ? h.toFixed(1).replace(".", ",") + " ore" : (h / 24).toFixed(1).replace(".", ",") + " giorni";
+  const expSince = (m, t) => m.exp48 * Math.max(0, t - m.ts) / (48 * 3600e3);
+  const localInput = ts => new Date(ts - new Date(ts).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  function liveRate(m, list, w) {
+    // the saved allocation's 48-hour estimate again, on today's figures
+    let tot = 0, found = 0;
+    const gen = ((DATA && DATA.generated) || 0) * 1000;
+    for (const row of m.rows) {
+      const p = list.find(x => x.key === row[0]); if (!p) continue; found++;
+      const A = gen > m.ts ? Math.max(p.alloc, row[4]) : p.alloc + row[4];   // after you voted, the pool's votes include yours
+      tot += A > 0 ? projected(p, w) * row[4] / A : 0;
+    }
+    return { tot, found };
+  }
+  let replaceArmed = 0;
+  function useAllocation() {
+    const r = rdLast && rdLast.r, used = r ? r.act.filter(o => o.k > 0).sort((a, b) => b.k - a.k) : [];
+    if (!used.length || !(r.ap > 0)) { toast("Non c'è un'allocazione da salvare: inserisci la tua Allocation Power.", true); return; }
+    const old = loadMine();
+    if (old && Date.now() - replaceArmed > 5000) { replaceArmed = Date.now(); toast(`Sostituisce l'allocazione salvata il ${fmtWhen(old.ts)}. Premi di nuovo entro 5 secondi per confermare.`); return; }
+    replaceArmed = 0;
+    const now = Date.now();
+    const m = { ts: now, ap: r.ap, exp48: r.total, checks: [],
+      rows: used.map(o => [o.p.key, o.p.name + (o.p.kind ? " " + o.p.kind : ""), o.p.chain, o.k, o.k * r.ap / 100, r.earn(o, o.k)]) };
+    if (old) m.prev = { ts: old.ts, exp48: old.exp48, checks: old.checks || [] };
+    if (!storeMine(m)) { toast("Memoria piena: allocazione non salvata.", true); return; }
+    RD.saved = localInput(now); saveRD(); $("rd-saved").value = RD.saved;
+    toast("Allocazione salvata. Il cooldown di 47 ore parte da adesso.");
+    rdRender();
+  }
+  function rdMine(list, r) {
+    const box = $("rd-mine"), m = loadMine(), sum = $("rd-mine-sum");
+    if (box.contains(document.activeElement)) return;      // don't wipe what is being typed
+    if (!m) {
+      sum.textContent = "nessuna salvata";
+      box.replaceChildren(el("div", "empty", "Nessuna allocazione salvata. Quando voti su Aero, premi «Usa questa allocazione» sotto l'allocazione suggerita: da quel momento qui vedi le fee attese e le confronti con quelle effettive."));
+      return;
+    }
+    const now = Date.now(), h = (now - m.ts) / 3600e3, exp = expSince(m, now), live = liveRate(m, list, r.w);
+    const last = (m.checks || [])[m.checks.length - 1];
+    const diff = last && last.exp >= 1 ? (last.act / last.exp - 1) * 100 : NaN;
+    sum.textContent = `salvata ${fmtWhen(m.ts)} · attese finora ${r$(exp)}`;
+    const t1 = el("div", "mtile");
+    t1.append(el("div", "lbl", "Fee attese dall'allocazione salvata"), el("div", "v", r$(exp)),
+      el("div", "s", `dal ${fmtWhen(m.ts)} · ${fmtH(h)} · stima ${r$(m.exp48)} ogni 48 ore`),
+      el("div", "s", `Al ritmo attuale, con i voti di adesso e senza ipotesi di concorrenza: ${live.found ? r$(live.tot) + " ogni 48 ore" : "pool non trovati nei dati"}`));
+    const t2 = el("div", "mtile"), lab = el("label", "lbl", "Fee effettive"); lab.htmlFor = "rd-act";
+    const inl = el("div", "inline"), inp = document.createElement("input"), btn = el("button", null, "Confronta");
+    inp.id = "rd-act"; inp.type = "text"; inp.inputMode = "decimal"; inp.autocomplete = "off"; inp.placeholder = "$ maturati"; btn.type = "button";
+    inl.append(inp, btn);
+    t2.append(lab, inl, el("div", "s", "Il totale maturato da quando hai allocato, riscosso più da riscuotere, dalla Dashboard di Aero."));
+    const t3 = el("div", "mtile");
+    t3.append(el("div", "lbl", "Effettive rispetto alle attese"),
+      el("div", "v " + (isFinite(diff) ? (diff >= 0 ? "up" : "down") : ""), isFinite(diff) ? sPct(diff) : "—"),
+      el("div", "s", !last ? "Inserisci le fee effettive e premi Confronta."
+        : last.exp < 1 ? `${r$(last.act)} effettive, ma le attese erano ancora ${r$(last.exp)}: confronta dopo qualche ora.`
+        : `${r$(last.act)} effettive contro ${r$(last.exp)} attese, il ${fmtWhen(last.ts)}`));
+    const det = el("details", "mdet more"), summ = el("summary", null, `Pool votati (${m.rows.length}) e confronti salvati`);
+    const tw = el("div", "tbl"), tbl = el("table"), th = el("thead"), tb = el("tbody");
+    const hr = el("tr"); ["Pool", "Rete", "Quota", "Voti", "Attese 48 ore"].forEach(x => hr.append(el("th", null, x))); th.append(hr);
+    for (const row of m.rows) { const tr = el("tr"); [row[1], row[2], row[3] + "%", fmtN(row[4]), r$(row[5])].forEach((v, i) => tr.append(el("td", i > 1 ? "num" : i === 1 ? "ch muted" : null, v))); tb.append(tr); }
+    tbl.append(th, tb); tw.append(tbl);
+    det.append(summ, tw);
+    if (m.checks && m.checks.length) {
+      const ul = el("ul");
+      m.checks.slice().reverse().forEach(c => { const d = c.exp >= 1 ? (c.act / c.exp - 1) * 100 : NaN; ul.append(el("li", null, `${fmtWhen(c.ts)} · dopo ${fmtH((c.ts - m.ts) / 3600e3)}: effettive ${r$(c.act)}, attese ${r$(c.exp)} (${sPct(d)})`)); });
+      det.append(el("div", "lbl", "Confronti"), ul);
+    }
+    const del = el("button", "ghost", "Elimina allocazione salvata"), delMsg = el("span", "sub");
+    del.type = "button";
+    const dr = el("div", "controls"); dr.append(del, delMsg); det.append(dr);
+    box.replaceChildren(t1, t2, t3, det);
+    btn.addEventListener("click", () => {
+      const v = numIn(inp.value), mm = loadMine(); if (!mm) return;
+      if (!(v >= 0)) { inp.focus(); return; }
+      const ts = Date.now(); mm.checks = (mm.checks || []).concat([{ ts, act: v, exp: expSince(mm, ts) }]).slice(-50); storeMine(mm);
+      inp.blur(); rdRender();
+    });
+    let delArmed = 0;
+    del.addEventListener("click", () => {
+      if (Date.now() - delArmed > 5000) { delArmed = Date.now(); delMsg.textContent = "Premi di nuovo entro 5 secondi per eliminarla."; return; }
+      storeMine(null); rdRender();
+    });
+  }
+
+  function rdCooldown() {
+    const v = RD.saved, cd = $("rd-cd"), note = $("rd-cd-note");
+    if (!v) { cd.textContent = "Inserisci data e ora"; note.textContent = "Le revenue continuano ad accumularsi durante il cooldown."; return; }
+    const next = new Date(new Date(v).getTime() + 47 * 3600e3), ms = next - Date.now();
+    const w = next.toLocaleString("it-IT", { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    if (ms <= 0) { cd.replaceChildren("Pronto ", el("span", "up", "●")); note.textContent = `Puoi riallocare dal ${w}.`; return; }
+    const h = Math.floor(ms / 3600e3), m = Math.floor(ms % 3600e3 / 60e3);
+    cd.textContent = `${h} h ${String(m).padStart(2, "0")} min`;
+    note.textContent = `Prossima modifica possibile: ${w}. Le revenue continuano ad accumularsi nel frattempo.`;
+  }
+  setInterval(rdCooldown, 30000);
+
+  // ---- the options the simulations follow: sent to the monitor with "Carica queste opzioni nelle simulazioni"
+  function rdOptions() {
+    return { cap: +RD.cap || 100, min: +RD.minA || 0, chains_off: XS.chainsOff.slice().sort(), excl: [...XS.keys].sort(),
+      rules: XS.rules.slice(), spike: !!RD.spk, spike_k: Math.min(1000, Math.max(0, rdNum(RD.spkK, 0))), trend: +RD.trend || 0, comp: +RD.comp || 0 };
+  }
+  const optsKey = o => JSON.stringify([+o.cap, +o.min, (o.chains_off || []).slice().sort(), (o.excl || []).slice().sort(),
+    (o.rules || []).map(r => r.toLowerCase()).sort(), !!o.spike, +o.spike_k, +o.trend, +o.comp]);
+  function optsText(o) {
+    const parts = [+o.cap < 100 ? `massimo ${o.cap}% per pool` : "nessun massimo per pool", +o.min ? `minimo ${o.min}%` : "nessun minimo"];
+    if ((o.chains_off || []).length) parts.push("senza " + o.chains_off.join(", "));
+    const nx = (o.excl || []).length, nr = (o.rules || []).length;
+    if (nx) parts.push(`${nx} ${nx === 1 ? "pool scartato" : "pool scartati"}`);
+    if (nr) parts.push(`${nr === 1 ? "scartata la ricerca" : "scartate le ricerche"} ${o.rules.map(r => "«" + r + "»").join(", ")}`);
+    if (o.spike) parts.push(`picchi di volume tagliati (tolleranza ${String(o.spike_k).replace(".", ",")}%)`);
+    return parts.join(", ");
+  }
+  let optsRun = false;
+  function rdLoadState() {
+    const box = $("rd-load-state"), bar = $("rd-loadbar"), btn = $("rd-load"), srv = SIM && SIM.options;
+    if (optsRun) return;
+    const same = !!srv && optsKey(srv) === optsKey(rdOptions());
+    bar.classList.toggle("diff", !same);
+    if (!SIM) box.textContent = "Carico lo stato delle simulazioni…";
+    else if (!srv) box.textContent = "Le simulazioni non usano ancora le tue opzioni: per ora i metodi non hanno limiti per pool.";
+    else if (same) box.textContent = `Le simulazioni usano queste opzioni dal ${when(srv.at)}.`;
+    else box.textContent = `Le simulazioni usano le opzioni caricate ${when(srv.at)}: ${optsText(srv)}; Radar con trend ${String(srv.trend).replace(".", ",")}% e concorrenza ${compText(srv.comp)}.`;
+    btn.disabled = same;
+    btn.textContent = same ? "Opzioni già caricate" : "Carica queste opzioni nelle simulazioni";
+  }
+
+  // ---- events
+  const rdBind = (id, key, ev) => {
+    const e = $(id);
+    if (e.type === "checkbox") e.checked = !!RD[key]; else e.value = RD[key];
+    e.addEventListener(ev || "input", () => { RD[key] = e.type === "checkbox" ? e.checked : e.value; saveRD(); rdSchedule(); });
+  };
+  rdBind("rd-ap", "ap"); rdBind("rd-price", "price"); rdBind("rd-trend", "trend"); rdBind("rd-comp", "comp", "change");
+  rdBind("rd-spk", "spk", "change"); rdBind("rd-spkK", "spkK"); rdBind("rd-min", "minA", "change"); rdBind("rd-cap", "cap", "change");
+  rdBind("rd-sort", "sortBy", "change");
+  $("rd-saved").value = RD.saved || "";
+  $("rd-saved").addEventListener("input", () => { RD.saved = $("rd-saved").value; saveRD(); rdCooldown(); });
+  document.querySelectorAll("#rd-mov-seg button").forEach(b => b.addEventListener("click", () => { RD.movH = +b.dataset.h; saveRD(); rdRender(); }));
+  let rdQt = 0;
+  $("rd-q").addEventListener("input", () => { clearTimeout(rdQt); rdQt = setTimeout(rdRender, 180); });
+  $("rd-q-drop").addEventListener("click", () => { const q = $("rd-q").value.trim(); if (!q || !rdLast) return; rdLast.list.filter(p => qmatch(p, q)).forEach(p => XS.keys.add(p.key)); saveX(); rdRender(); });
+  $("rd-q-rule").addEventListener("click", () => { const q = $("rd-q").value.trim(); if (!q) return; if (!XS.rules.some(r => r.toLowerCase() === q.toLowerCase())) XS.rules.push(q); saveX(); rdRender(); });
+  $("rd-more").addEventListener("click", () => { rdShowAll = !rdShowAll; rdRender(); });
+  $("rd-use").addEventListener("click", useAllocation);
+  $("rd-copy").addEventListener("click", () => {
+    const r = rdLast && rdLast.r, used = r ? r.act.filter(o => o.k > 0).sort((a, b) => b.k - a.k) : [];
+    const txt = used.map(o => `${o.k}%\t${o.p.name}${o.p.kind ? " " + o.p.kind : ""}\t${o.p.chain}`).join("\n");
+    if (!txt) { toast("Niente da copiare.", true); return; }
+    const fallback = () => toast("Copia automatica bloccata: " + txt.replace(/\t/g, " ").replace(/\n/g, " · "), true);
+    try { navigator.clipboard.writeText(txt).then(() => toast("Pesi copiati."), fallback); } catch (e) { fallback(); }
+  });
+  $("rd-load").addEventListener("click", () => {
+    const js = JSON.stringify(rdOptions());
+    if (js.length > 60000) { $("rd-load-state").textContent = "Troppi pool scartati uno per uno: usa una ricerca salvata o il menù Reti."; return; }
+    optsRun = true;
+    $("rd-load").disabled = true;
+    startRun({ options: js }, "Carico le opzioni nelle simulazioni…").finally(() => { optsRun = false; rdLoadState(); });
+  });
+  document.addEventListener("click", e => { const dd = $("rd-chains-dd"); if (dd.open && !dd.contains(e.target)) dd.open = false; });
+
+  // ---------------------------------------------------------------- folding: long sections open and close, remembered
+  let FOLD = {};
+  try { FOLD = JSON.parse(lsGet("radar-fold") || "{}") || {}; } catch (e) {}
+  document.querySelectorAll("details[data-fold]").forEach(d => {
+    const id = d.dataset.fold;
+    if (id in FOLD) d.open = !!FOLD[id];
+    d.addEventListener("toggle", () => {
+      FOLD[id] = d.open;
+      lsSet("radar-fold", JSON.stringify(FOLD));
+      if (d.open && id === "waves" && DATA) waves(DATA);
+      if (d.open && id === "sim" && SIM) simChart(SIM);
+    });
+  });
+
+  // ---------------------------------------------------------------- manual runs on GitHub Actions
+  const REPO_DEFAULT = "wkisai95/solid-eureka", WORKFLOW = "monitor.yml";
+  const repo = () => (DATA && DATA.repo) || REPO_DEFAULT;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let ghToken = "";
+  try { ghToken = localStorage.getItem("radar-gh-token") || ""; } catch (e) {}
+
+  function gh(path, opts = {}) {
+    // only headers GitHub's CORS policy has always allowed: the page runs on github.io and in the app's WebView
+    const headers = { "Accept": "application/vnd.github+json" };
+    if (ghToken) headers.Authorization = "Bearer " + ghToken;
+    if (opts.body) headers["Content-Type"] = "application/json";
+    return fetch("https://api.github.com" + path, { ...opts, headers, cache: "no-store" });
+  }
+
+  function runState(text, opts = {}) {
+    const box = $("run-state");
+    if (optsRun) { const lb = $("rd-load-state"); lb.textContent = text; lb.classList.toggle("bad-text", !!opts.bad); }
+    box.replaceChildren(el("span", opts.bad ? "bad-text" : null, text));
+    if (opts.link) { const a = el("a", null, " Dettagli su GitHub"); a.href = opts.link; a.target = "_blank"; a.rel = "noopener"; box.append(a); }
+  }
+
+  function ghLinkText() { $("gh-open").textContent = ghToken ? "GitHub collegato" : "Collega GitHub"; }
+
+  function ghPanel(show, msg) {
+    const [owner, name] = repo().split("/");
+    $("gh-repo-name").textContent = name;
+    $("gh-actions").href = `https://github.com/${repo()}/actions/workflows/${WORKFLOW}`;
+    $("gh-new").href = "https://github.com/settings/personal-access-tokens/new?" + new URLSearchParams({
+      name: "Monitor sAERO", description: "Avvia il monitor sAERO dalla pagina o dall'app",
+      target_name: owner, expires_in: "366", actions: "write" }).toString();
+    $("gh-msg").textContent = msg || (ghToken ? "Un token è già salvato su questo dispositivo." : "");
+    $("gh-forget").hidden = !ghToken;
+    $("gh-panel").hidden = !show;
+    if (show) $("gh-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  let running = false;
+  function busy(on) { running = on; $("run-now").disabled = on; }
+
+  async function startRun(inputs, label) {
+    if (running) return;
+    if (!ghToken) { ghPanel(true, "Collega GitHub una volta per avviare la raccolta da qui."); return; }
+    busy(true);
+    const t0 = Date.now();
+    try {
+      runState(label || "Avvio la raccolta…");
+      const r = await gh(`/repos/${repo()}/actions/workflows/${WORKFLOW}/dispatches`,
+        { method: "POST", body: JSON.stringify({ ref: "main", inputs: inputs || {} }) });
+      if (r.status === 401) { runState("GitHub non accetta il token: è scaduto o sbagliato.", { bad: true }); ghPanel(true); return; }
+      if (r.status === 403 || r.status === 404) {
+        runState("Il token non può avviare il monitor.", { bad: true });
+        ghPanel(true, `Serve il permesso Actions: Read and write sul repository ${repo()}.`);
+        return;
+      }
+      if (!r.ok) { runState(`GitHub ha risposto con un errore (HTTP ${r.status}). Riprova tra poco.`, { bad: true }); return; }
+      let runId = null;
+      try { const j = await r.json(); runId = (j && (j.workflow_run_id || j.id)) || null; } catch (e) {}
+      try { localStorage.setItem("radar-run", JSON.stringify({ id: runId, t0 })); } catch (e) {}
+      await follow(runId, t0);
+    } catch (e) {
+      runState("Non riesco a contattare GitHub: " + e.message + ".", { bad: true });
+    } finally {
+      busy(false);
+    }
+  }
+
+  async function follow(runId, t0) {
+    const before = DATA ? DATA.generated : 0;
+    for (let i = 0; i < 100; i++) {
+      await sleep(i ? 12000 : 4000);
+      let run = null;
+      try {
+        if (runId) {
+          const r = await gh(`/repos/${repo()}/actions/runs/${runId}`);
+          if (r.ok) run = await r.json();
+        } else {
+          const r = await gh(`/repos/${repo()}/actions/workflows/${WORKFLOW}/runs?event=workflow_dispatch&per_page=5`);
+          if (r.ok) {
+            const j = await r.json();
+            run = (j.workflow_runs || []).find(x => Date.parse(x.created_at) >= t0 - 90000) || null;
+            if (run) runId = run.id;
+          }
+        }
+      } catch (e) { /* network hiccup: try again */ }
+      const mins = Math.max(0, Math.round((Date.now() - t0) / 60000));
+      if (!run || ["queued", "waiting", "pending", "requested"].includes(run.status)) { runState(`In coda su GitHub… (${mins} min)`); continue; }
+      if (run.status !== "completed") { runState(`Raccolta in corso… (${mins} min, di solito 2-5)`); continue; }
+      try { localStorage.removeItem("radar-run"); } catch (e) {}
+      if (run.conclusion !== "success") { runState("La raccolta non è riuscita.", { bad: true, link: run.html_url }); return; }
+      runState("Fatto: carico i dati nuovi…");
+      for (let k = 0; k < 10; k++) {
+        await load();
+        if (DATA && DATA.generated > before) { runState(`Dati aggiornati alle ${timeFmt.format(new Date(DATA.generated * 1000))}.`); return; }
+        await sleep(8000);
+      }
+      runState("La raccolta è finita: i dati nuovi compaiono tra qualche minuto.");
+      return;
+    }
+    runState("Ci mette più del solito: i dati compariranno appena pronti.");
+  }
+
+  $("run-now").addEventListener("click", () => startRun({}, "Avvio la raccolta…"));
+  $("gh-open").addEventListener("click", () => ghPanel($("gh-panel").hidden));
+  $("gh-close").addEventListener("click", () => ghPanel(false));
+  $("gh-forget").addEventListener("click", () => {
+    ghToken = "";
+    try { localStorage.removeItem("radar-gh-token"); } catch (e) {}
+    ghLinkText();
+    ghPanel(true, "Token rimosso da questo dispositivo.");
+  });
+  $("gh-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const tok = $("gh-token").value.trim();
+    if (!tok) return;
+    const prev = ghToken;
+    ghToken = tok;
+    $("gh-msg").textContent = "Controllo il token…";
+    try {
+      const r = await gh(`/repos/${repo()}/actions/workflows/${WORKFLOW}`);
+      if (!r.ok) {
+        ghToken = prev;
+        $("gh-msg").textContent = r.status === 401 ? "GitHub non riconosce questo token." : `GitHub risponde ${r.status}: controlla che il token abbia accesso a ${repo()}.`;
+        return;
+      }
+      try { localStorage.setItem("radar-gh-token", tok); } catch (x) {}
+      $("gh-token").value = "";
+      ghLinkText();
+      ghPanel(false);
+      runState("GitHub collegato: ora puoi avviare la raccolta da qui.");
+    } catch (x) {
+      ghToken = prev;
+      $("gh-msg").textContent = "Non riesco a contattare GitHub: " + x.message + ".";
+    }
+  });
+
+  ghLinkText();
+  try {
+    const pend = JSON.parse(localStorage.getItem("radar-run") || "null");
+    if (pend && ghToken && Date.now() - pend.t0 < 30 * 60000) {
+      busy(true);
+      follow(pend.id, pend.t0).catch(() => {}).finally(() => busy(false));
+    }
+  } catch (e) {}
+
+  function render() {
+    if (!DATA) return;
+    header(DATA); rdRender(); meRender(); waves(DATA); calendar(DATA); incentives(DATA); chainOptions(DATA); pools(DATA); chains(DATA); alertsList(DATA);
+  }
+
+  async function load() {
+    try {
+      const r = await fetch("latest.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      DATA = await r.json();
+      if (POS && POS.generated < DATA.generated) { POS = null; SHARDS = {}; posLoading = null; }
+      render();
+      loadSim();
+    } catch (e) {
+      $("updated").textContent = "Non riesco a leggere i dati: " + e.message + ". Riprovo tra un minuto.";
+      setTimeout(load, 60000);
+    }
+  }
+
+  $("q").addEventListener("input", () => DATA && pools(DATA));
+  $("chain-f").addEventListener("change", e => { try { localStorage.setItem("radar-chain", e.target.value); } catch (x) {} DATA && pools(DATA); });
+  $("big").addEventListener("change", () => DATA && pools(DATA));
+  $("sort").value = sortKey === "name" ? "ap" : sortKey;
+  $("sort").addEventListener("change", e => { sortKey = e.target.value; sortDir = -1; try { localStorage.setItem("radar-sort", JSON.stringify({ k: sortKey, d: sortDir })); } catch (x) {} DATA && pools(DATA); });
+  document.querySelectorAll("th[data-k]").forEach(th => th.addEventListener("click", () => {
+    const k = th.dataset.k;
+    if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = k === "name" ? 1 : -1; }
+    try { localStorage.setItem("radar-sort", JSON.stringify({ k: sortKey, d: sortDir })); } catch (x) {}
+    if ([...$("sort").options].some(o => o.value === k)) $("sort").value = k;
+    DATA && pools(DATA);
+  }));
+  load();
+  setInterval(load, 5 * 60 * 1000);
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { DATA && waves(DATA); SIM && simChart(SIM); }, 200); });
+})();
+</script>
+</body>
+</html>
