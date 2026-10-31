@@ -99,6 +99,14 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .row .r { text-align: right; }
 .row .d { grid-column: 1 / -1; color: var(--ink-2); font-size: 13px; overflow-wrap: anywhere; }
 .stats { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.stat .d { font-size: 12px; color: var(--ink-2); font-family: var(--f-num); }
+#me-addr { flex: 1 1 260px; font-family: var(--f-num); }
+.mepos { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.mepos h3 { margin: 0; font: 600 16px/1.3 var(--f-body); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.mepos h3 .sub { font-weight: 400; }
+.mepos .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.mepos table td.old { color: var(--ink-2); }
+.warnline { color: var(--warn); font-size: 13px; }
 .stat .k { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .06em; }
 .stat .v { font: 500 20px/1.2 var(--f-num); }
 .chart { width: 100%; overflow-x: auto; }
@@ -317,6 +325,28 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     <div class="controls"><button type="button" class="ghost" id="gh-forget" hidden>Dimentica il token</button></div>
   </section>
 
+  <section class="panel" id="me">
+    <div class="panel-head"><h2>I tuoi sAERO</h2><span class="sub" id="me-when"></span></div>
+    <form class="controls" id="me-form">
+      <input type="text" id="me-addr" autocomplete="off" spellcheck="false" placeholder="Il tuo indirizzo 0x…" aria-label="Indirizzo del wallet">
+      <button type="submit">Mostra</button>
+    </form>
+    <p class="note">L'indirizzo resta solo su questo dispositivo: la pagina legge da Base quali sAERO possiede e prende dal monitor quanto ha incassato ognuno. Gli incassi sono fee e incentivi dei pool, divisi in base alla quota di ogni posizione nel pool.</p>
+    <div class="stats" id="me-stats"></div>
+    <div class="chartbox"><div class="chart" id="me-chart"></div></div>
+    <div id="me-list"></div>
+    <details class="sub-fold" data-fold="me-ids">
+      <summary><span class="fold-t">Altre posizioni per numero</span><span class="sub" id="me-ids-sum"></span></summary>
+      <div class="fold-body">
+        <form class="controls" id="mine-form">
+          <input type="text" id="mine-ids" inputmode="numeric" autocomplete="off" placeholder="Es. 1234, 5678" aria-label="Numeri di altre posizioni">
+          <button type="submit">Aggiungi</button>
+        </form>
+        <p class="note">Per seguire posizioni che non sono su questo indirizzo, per esempio su un altro wallet.</p>
+      </div>
+    </details>
+  </section>
+
   <section class="panel" id="radar">
     <div class="panel-head"><h2>Radar sAERO</h2><span class="sub" id="rd-when"></span></div>
     <p class="note">Dove allocare il tuo sAERO per incassare di più nelle prossime 48 ore. I pool arrivano dal monitor, con fee e incentivi letti dalla chain su tutte e sette le reti. Inserisci la tua Allocation Power: il radar divide il 100% tra i pool tenendo conto di quanto <b>la tua stessa allocazione diluisce</b> ogni pool.</p>
@@ -408,18 +438,6 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       </div>
     </details>
   </section>
-
-  <details class="panel fold" data-fold="mine" open>
-    <summary class="panel-head"><h2>Le tue posizioni</h2></summary>
-    <div class="fold-body">
-    <p class="note">Scrivi i numeri delle tue posizioni sAERO. Restano solo su questo dispositivo e non finiscono nei dati pubblici.</p>
-    <form class="controls" id="mine-form">
-      <input type="text" id="mine-ids" inputmode="numeric" autocomplete="off" placeholder="Es. 1234, 5678" aria-label="Numeri delle tue posizioni">
-      <button type="submit">Mostra</button>
-    </form>
-    <div class="list" id="mine"></div>
-    </div>
-  </details>
 
   <details class="panel fold" data-fold="sim" open id="sim">
     <summary class="panel-head"><h2>Simulazione <span id="sim-size">235k</span> sAERO</h2><span class="sub" id="sim-since"></span></summary>
@@ -612,64 +630,256 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     $("cd-h").textContent = String(d.cooldown_h).replace(".", ",");
   }
 
+  // ---------------------------------------------------------------- I tuoi sAERO
+  // The address stays on this device: the page reads from Base which sAERO it holds, and takes from the monitor's
+  // public export what each position number has allocated and earned.
+  const SAERO = "0xbf7977e1521e9a3032bf7243ee4712f311f13915";
+  const BASE_RPCS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com", "https://base.drpc.org", "https://1rpc.io/base"];
+  const BASE_GENESIS = 1686789347;           // Base has fixed 2-second blocks
   let POS = null, SHARDS = {}, posLoading = null;
-  let myIds = [];
+  let myIds = [], meAddr = "", ME = null, meErr = null, meLoading = false;
   try { myIds = JSON.parse(localStorage.getItem("radar-ids") || "[]"); } catch (e) { myIds = []; }
+  try { meAddr = localStorage.getItem("radar-addr") || ""; } catch (e) { meAddr = ""; }
   $("mine-ids").value = myIds.join(", ");
+  $("me-addr").value = meAddr;
+
+  const hex64 = h => h.replace(/^0x/, "").toLowerCase().padStart(64, "0");
+  const u256 = n => hex64(BigInt(n).toString(16));
+  const word = (h, i) => BigInt("0x" + ((h || "0x").slice(2 + 64 * i, 66 + 64 * i) || "0"));
+  const e18 = b => Number(b / 10n ** 12n) / 1e6;
+
+  async function baseCalls(datas) {
+    let last = null;
+    for (const url of BASE_RPCS) {
+      try {
+        const body = datas.map((d, i) => ({ jsonrpc: "2.0", id: i, method: "eth_call", params: [{ to: SAERO, data: d }, "latest"] }));
+        const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json();
+        if (!Array.isArray(j)) throw new Error((j && j.error && j.error.message) || "risposta non valida");
+        const out = [];
+        for (const x of j) { if (x.error) throw new Error(x.error.message); out[x.id] = x.result; }
+        if (out.length !== datas.length || out.some(x => x == null)) throw new Error("risposta incompleta");
+        return out;
+      } catch (e) { last = e; }
+    }
+    throw last || new Error("nessun nodo raggiungibile");
+  }
+
+  // the sAERO of an address: number, staked AERO, end or perpetual, Allocation Power, owned since
+  async function readOwned(addr) {
+    const [bal] = await baseCalls(["0x70a08231" + hex64(addr)]);
+    const n = Number(word(bal, 0));
+    if (n > 100) throw new Error(`${n} posizioni: troppe da leggere qui`);
+    if (!n) return [];
+    const ids = (await baseCalls(Array.from({ length: n }, (_, i) => "0x2f745c59" + hex64(addr) + u256(i)))).map(h => Number(word(h, 0)));
+    const res = await baseCalls(ids.flatMap(id => ["0x5e1bef32" + u256(id), "0xe7e242d4" + u256(id), "0x23857d51" + u256(id)]));
+    return ids.map((id, i) => {
+      const st = res[3 * i], blk = Number(word(res[3 * i + 2], 0));
+      return { id, amount: e18(word(st, 0)), end: Number(word(st, 1)), perm: word(st, 2) !== 0n, ap: e18(word(res[3 * i + 1], 0)),
+        since: blk ? BASE_GENESIS + 2 * blk : 0 };
+    }).sort((a, b) => b.ap - a.ap);
+  }
+
+  async function meRefresh() {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(meAddr)) { ME = null; meErr = null; return meRender(); }
+    meLoading = true; meErr = null; meRender();
+    try { ME = { addr: meAddr.toLowerCase(), at: Date.now() / 1000, pos: await readOwned(meAddr) }; }
+    catch (e) { meErr = e.message || String(e); }
+    meLoading = false;
+    meRender();
+  }
+
+  const allIds = () => [...new Set([...(ME ? ME.pos.map(p => p.id) : []), ...myIds])];
 
   function loadPositions() {
     if (!posLoading) {
       posLoading = (async () => {
-        const r = await fetch("positions.json?t=" + Date.now(), { cache: "no-store" });
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        const idx = await r.json();
-        const size = idx.shard || 1000, have = new Set(idx.shards || []);
-        const need = [...new Set(myIds.map(id => Math.floor(id / size)))].filter(n => have.has(n));
-        const got = {};
+        if (!POS) {
+          const r = await fetch("positions.json?t=" + Date.now(), { cache: "no-store" });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          POS = await r.json(); SHARDS = {};
+        }
+        const size = POS.shard || 1000, have = new Set(POS.shards || []);
+        const need = [...new Set(allIds().map(id => Math.floor(id / size)))].filter(n => have.has(n) && !SHARDS[n]);
         await Promise.all(need.map(async n => {
           const rr = await fetch(`pos/${n}.json?t=${Date.now()}`, { cache: "no-store" });
           if (!rr.ok) throw new Error("HTTP " + rr.status);
-          got[n] = await rr.json();
+          SHARDS[n] = await rr.json();
         }));
-        POS = idx; SHARDS = got; mine();
-      })().catch(e => { posLoading = null; empty($("mine"), "Non riesco a leggere le posizioni: " + e.message + "."); });
+        posLoading = null; meRender();
+      })().catch(e => { posLoading = null; meErr = "Non riesco a leggere le posizioni: " + e.message; meRender(); });
     }
     return posLoading;
   }
 
-  function mine() {
-    const box = $("mine");
-    box.replaceChildren();
-    if (!myIds.length) return empty(box, "Nessuna posizione impostata.");
-    if (!POS) { empty(box, "Carico le posizioni…"); loadPositions(); return; }
-    const now = Date.now() / 1000, size = POS.shard || 1000, have = new Set(POS.shards || []);
+  const datePlain = ts => new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(ts * 1000));
+  const apr = (usd, secs, base, price) => usd > 0 && secs > 3600 && base > 0 && price > 0 ? usd / secs * 365 * 86400 / (base * price) * 100 : null;
+  const stat = (k, v, d) => { const s = el("div", "stat"); s.append(el("div", "k", k), el("div", "v", v)); if (d) s.append(el("div", "d", d)); return s; };
+
+  function meChart(days) {
+    const box = $("me-chart");
+    if (!days.length) return box.replaceChildren();
+    const w = Math.max(520, Math.round(box.clientWidth || 720)), h = 150, padL = 46, padB = 24, padT = 8;
+    const max = Math.max(1, ...days.map(d => d[1]));
+    const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); const m = max / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+    const bw = Math.min(56, (w - padL - 4) / days.length), y = v => h - padB - v / nice * (h - padB - padT);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`); svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Dollari incassati ogni giorno dai tuoi sAERO");
+    const add = (name, attrs, text) => { const e = document.createElementNS(ns, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
+    for (let i = 0; i <= 2; i++) {
+      const v = nice * i / 2;
+      add("line", { x1: padL, x2: w, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": 1 });
+      add("text", { x: padL - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, "$" + fmtN(v));
+    }
+    const today = Math.floor(Date.now() / 864e5) * 86400;
+    days.forEach(([d, v], i) => {
+      const r = add("rect", { x: padL + i * bw + 2, y: y(v), width: Math.max(1, bw - 4), height: Math.max(0.5, h - padB - y(v)), rx: 2,
+        fill: d >= today ? "var(--passive)" : "var(--accent)" });
+      const t = document.createElementNS(ns, "title");
+      t.textContent = `${datePlain(d)}: $${v.toFixed(2).replace(".", ",")}${d >= today ? " (oggi, in corso)" : ""}`;
+      r.append(t);
+      if (days.length <= 8 || i % 2 === 0) add("text", { x: padL + i * bw + bw / 2, y: h - 7, "text-anchor": "middle", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" },
+        new Intl.DateTimeFormat("it-IT", { timeZone: "UTC", day: "numeric", month: "numeric" }).format(new Date(d * 1000)));
+    });
+    box.replaceChildren(svg);
+  }
+
+  function meRender() {
+    const stats = $("me-stats"), list = $("me-list");
+    $("me-ids-sum").textContent = myIds.length ? myIds.map(i => "#" + i).join(" ") : "";
+    stats.replaceChildren(); list.replaceChildren(); $("me-chart").replaceChildren(); $("me-when").textContent = "";
+    if (meErr) list.append(el("div", "warnline", meErr));
+    if (meLoading) return empty(stats, "Leggo i tuoi sAERO su Base…");
+    const ids = allIds();
+    if (!ids.length) return empty(stats, meAddr ? (meErr ? "" : "Nessun sAERO su questo indirizzo.") : "Scrivi il tuo indirizzo per vedere allocazione e APR reale dei tuoi sAERO.");
+    if (!POS || ids.some(id => (POS.shards || []).includes(Math.floor(id / (POS.shard || 1000))) && !SHARDS[Math.floor(id / (POS.shard || 1000))])) {
+      empty(stats, "Carico le posizioni…"); loadPositions(); return;
+    }
+    const now = Date.now() / 1000, price = (DATA && DATA.aero_usd) || 0, size = POS.shard || 1000;
     const chainName = cid => (POS.chains || {})[cid] || "chain " + cid;
-    for (const id of myIds) {
-      const n = Math.floor(id / size);
-      if (have.has(n) && !SHARDS[n]) { POS = null; posLoading = null; empty(box, "Carico le posizioni…"); loadPositions(); return; }
-      const sh = SHARDS[n];
-      const entries = ((sh && sh.p[String(id)]) || []).slice().sort((a, b) => b[2] - a[2]);
-      if (!entries.length) {
-        box.append(row(`#${id}`, el("span", "pill pas", "nessun voto"), "Non trovo allocazioni per questo numero su nessuna chain: controlla che sia giusto."));
-        continue;
+    const pools = new Map(((DATA && DATA.pools) || []).map(p => [p.key, p]));
+    const onChain = new Map((ME ? ME.pos : []).map(p => [p.id, p]));
+    let T = { amount: 0, ap: 0, alloc: 0, u24: 0, r24: 0, u7: 0, r7: 0, tot: 0, base: 0, since: 0 };
+    const days = new Map();
+    const rows = [];
+    for (const id of ids) {
+      const sh = SHARDS[Math.floor(id / size)];
+      const ent = ((sh && sh.p[String(id)]) || []).slice().sort((a, b) => b[2] - a[2]);
+      const r = sh && sh.r && sh.r[String(id)];
+      const oc = onChain.get(id);
+      const alloc = ent.reduce((s, e) => s + e[2], 0);
+      const base = oc ? (oc.amount || oc.ap) : alloc;    // value of the staked AERO; manual numbers: what is allocated
+      rows.push({ id, sh, ent, r, oc, alloc, base });
+      T.alloc += alloc; T.base += base;
+      if (oc) { T.amount += oc.amount; T.ap += oc.ap; }
+      if (r) {
+        const [since, tot, u24, s24, u7, s7, d] = r;
+        T.tot += tot;
+        T.since = T.since ? Math.min(T.since, since) : since;
+        if (s24 > 0) T.r24 += u24 / s24;
+        if (s7 > 0) T.r7 += u7 / s7;
+        T.u24 += u24; T.u7 += u7;
+        for (const [day, v] of d) days.set(day, (days.get(day) || 0) + v);
       }
-      for (const [cid, ends, saero, , moves, pools] of entries) {
-        const free = ends <= now, c = chainName(cid);
-        const pill = el("span", "pill " + (free ? "free" : "wait"), free ? "libera" : "cooldown " + inT(ends - now));
-        const where = pools.map(([i, a]) => `${sh.names[i]} ${fmtN(a)}`).join(" · ");
-        box.append(row(`#${id} · ${c} · ${fmtN(saero)} sAERO`, pill,
-          (free ? `Puoi riallocare su ${c} ora. ` : `Puoi riallocare su ${c} ${when(ends)}. `) + where));
+    }
+    const capital = T.base * price;
+    const a24 = capital > 0 ? T.r24 * 365 * 86400 / capital * 100 : null, a7 = capital > 0 ? T.r7 * 365 * 86400 / capital * 100 : null;
+    stats.append(
+      stat("sAERO", fmtN(ME ? T.amount : T.alloc), ME ? `AP ${fmtN(T.ap)} · ${price ? "$" + fmtN(T.amount * price) : ""}` : "allocati"),
+      stat("Allocati", T.ap > 0 ? fmtPct(Math.min(100, T.alloc / T.ap * 100)) : fmtN(T.alloc), T.ap > 0 ? fmtN(T.alloc) + " su " + fmtN(T.ap) : ""),
+      stat("APR reale 24 ore", fmtPct(a24), "$" + (T.r24 * 86400).toFixed(2).replace(".", ",") + " al giorno"),
+      stat("APR reale 7 giorni", fmtPct(a7), "$" + (T.r7 * 86400).toFixed(2).replace(".", ",") + " al giorno"),
+      stat("Incassato", "$" + T.tot.toFixed(2).replace(".", ","), T.since ? "dal " + datePlain(T.since) : ""));
+    if (ME) $("me-when").textContent = `letto da Base ${when(ME.at)}`;
+    if (ME && T.ap > 0 && T.alloc < T.ap * 0.995)
+      list.append(el("div", "warnline", `${fmtN(T.ap - T.alloc)} di Allocation Power non sono allocati: non incassano nulla.`));
+    meChart([...days.entries()].sort((a, b) => a[0] - b[0]));
+    if (ME) {
+      const b = el("button", "linkish", `Usa ${fmtN(T.ap)} come Allocation Power nel Radar`);
+      b.type = "button";
+      b.addEventListener("click", () => { const i = $("rd-ap"); i.value = String(Math.round(T.ap)); i.dispatchEvent(new Event("input")); document.getElementById("radar").scrollIntoView({ behavior: "smooth" }); });
+      if (T.ap > 0) list.append(b);
+    }
+    for (const { id, sh, ent, r, oc, alloc, base } of rows) {
+      const box = el("div", "mepos");
+      const h = el("h3", null, `#${id}`);
+      const bits = [];
+      if (oc) {
+        bits.push(`${fmtN(oc.amount)} AERO`, oc.perm ? "perpetuo" : (oc.end ? "fino al " + datePlain(oc.end) : ""));
+        if (oc.since) bits.push("tuo dal " + datePlain(oc.since));
+      } else bits.push("aggiunto a mano");
+      h.append(el("span", "sub", bits.filter(Boolean).join(" · ")));
+      box.append(h);
+      if (r) {
+        const [since, tot, u24, s24, u7, s7] = r;
+        const kv = el("div", "pills");
+        const p24 = apr(u24, s24, base, price), p7 = apr(u7, s7, base, price);
+        kv.append(el("span", "pill act", `APR 24 ore ${fmtPct(p24)}`), el("span", "pill act", `APR 7 giorni ${fmtPct(p7)}`),
+          el("span", "pill pas", `$${(s7 > 0 ? u7 / s7 * 86400 : 0).toFixed(2).replace(".", ",")}/giorno`),
+          el("span", "pill pas", `$${tot.toFixed(2).replace(".", ",")} dal ${datePlain(since)}`));
+        box.append(kv);
       }
+      if (!ent.length) {
+        box.append(el("div", "empty", oc && oc.ap > 0 ? "Nessuna allocazione: questa posizione non incassa nulla finché non la allochi." : "Nessuna allocazione trovata per questo numero."));
+        list.append(box); continue;
+      }
+      const cds = el("div", "pills");
+      for (const [cid, ends] of ent) {
+        const free = ends <= now;
+        cds.append(el("span", "pill " + (free ? "free" : "wait"), `${chainName(cid)}: ${free ? "puoi riallocare" : "cooldown " + inT(ends - now)}`));
+      }
+      box.append(cds);
+      const earned = new Map((r ? r[7] : []).map(([i, v]) => [i, v]));
+      const tb = el("div", "tbl"), table = document.createElement("table");
+      const thr = document.createElement("tr");
+      for (const t of ["Pool", "Rete", "sAERO", "Quota", "Del pool", "APR pool 48h", "Incassato"]) thr.append(el("th", null, t));
+      const thead = document.createElement("thead"); thead.append(thr);
+      const tbody = document.createElement("tbody");
+      const ap = oc && oc.ap > 0 ? oc.ap : alloc;
+      const line = (name, chain, a, key, usd, old) => {
+        const tr = document.createElement("tr");
+        const pool = key ? pools.get(key) : null;
+        const td = el("td"); td.append(el("span", "nm", name)); if (pool && pool.kind && pool.kind !== "?") td.append(el("span", "kd", pool.kind));
+        tr.append(td, el("td", "ch muted", chain));
+        tr.append(el("td", "num" + (old ? " old" : ""), old ? "—" : fmtN(a)), el("td", "num", old ? "—" : fmtPct(a / ap * 100)));
+        tr.append(el("td", "num", !old && pool && pool.ap > 0 ? fmtPct(a / pool.ap * 100) : "—"));
+        tr.append(el("td", "num", pool && pool.apr != null ? fmtPct(pool.apr) : "—"));
+        tr.append(el("td", "num", usd != null ? "$" + usd.toFixed(2).replace(".", ",") : "—"));
+        tbody.append(tr);
+      };
+      const shown = new Set();
+      for (const [cid, , , , , pls] of ent) for (const [i, a] of pls) {
+        const key = sh.keys ? sh.keys[i] : null;
+        shown.add(i);
+        line(sh.names[i], chainName(cid), a, key, earned.has(i) ? earned.get(i) : null, false);
+      }
+      for (const [i, v] of earned) if (!shown.has(i) && v >= 0.01) {
+        const key = sh.keys ? sh.keys[i] : null, cid = key ? +key.split(":")[0] : null;
+        line(sh.names[i] + " (prima)", cid ? chainName(cid) : "", 0, key, v, true);
+      }
+      table.append(thead, tbody); tb.append(table); box.append(tb);
+      list.append(box);
     }
   }
 
+  $("me-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const v = $("me-addr").value.trim();
+    if (v && !/^0x[0-9a-fA-F]{40}$/.test(v)) { meErr = "L'indirizzo deve essere 0x seguito da 40 caratteri esadecimali."; ME = null; return meRender(); }
+    meAddr = v;
+    try { if (v) localStorage.setItem("radar-addr", v); else localStorage.removeItem("radar-addr"); } catch (x) {}
+    meRefresh();
+  });
   $("mine-form").addEventListener("submit", e => {
     e.preventDefault();
     myIds = [...new Set(($("mine-ids").value.match(/\d+/g) || []).map(Number))];
     $("mine-ids").value = myIds.join(", ");
     try { localStorage.setItem("radar-ids", JSON.stringify(myIds)); } catch (x) {}
-    mine();
+    meRender();
   });
+  meRefresh();
 
   function waves(d) {
     const W = d.waves || [];
@@ -1770,7 +1980,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
 
   function render() {
     if (!DATA) return;
-    header(DATA); rdRender(); mine(); waves(DATA); calendar(DATA); incentives(DATA); chainOptions(DATA); pools(DATA); chains(DATA); alertsList(DATA);
+    header(DATA); rdRender(); meRender(); waves(DATA); calendar(DATA); incentives(DATA); chainOptions(DATA); pools(DATA); chains(DATA); alertsList(DATA);
   }
 
   async function load() {

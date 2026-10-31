@@ -3,6 +3,7 @@ import statistics
 
 from . import aero as A
 from . import chain as C
+from . import earnings as E
 from . import marketdata as MD
 
 HOUR = 3600
@@ -285,25 +286,39 @@ SHARD = 1000
 
 
 def positions_export(state, params, now):
-    """Every position on every chain with its cooldown end, so the page can show the viewer's own positions.
+    """Every position on every chain with its cooldown end and what it has earned, so the page can show the
+    viewer's own positions.
 
     Split by position number (SHARD numbers per file) so the page downloads only the files it needs.
-    Returns (index, {shard: {"names": [...], "p": {id: [[chainId, cooldown end, sAERO, active, moves,
-    [[name index, sAERO], ...]], ...]}}}).
+    Returns (index, {shard: {"names": [...], "keys": [...], "p": {id: [[chainId, cooldown end, sAERO, active,
+    moves, [[pool index, sAERO], ...]], ...]}, "r": {id: earnings.summary with pool indexes}}}).
     """
     cooldown = params["cooldown"]
     shards = {}
+
+    def shard(tid):
+        return shards.setdefault(int(tid) // SHARD, {"names": [], "keys": [], "idx": {}, "p": {}, "r": {}})
+
+    def pool_index(sh, g):
+        if g not in sh["idx"]:
+            sh["idx"][g] = len(sh["keys"])
+            sh["keys"].append(g)
+            sh["names"].append(A.gauge_name(state, g))
+        return sh["idx"][g]
+
     for cid, tid, t, size, end, active in positions(state, cooldown):
-        sh = shards.setdefault(int(tid) // SHARD, {"names": [], "idx": {}, "p": {}})
-        pools = []
-        for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])[:4]:
-            n = A.gauge_name(state, g)
-            if n not in sh["idx"]:
-                sh["idx"][n] = len(sh["names"])
-                sh["names"].append(n)
-            pools.append([sh["idx"][n], round(a)])
+        sh = shard(tid)
+        pools = [[pool_index(sh, g), round(a)] for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])]
         sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools])
-    index = {"v": 3, "generated": now, "cooldown_h": round(cooldown / HOUR, 2), "shard": SHARD,
-             "shards": sorted(shards),
+    book = state.get("earnings") or {}
+    keys = E.gauge_keys(book)
+    for tid, pe in (book.get("p") or {}).items():
+        sh = shard(tid)
+        r = E.summary(pe, now, keys)
+        r[-1] = [[pool_index(sh, g), v] for g, v in sorted(r[-1].items(), key=lambda kv: -kv[1]) if v >= 0.01]
+        sh["r"][tid] = r
+    index = {"v": 4, "generated": now, "cooldown_h": round(cooldown / HOUR, 2), "shard": SHARD,
+             "shards": sorted(shards), "earnings_from": (state.get("earnings") or {}).get("from"),
              "chains": {cid: C.chain_short(cid) for cid in sorted({int(c) for c in state["chains"]})}}
-    return index, {k: {"generated": now, "names": v["names"], "p": v["p"]} for k, v in shards.items()}
+    return index, {k: {"generated": now, "names": v["names"], "keys": v["keys"], "p": v["p"], "r": v["r"]}
+                   for k, v in shards.items()}

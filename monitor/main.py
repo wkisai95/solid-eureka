@@ -15,6 +15,7 @@ from time import time as wall_clock
 from zoneinfo import ZoneInfo
 
 from . import aero as A
+from . import earnings as E
 from . import alerts as N
 from . import chain as C
 from . import market as M
@@ -259,6 +260,13 @@ def run(args):
         state["repairs"].append("broken_prices_1")
     aero_key = A.tkey(C.BASE_CHAIN, params["aero"])
     T.accrue(tr, state, prices, fresh_fees, now, params["cooldown"])
+    # what every real position earns, for the page's "I tuoi sAERO"
+    try:
+        e_last = int((state.get("earnings") or {}).get("last") or 0)
+        E.accrue(state, prices, T.interval_revenue(state, prices, fresh_fees, e_last, now) if e_last else {}, now, log)
+    except Exception:
+        status["errors"].append("earnings: " + traceback.format_exc()[-200:])
+        log(f"earnings failed: {traceback.format_exc()[-600:]}")
     latest_reco = T.snapshot(tr, state, prices, now, params["cooldown"], params["max_gauges"])
     tracker_report = T.summary(tr, state, now, prices.get(aero_key), params["cooldown"], latest_reco)
     log(f"tracker: size {size:,.0f}, " + ", ".join(

@@ -40,6 +40,20 @@ media del mercato, i movimenti di allocazione (1, 6, 24 e 48 ore) e la tabella d
 pagina): da quel giro in poi tutti i metodi della simulazione le seguono. Restano valide finché non ne carichi altre
 e sono in `tracker.json` (`options`).
 
+## I tuoi sAERO
+
+In cima alla pagina scrivi l'indirizzo del tuo wallet: resta solo sul dispositivo. La pagina legge da Base quali sAERO
+possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quando è tuo) e prende dal monitor:
+
+- **allocazione** di ogni posizione su ogni rete, con la quota del pool e l'APR del pool nelle ultime 48 ore;
+- **cooldown** di ogni rete;
+- **APR reale**: a ogni giro il monitor divide le fee e gli incentivi arrivati a ogni pool tra tutte le posizioni
+  allocate, in proporzione alla loro quota. Da qui gli incassi delle ultime ~24 ore, degli ultimi 7 giorni, per pool
+  e per giorno. L'APR è calcolato sul valore degli AERO in stake al prezzo attuale.
+
+Il primo giro ricostruisce gli ultimi 7 giorni dalle fee già raccolte, solo per le ore in cui ogni posizione aveva già
+l'allocazione di adesso. I numeri sono una stima dai dati pubblici, non i claim effettivi del contratto.
+
 ## Simulazione
 
 Ogni giro (circa ogni 15 minuti) calcola con cinque metodi l'allocazione migliore per una posizione di
