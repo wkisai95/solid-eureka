@@ -577,6 +577,44 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   const TZ = "Europe/Rome";
   const $ = id => document.getElementById(id);
   let DATA = null, sortKey = "ap", sortDir = -1;
+
+  // ---------------------------------------------------------------- where the data come from
+  // The monitor pushes every run to the "data" branch. GitHub Pages republishes the site from it later (it builds at
+  // most about ten times an hour) and its CDN caches the files, while raw.githubusercontent.com caches a branch for
+  // five minutes whatever the query string. So the page asks GitHub which commit the branch is on (40 characters)
+  // and reads the files of that very commit, which never change: new data show up as soon as a run has pushed them,
+  // and nothing is downloaded again until there is a new commit. If GitHub cannot be asked (rate limit, offline), the
+  // site's own copy is used as before.
+  var dataSha = null, dataShaAt = 0, loadedSha = null;
+  function dataRepo() { return (DATA && DATA.repo) || "wkisai95/solid-eureka"; }
+  async function headSha(force) {
+    if (!force && Date.now() - dataShaAt < 60000) return dataSha;
+    let tok = "";
+    try { tok = localStorage.getItem("radar-gh-token") || ""; } catch (e) {}
+    const ask = async auth => {
+      const h = { Accept: "application/vnd.github.sha" };
+      if (auth) h.Authorization = "Bearer " + auth;
+      const r = await fetch(`https://api.github.com/repos/${dataRepo()}/commits/data`, { headers: h, cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const t = (await r.text()).trim();
+      if (!/^[0-9a-f]{40}$/.test(t)) throw new Error("risposta inattesa");
+      return t;
+    };
+    try { dataSha = tok ? await ask(tok).catch(() => ask("")) : await ask(""); }
+    catch (e) { dataSha = null; }
+    dataShaAt = Date.now();
+    return dataSha;
+  }
+  async function dataFetch(file, force) {
+    const sha = await headSha(force);
+    if (sha) {
+      try {
+        const r = await fetch(`https://raw.githubusercontent.com/${dataRepo()}/${sha}/${file}`);
+        if (r.ok) return r;
+      } catch (e) { /* fall back to the site's copy */ }
+    }
+    return fetch(`${file}?t=${Date.now()}`, { cache: "no-store" });
+  }
   try { const s = JSON.parse(localStorage.getItem("radar-sort") || "null"); if (s) { sortKey = s.k; sortDir = s.d; } } catch (e) {}
 
   const fmtN = x => {
@@ -707,14 +745,14 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (!posLoading) {
       posLoading = (async () => {
         if (!POS) {
-          const r = await fetch("positions.json?t=" + Date.now(), { cache: "no-store" });
+          const r = await dataFetch("positions.json");
           if (!r.ok) throw new Error("HTTP " + r.status);
           POS = await r.json(); SHARDS = {};
         }
         const size = POS.shard || 1000, have = new Set(POS.shards || []);
         const need = [...new Set(allIds().map(id => Math.floor(id / size)))].filter(n => have.has(n) && !SHARDS[n]);
         await Promise.all(need.map(async n => {
-          const rr = await fetch(`pos/${n}.json?t=${Date.now()}`, { cache: "no-store" });
+          const rr = await dataFetch(`pos/${n}.json`);
           if (!rr.ok) throw new Error("HTTP " + rr.status);
           SHARDS[n] = await rr.json();
         }));
@@ -1361,7 +1399,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
 
   async function loadSim() {
     try {
-      const r = await fetch("tracker.json?t=" + Date.now(), { cache: "no-store" });
+      const r = await dataFetch("tracker.json");
       if (!r.ok) throw new Error("HTTP " + r.status);
       SIM = await r.json();
       simRender();
@@ -2173,9 +2211,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
 
   async function load() {
     try {
-      const r = await fetch("latest.json?t=" + Date.now(), { cache: "no-store" });
+      const sha = await headSha(true);
+      if (sha && sha === loadedSha && DATA) { header(DATA); return; }     // nothing new since the last look
+      const r = await dataFetch("latest.json");
       if (!r.ok) throw new Error("HTTP " + r.status);
       DATA = await r.json();
+      loadedSha = sha;
       if (POS && POS.generated < DATA.generated) { POS = null; SHARDS = {}; posLoading = null; }
       render();
       loadSim();
@@ -2198,7 +2239,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     DATA && pools(DATA);
   }));
   load();
-  setInterval(load, 5 * 60 * 1000);
+  setInterval(load, 2 * 60 * 1000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
   let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { DATA && waves(DATA); SIM && simChart(SIM); }, 200); });
