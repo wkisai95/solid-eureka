@@ -138,16 +138,11 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             r["inc24h"] = round(inc24, 2)
         # hourly traded volume (DexScreener, one snapshot an hour; index 0: this hour) and fees per dollar traded:
         # fee transfers arrive in batches on some chains, the volume shows when the trading really happened
-        vser = (MD.market_state(state)["hist"]["pools"]).get(key) or {}
-        if vser:
-            vh = [(vser.get(str(h0 - i * HOUR)) or [None])[0] for i in range(24)]
-            if any(v for v in vh if v):
-                r["vh"] = vh
-            cur = vser.get(max(vser, key=int))
-            old = vser.get(str(int(max(vser, key=int)) - 24 * HOUR))
-            v48 = (cur[1] or 0) + (old[1] if old else cur[1] or 0)
-            if v48 > 0 and fees48 > 0:
-                r["fpv"] = round(min(0.01, fees48 / v48), 7)
+        vh, v48 = MD.hourly_volume(state, key, now)
+        if vh and any(v for v in vh if v):
+            r["vh"] = vh
+        if v48 and fees48 > 0:
+            r["fpv"] = round(min(0.01, fees48 / v48), 7)
         mv = mkt_pools.get(key)
         if mv:
             # this pool's volume and liquidity, and the same pair on every DEX of the chain

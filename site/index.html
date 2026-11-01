@@ -369,6 +369,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field"><span class="flabel">Taglia i picchi di volume</span><label class="switch"><input id="rd-spk" type="checkbox" role="switch"><span id="rd-spk-s">Spento</span></label>
         <div class="inline"><small>Tolleranza</small><input id="rd-spkK" class="short" type="text" inputmode="decimal" autocomplete="off" aria-label="Tolleranza in percento del Δ mercato"><small>% del Δ mercato</small></div>
         <small id="rd-spk-info"></small></div>
+      <div class="field"><span class="flabel">Scarta i pool con APR instabile</span><label class="switch"><input id="rd-stb" type="checkbox" role="switch"><span id="rd-stb-s">Acceso</span></label>
+        <div class="inline"><small>Scarto massimo</small><input id="rd-stbK" class="short" type="text" inputmode="decimal" autocomplete="off" aria-label="Scarto massimo, in volte, tra l'APR di una finestra e quello delle 48 ore"><small>volte l'APR 48 ore</small></div>
+        <small id="rd-stb-info"></small></div>
       <div class="field"><label for="rd-min">Minimo per pool</label><select id="rd-min"><option value="0">Nessun minimo</option><option value="2">2%</option><option value="3">3%</option><option value="5">5% (max 20 pool)</option><option value="10">10% (max 10 pool)</option><option value="15">15% (max 6 pool)</option><option value="20">20% (max 5 pool)</option><option value="25">25% (max 4 pool)</option><option value="34">34% (max 2 pool)</option></select><small>I pool sotto il minimo vengono esclusi e i loro voti ridistribuiti</small></div>
       <div class="field"><span class="flabel" id="rd-chains-l">Reti</span><details class="dd" id="rd-chains-dd"><summary id="rd-chains-sum">Tutte le reti</summary><div class="ddlist" id="rd-chains" role="group" aria-labelledby="rd-chains-l"></div></details><small>Togli la spunta alle reti su cui non vuoi allocare</small></div>
       <div class="field"><label for="rd-cap">Massimo per pool</label><select id="rd-cap"><option value="100">Nessun limite</option><option value="50">50%</option><option value="34">34%</option><option value="25">25%</option><option value="20">20%</option><option value="10">10%</option></select><small>Distribuisce il rischio di previsione</small></div>
@@ -436,6 +439,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p><b>Quota proporzionale.</b> Chi alloca a un pool si divide la sua revenue in proporzione ai voti. La tua quota è la tua Allocation Power divisa per l'allocazione esistente più la tua.</p>
         <p><b>Concorrenza.</b> I pool con pochi voti e molte fee o incentivi non restano così: gli altri allocatori ci arrivano. Il radar tratta ogni pool come se avesse abbastanza voti da rendere al massimo il multiplo scelto della media del mercato (o li lascia fermi con «voti fermi»).</p>
         <p><b>Picchi di volume (interruttore).</b> Calcola la variazione delle fee 48 ore di tutto il mercato rispetto alle 48 ore prima, e quella di ogni pool. Un pool è in picco se sale oltre il Δ del mercato più la tolleranza: con mercato +50% e tolleranza 75%, la soglia è +50% + 0,75 × 50% = +87,5%. Un picco così raramente si ripete nelle 47 ore dopo, quindi il radar non conta le sue fee attuali ma quelle delle 48 ore prima, mosse come il mercato (+50% nell'esempio). Il pool non sparisce: gli incentivi programmati per le prossime 47 ore arrivano comunque e restano nel conto.</p>
+        <p><b>APR instabile (interruttore, acceso di default).</b> Per ogni pool confronta l'APR delle ultime 6, 12, 18 e 24 ore con quello delle 48 ore su cui il radar decide. Le fee di ogni finestra vengono dal volume orario per le fee per dollaro scambiato delle 48 ore, gli incentivi contano al ritmo programmato. Il confronto è al netto del mercato: se tutto il mercato nelle ultime 6 ore rende 0,72× le 48 ore, un pool a 0,72× è normale. Con scarto 2 il pool viene scartato se in una finestra rende più del doppio o meno della metà di quanto ci si aspetta. I pool senza volume orario non si possono verificare e restano, con una nota.</p>
         <p><b>Minimo e massimo per pool.</b> Con un minimo del 10% ogni pool scelto riceve almeno il 10% dei voti, quindi al massimo 10 pool: il radar toglie il pool con la quota più piccola sotto il minimo e ridistribuisce, finché tutti lo rispettano. Il massimo limita la quota di ogni pool; se i pool rimasti sono troppo pochi per arrivare al 100%, sale quanto basta. Su ogni rete si votano al massimo 20 pool.</p>
         <p><b>Autodiluizione.</b> Ogni voto che aggiungi abbassa il rendimento del successivo. Il radar distribuisce la tua AP a fette dell'1%, ogni volta al pool che rende di più sulla fetta successiva.</p>
         <p><b>Simulazioni.</b> «Carica queste opzioni nelle simulazioni» le manda al monitor: da quel giro in poi tutti e cinque i metodi della simulazione rispettano massimo, minimo, reti, pool e ricerche scartati e picchi di volume; trend e concorrenza definiscono il metodo «Radar». La dimensione della simulazione resta la sua: la tua Allocation Power resta solo su questo dispositivo.</p>
@@ -1355,7 +1359,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---------------------------------------------------------------- Radar sAERO: the old app, on the monitor's data
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-  const RD_DEF = { ap: "235000", price: "", trend: "0", comp: "3", spk: false, spkK: "75", minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
+  const RD_DEF = { ap: "235000", price: "", trend: "0", comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
   let RD = { ...RD_DEF };
   try { RD = { ...RD_DEF, ...(JSON.parse(lsGet("radar-rd") || "null") || {}) }; } catch (e) {}
   let XS = { keys: new Set(), rules: [], chainsOff: [] };
@@ -1410,7 +1414,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
 
   // recent hours of a pool. With hourly volume (DexScreener): revenue over the last n hours = volume × the pool's
-  // fees per dollar traded in the last 48 hours, plus incentives streamed evenly; the warning looks at how the
+  // fees per dollar traded in the last 48 hours, plus incentives at the rate scheduled for the next 48 hours; the warning looks at how the
   // volume is spread. Without it, the fee transfers themselves, which on some chains arrive in daily batches.
   const RD_WIN = [6, 12, 18, 24];
   function recent(p) {
@@ -1422,7 +1426,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       for (const n of RD_WIN) {
         const xs = p.vh.slice(0, n).filter(v => v != null);
         const vol = xs.length ? xs.reduce((a, b) => a + b, 0) * n / xs.length : 0;
-        w[n] = { rev: vol * p.fpv + p.inc24 * n / 24, vol };
+        w[n] = { rev: vol * p.fpv + p.inc * n / 48, vol };
       }
       const xs = p.vh.map((v, i) => [v || 0, h0 - i * 3600]), v24 = xs.reduce((a, x) => a + x[0], 0);
       const top = xs.reduce((a, x) => x[0] > a[0] ? x : a, [0, 0]);
@@ -1431,6 +1435,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         warn = `il ${Math.round(top[0] / v24 * 100)}% del volume delle 24 ore in un'ora sola (intorno alle ${when(top[1])})`;
       else if (v24 > 0 && v6 / v24 >= 0.55)
         warn = `il ${Math.round(v6 / v24 * 100)}% del volume delle 24 ore nelle ultime 6 ore`;
+    } else if (!(p.fee > 0) && p.inc > 0) {
+      src = "incentivi";                     // only scheduled incentives: the same in every window
+      for (const n of RD_WIN) w[n] = { rev: p.inc * n / 48 };
     } else if (p.fh.length || p.inc24) {
       src = "trasferimenti";
       for (const n of RD_WIN) {
@@ -1440,9 +1447,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           const b = h0 - i * 3600, lo = Math.max(b, start), hi = Math.min(b + 3600, now);
           if (hi > lo && v) f += v * (hi - lo) / Math.max(1, Math.min(b + 3600, now) - b);
         });
-        w[n] = { rev: f + p.inc24 * n / 24 };
+        w[n] = { rev: f + p.inc * n / 48 };
       }
     }
+    if (src) w[48] = { rev: p.fee + p.inc };
     return { w, warn, src };
   }
 
@@ -1462,13 +1470,43 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const Dm = prev > 0 ? (now / prev - 1) * 100 : 0, K = Math.max(0, rdNum(RD.spkK, 0)) / 100, thr = Dm + K * Math.abs(Dm);
       spike = { Dm, thr, n: withD.length, ids: new Set(withD.filter(p => p.d > thr).map(p => p.key)) };
     }
+    // unsteady APR: a recent window more than k times above or below the pool's 48 hours moved like the market.
+    // Fees per hour of a window = hourly volume × fees per dollar of the 48 hours; incentives at their scheduled rate
+    let stab = null;
+    if (RD.stb) {
+      const k = Math.max(1.1, rdNum(RD.stbK, 2)), per = [];
+      for (const p of list) {
+        if (!(p.fee > 0) || !p.vh || !p.fpv) continue;
+        const rates = {};
+        for (const n of RD_WIN) {
+          const xs = p.vh.slice(0, n).filter(v => v != null);
+          if (xs.length) rates[n] = xs.reduce((a, b) => a + b, 0) / xs.length * p.fpv;
+        }
+        if (Object.keys(rates).length) per.push([p, p.fee / 48, p.inc / 48, rates]);
+      }
+      const base = per.reduce((a, x) => a + x[1], 0), mkt = {};
+      for (const n of RD_WIN) mkt[n] = base > 0 ? per.reduce((a, x) => a + (x[3][n] != null ? x[3][n] : x[1]), 0) / base : 1;
+      const gap = r => r > 0 ? Math.abs(Math.log(r)) : Infinity, ids = new Map(), checked = new Map();
+      for (const [p, f, i, rates] of per) {
+        let worst = null;
+        for (const n of RD_WIN) {
+          if (rates[n] == null) continue;
+          const exp = f * mkt[n] + i, r = exp > 0 ? (rates[n] + i) / exp : 1;
+          if (!worst || gap(r) > gap(worst.r)) worst = { n, r };
+        }
+        if (!worst) continue;
+        checked.set(p.key, worst);
+        if (gap(worst.r) > Math.log(k)) ids.set(p.key, worst);
+      }
+      stab = { k, mkt, ids, checked, n: per.length };
+    }
     // a spike does not drop the pool: its fees go back to the 48 hours before, moved like the market; incentives stay
     const value = p => {
       const R = projected(p, w);
       if (!(spike && spike.ids.has(p.key))) return R;
       return p.inc + Math.min(R - p.inc, Math.max(0, p.prev * (1 + spike.Dm / 100)));
     };
-    const act = list.filter(p => p.on).map(p => {
+    const act = list.filter(p => p.on && !(stab && stab.ids.has(p.key))).map(p => {
       const R = value(p), A0 = Math.max(0, p.alloc);
       return { p, R, A0, A: N && avg > 0 ? Math.max(A0, R / (N * avg)) : A0, k: 0 };
     });
@@ -1507,7 +1545,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const total = act.reduce((s, o) => s + earn(o, o.k), 0);
     let top = null, topE = 0;
     for (const o of act) { const e = earn(o, 100); if (e > topE) { topE = e; top = o; } }
-    return { ap, w, act, total, top, topE, earn, avg, N, spike };
+    return { ap, w, act, total, top, topE, earn, avg, N, spike, stab };
   }
 
   function toast(text, bad) {
@@ -1549,8 +1587,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       // APR you would get over the recent hours, with your own slice in the pool
       const rc = recent(o.p), x = o.k * r.ap / 100, pr = rdPrice();
       if (pr > 0 && rc.src) {
-        const aprs = RD_WIN.map(n => `${n}h ${fmtPct(rc.w[n].rev / n * 8760 / ((o.A0 + x) * pr) * 100)}`).join(" · ");
-        const line = el("div", "sb", "APR " + aprs + (rc.src === "trasferimenti" ? " (dalle fee arrivate: volume orario non disponibile)" : ""));
+        const aprs = [...RD_WIN, 48].map(n => `${n}h ${fmtPct(rc.w[n].rev / n * 8760 / ((o.A0 + x) * pr) * 100)}`).join(" · ");
+        const note = rc.src === "trasferimenti" ? (r.stab ? " (volume orario non disponibile: stabilità non verificabile)" : " (dalle fee arrivate: volume orario non disponibile)") : "";
+        const line = el("div", "sb", "APR " + aprs + note);
         line.title = "APR con la tua quota nel pool. " + (rc.src === "volume"
           ? "Fee stimate dal volume di ogni ora per le fee per dollaro scambiato delle ultime 48 ore, più gli incentivi."
           : "Fee arrivate al contratto in quelle ore: su alcune reti arrivano a blocchi una o due volte al giorno.");
@@ -1575,6 +1614,19 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       });
       d.append(left, el("div", "pct", o.k + "%"), xb);
       strips.append(d);
+    }
+    $("rd-stb-s").textContent = RD.stb ? "Acceso" : "Spento";
+    {
+      const sb = r.stab, bi = $("rd-stb-info"), x2 = v => v.toFixed(2).replace(".", ",");
+      if (!sb) bi.textContent = "Scarta i pool in cui l'APR di 6, 12, 18 o 24 ore è oltre lo scarto da quello delle 48 ore, al netto dell'andamento del mercato";
+      else if (!sb.n) bi.textContent = "Manca ancora il volume orario: il filtro non ha nulla da confrontare";
+      else {
+        const big = [...sb.ids.keys()].map(k => list.find(p => p.key === k)).filter(Boolean)
+          .sort((a, b) => projected(b, r.w) - projected(a, r.w)).slice(0, 3)
+          .map(p => { const v = sb.ids.get(p.key); return `${p.name} ${v.n}h ×${x2(v.r)}`; });
+        bi.textContent = `Mercato rispetto alle 48 ore: ${RD_WIN.map(n => `${n}h ×${x2(sb.mkt[n])}`).join(" · ")}. ` +
+          `Scartati ${sb.ids.size} pool su ${sb.n} con volume orario${big.length ? " (i più grandi per fee: " + big.join(", ") + ")" : ""}.`;
+      }
     }
     $("rd-spk-s").textContent = RD.spk ? "Acceso" : "Spento";
     const sp = r.spike, si = $("rd-spk-info");
@@ -1638,7 +1690,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     for (const p of rows) {
       const tr = document.createElement("tr");
       const isSp = !!(r.spike && r.spike.ids.has(p.key));
-      tr.className = (p.on ? "" : "off") + (isSp ? " spike" : "");
+      const un = r.stab && r.stab.ids.get(p.key);
+      tr.className = (p.on ? "" : "off") + (isSp || un ? " spike" : "");
+      if (un) tr.title = `Scartato: APR ${un.n} ore ${un.r > 0 ? "×" + un.r.toFixed(2).replace(".", ",") : "a zero"} rispetto alle 48 ore, al netto del mercato`;
       if (isSp) tr.title = "Picco di volume: fee riportate al livello delle 48 ore prima mosse come il mercato, incentivi tenuti";
       const td0 = el("td", "ck"), cb = document.createElement("input");
       cb.type = "checkbox"; cb.checked = p.on; cb.setAttribute("aria-label", "Usa " + p.name + " " + p.chain);
@@ -1834,10 +1888,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---- the options the simulations follow: sent to the monitor with "Carica queste opzioni nelle simulazioni"
   function rdOptions() {
     return { cap: +RD.cap || 100, min: +RD.minA || 0, chains_off: XS.chainsOff.slice().sort(), excl: [...XS.keys].sort(),
-      rules: XS.rules.slice(), spike: !!RD.spk, spike_k: Math.min(1000, Math.max(0, rdNum(RD.spkK, 0))), trend: +RD.trend || 0, comp: +RD.comp || 0 };
+      rules: XS.rules.slice(), spike: !!RD.spk, spike_k: Math.min(1000, Math.max(0, rdNum(RD.spkK, 0))), trend: +RD.trend || 0, comp: +RD.comp || 0,
+      stable: !!RD.stb, stable_k: Math.min(100, Math.max(1.1, rdNum(RD.stbK, 2))) };
   }
   const optsKey = o => JSON.stringify([+o.cap, +o.min, (o.chains_off || []).slice().sort(), (o.excl || []).slice().sort(),
-    (o.rules || []).map(r => r.toLowerCase()).sort(), !!o.spike, +o.spike_k, +o.trend, +o.comp]);
+    (o.rules || []).map(r => r.toLowerCase()).sort(), !!o.spike, +o.spike_k, +o.trend, +o.comp, !!o.stable, +(o.stable_k || 0)]);
   function optsText(o) {
     const parts = [+o.cap < 100 ? `massimo ${o.cap}% per pool` : "nessun massimo per pool", +o.min ? `minimo ${o.min}%` : "nessun minimo"];
     if ((o.chains_off || []).length) parts.push("senza " + o.chains_off.join(", "));
@@ -1845,6 +1900,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (nx) parts.push(`${nx} ${nx === 1 ? "pool scartato" : "pool scartati"}`);
     if (nr) parts.push(`${nr === 1 ? "scartata la ricerca" : "scartate le ricerche"} ${o.rules.map(r => "«" + r + "»").join(", ")}`);
     if (o.spike) parts.push(`picchi di volume tagliati (tolleranza ${String(o.spike_k).replace(".", ",")}%)`);
+    if (o.stable) parts.push(`APR instabili scartati (oltre ${String(o.stable_k).replace(".", ",")}× le 48 ore)`);
     return parts.join(", ");
   }
   let optsRun = false;
@@ -1868,7 +1924,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     e.addEventListener(ev || "input", () => { RD[key] = e.type === "checkbox" ? e.checked : e.value; saveRD(); rdSchedule(); });
   };
   rdBind("rd-ap", "ap"); rdBind("rd-price", "price"); rdBind("rd-trend", "trend"); rdBind("rd-comp", "comp", "change");
-  rdBind("rd-spk", "spk", "change"); rdBind("rd-spkK", "spkK"); rdBind("rd-min", "minA", "change"); rdBind("rd-cap", "cap", "change");
+  rdBind("rd-spk", "spk", "change"); rdBind("rd-spkK", "spkK"); rdBind("rd-stb", "stb", "change"); rdBind("rd-stbK", "stbK"); rdBind("rd-min", "minA", "change"); rdBind("rd-cap", "cap", "change");
   rdBind("rd-sort", "sortBy", "change");
   $("rd-saved").value = RD.saved || "";
   $("rd-saved").addEventListener("input", () => { RD.saved = $("rd-saved").value; saveRD(); rdCooldown(); });

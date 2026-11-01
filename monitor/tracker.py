@@ -7,6 +7,7 @@ shows which pools and which way of choosing them actually pay the most. Every me
 the page: largest and smallest share per pool, chains, excluded pools and searches, volume spikes.
 """
 import heapq
+import math
 import re
 import statistics
 
@@ -30,7 +31,8 @@ STRATEGIES = {
 RULES = {}          # per-strategy settings from config.json ("strategies"), set by main
 OPTIONS = {}        # the page's options loaded into the simulations (state["options"]), set by main
 DEFAULT_OPTIONS = {"cap": 100, "min": 0, "chains_off": [], "excl": [], "rules": [], "spike": False, "spike_k": 75,
-                   "trend": 0, "comp": 3}
+                   "trend": 0, "comp": 3, "stable": False, "stable_k": 2}
+STABLE_WINDOWS = (6, 12, 18, 24)
 KEY_RE = re.compile(r"\d{1,7}:0x[0-9a-f]{40}")
 
 
@@ -61,8 +63,11 @@ def parse_options(raw):
     num("spike_k", 0, 1000, float)
     num("trend", 0, 100, float)
     num("comp", 0, 50, float)
+    num("stable_k", 1.1, 100, float)
     if "spike" in raw:
         o["spike"] = bool(raw["spike"])
+    if "stable" in raw:
+        o["stable"] = bool(raw["stable"])
     for k, limit in (("chains_off", 20), ("excl", 3000), ("rules", 100)):
         v = raw.get(k)
         if v is not None and (not isinstance(v, list) or len(v) > limit):
@@ -91,6 +96,9 @@ def describe_options(o):
         parts.append(f"{len(o['excl'])} pools and {len(o['rules'])} searches excluded")
     if o["spike"]:
         parts.append(f"volume spikes trimmed, incentives kept (tolerance {o['spike_k']:g}%)")
+    if o.get("stable"):
+        parts.append(f"unsteady APR left out (a window more than {o['stable_k']:g}x away from 48 hours, "
+                     f"against the market)")
     parts.append(f"radar trend {o['trend']:g}%, competition {o['comp']:g}x")
     return ", ".join(parts)
 
@@ -147,6 +155,60 @@ def spikes(state, keys, now, tolerance):
     return {k: prevs[k] for k, d in changes.items() if d > thr}, (round(dm, 1), round(thr, 1))
 
 
+def _gap(ratio):
+    return math.inf if ratio <= 0 else abs(math.log(ratio))
+
+
+_UNSTEADY = {}
+
+
+def unsteady(state, rows, now, cooldown, k):
+    """Pools whose revenue per hour over the last 6, 12, 18 or 24 hours is more than k times above or below their
+    last 48 hours, moved like the whole market. Returns ({pool: (window in hours, ratio)}, {window: market ratio}).
+
+    A window's fees are its hourly traded volume (DexScreener snapshots) at the pool's fees per dollar traded over 48
+    hours, because fee transfers arrive in batches on some chains. Incentives count at the rate scheduled for the
+    next cooldown in every window, so a pool paid mostly by incentives moves little. The market ratio is the same
+    comparison for the fees of every pool with hourly volume: a quiet Sunday lowers every pool and moves none of
+    them out. Pools without hourly volume cannot be checked and stay in.
+    """
+    tag = (id(state), now, cooldown, k)
+    if _UNSTEADY.get("tag") == tag:
+        return _UNSTEADY["out"]
+    per = {}
+    for key, (f48, _f12, inc, _d) in rows.items():
+        if f48 <= 0:
+            continue
+        vh, v48 = MD.hourly_volume(state, key, now)
+        if not vh or not v48:
+            continue
+        fpv = min(0.01, f48 / v48)
+        rates = {}
+        for n in STABLE_WINDOWS:
+            xs = [v for v in vh[:n] if v is not None]
+            if xs:
+                rates[n] = sum(xs) / len(xs) * fpv
+        if rates:
+            per[key] = (f48 / 48, inc / (cooldown / HOUR), rates)
+    base = sum(f for f, _, _ in per.values())
+    out, mkt = {}, {}
+    if base > 0:
+        mkt = {n: sum(r.get(n, f) for f, _, r in per.values()) / base for n in STABLE_WINDOWS}
+        for key, (f, i, rates) in per.items():
+            worst = None
+            for n, rate in rates.items():
+                expected = f * mkt[n] + i
+                ratio = (rate + i) / expected if expected > 0 else 1.0
+                if worst is None or _gap(ratio) > _gap(worst[1]):
+                    worst = (n, ratio)
+            if worst and _gap(worst[1]) > math.log(k):
+                out[key] = (worst[0], round(worst[1], 3))
+    res = (out, {n: round(v, 3) for n, v in mkt.items()})
+    _UNSTEADY.clear()
+    _UNSTEADY.update({"tag": tag, "out": res})
+    return res
+
+
 # ---------------------------------------------------------------- recommendation
 
 _INPUTS = {}
@@ -174,6 +236,8 @@ def candidates(state, prices, now, cooldown, strategy, opts=None):
     ap = state["ap"]
     rows = _inputs(state, prices, now, cooldown)
     allowed = set(rows) - excluded(state, rows, opts)
+    if opts.get("stable"):
+        allowed -= set(unsteady(state, rows, now, cooldown, float(opts.get("stable_k", 2)))[0])
     spiked, dm = {}, 0.0
     if opts.get("spike"):
         spiked, mk = spikes(state, rows, now, float(opts.get("spike_k", 75)))

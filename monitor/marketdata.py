@@ -390,6 +390,20 @@ def _sym(state, cid, t):
 
 # ---------------------------------------------------------------- history
 
+def hourly_volume(state, key, now, hours=24):
+    """(volume of each of the last `hours` hours, index 0 this hour and None where no snapshot was taken; volume of
+    the last 48 hours) of an Aero pool, from the hourly snapshots; (None, None) when the pool has none."""
+    vser = (market_state(state)["hist"]["pools"]).get(key) or {}
+    if not vser:
+        return None, None
+    h0 = now - now % HOUR
+    vh = [(vser.get(str(h0 - i * HOUR)) or [None])[0] for i in range(hours)]
+    last = max(vser, key=int)
+    old = vser.get(str(int(last) - 24 * HOUR))
+    v48 = (vser[last][1] or 0) + (old[1] if old else vser[last][1] or 0)
+    return vh, v48
+
+
 def record(mk, now):
     hour = str(now - now % HOUR)
     hp, hc = mk["hist"]["pools"], mk["hist"]["chains"]
