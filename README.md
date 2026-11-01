@@ -32,6 +32,7 @@ diluisce ogni pool. Tutte le opzioni della vecchia app:
 | Taglia i picchi di volume | Nei pool le cui fee sono salite più del mercato oltre la tolleranza conta le fee delle 48 ore prima, mosse come il mercato; gli incentivi programmati restano |
 | APR 6, 12, 18, 24 ore (pool suggeriti) | APR con la tua quota, dalle fee per dollaro scambiato delle ultime 48 ore applicate al volume orario di DexScreener, più gli incentivi; avviso se un'ora fa almeno il 25% del volume delle 24 ore o le ultime 6 ore almeno il 55% |
 | Scarta i pool con APR instabile (acceso) | Scarta i pool in cui l'APR di 6, 12, 18 o 24 ore è oltre lo scarto (2 = più del doppio o meno della metà) da quello delle 48 ore mosso come il mercato; i pool senza volume orario restano, con una nota |
+| Nota «Voti in uscita» (pool suggeriti) | Se nelle ultime 6 ore sono usciti voti dal pool e, già al netto dei tuoi, a parità di rewards il rendimento atteso supera di almeno il 5% quello che ha reso ogni voto nelle 6 ore: voti usciti, quota del totale e aumento atteso |
 | Minimo e massimo per pool | Quota minima e massima di ogni pool, in percentuale |
 | Reti, pool e ricerche scartati | Le reti spente, i pool senza spunta e le ricerche salvate restano fuori |
 

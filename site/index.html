@@ -229,6 +229,7 @@ label.switch input:checked::after { left: 21px; }
   padding: 6px 9px; font-size: 13px; line-height: 1; align-self: start; }
 .strip .x:hover { color: var(--bad); border-color: var(--bad); filter: none; }
 .toast button.linkish { margin-left: 8px; }
+.strip .outflow { font-size: 12px; color: var(--accent); }
 .strip .spk { font-size: 12px; color: var(--warn); }
 .strip .pct { font: 700 26px/1 var(--f-display); font-variant-numeric: tabular-nums; }
 .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 5px; }
@@ -440,6 +441,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p><b>Concorrenza.</b> I pool con pochi voti e molte fee o incentivi non restano così: gli altri allocatori ci arrivano. Il radar tratta ogni pool come se avesse abbastanza voti da rendere al massimo il multiplo scelto della media del mercato (o li lascia fermi con «voti fermi»).</p>
         <p><b>Picchi di volume (interruttore).</b> Calcola la variazione delle fee 48 ore di tutto il mercato rispetto alle 48 ore prima, e quella di ogni pool. Un pool è in picco se sale oltre il Δ del mercato più la tolleranza: con mercato +50% e tolleranza 75%, la soglia è +50% + 0,75 × 50% = +87,5%. Un picco così raramente si ripete nelle 47 ore dopo, quindi il radar non conta le sue fee attuali ma quelle delle 48 ore prima, mosse come il mercato (+50% nell'esempio). Il pool non sparisce: gli incentivi programmati per le prossime 47 ore arrivano comunque e restano nel conto.</p>
         <p><b>APR instabile (interruttore, acceso di default).</b> Per ogni pool confronta l'APR delle ultime 6, 12, 18 e 24 ore con quello delle 48 ore su cui il radar decide. Le fee di ogni finestra vengono dal volume orario per le fee per dollaro scambiato delle 48 ore, gli incentivi contano al ritmo programmato. Il confronto è al netto del mercato: se tutto il mercato nelle ultime 6 ore rende 0,72× le 48 ore, un pool a 0,72× è normale. Con scarto 2 il pool viene scartato se in una finestra rende più del doppio o meno della metà di quanto ci si aspetta. I pool senza volume orario non si possono verificare e restano, con una nota.</p>
+        <p><b>Voti in uscita.</b> Il radar divide le fee per i voti che il pool ha adesso. Se nelle ultime 6 ore sono usciti voti, le stesse rewards si dividono tra meno voti, quindi l'APR a 6 ore con l'allocazione suggerita è più alto di quanto ha reso davvero ogni voto in quelle ore, quando i voti erano di più. Se la differenza, già al netto dei tuoi voti, supera il 5%, sotto il pool compare una nota con i voti usciti, la loro quota del totale e l'aumento atteso. Vale finché i voti non rientrano.</p>
         <p><b>Minimo e massimo per pool.</b> Con un minimo del 10% ogni pool scelto riceve almeno il 10% dei voti, quindi al massimo 10 pool: il radar toglie il pool con la quota più piccola sotto il minimo e ridistribuisce, finché tutti lo rispettano. Il massimo limita la quota di ogni pool; se i pool rimasti sono troppo pochi per arrivare al 100%, sale quanto basta. Su ogni rete si votano al massimo 20 pool.</p>
         <p><b>Autodiluizione.</b> Ogni voto che aggiungi abbassa il rendimento del successivo. Il radar distribuisce la tua AP a fette dell'1%, ogni volta al pool che rende di più sulla fetta successiva.</p>
         <p><b>Simulazioni.</b> «Carica queste opzioni nelle simulazioni» le manda al monitor: da quel giro in poi tutti e cinque i metodi della simulazione rispettano massimo, minimo, reti, pool e ricerche scartati e picchi di volume; trend e concorrenza definiscono il metodo «Radar». La dimensione della simulazione resta la sua: la tua Allocation Power resta solo su questo dispositivo.</p>
@@ -1426,18 +1428,18 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       for (const n of RD_WIN) {
         const xs = p.vh.slice(0, n).filter(v => v != null);
         const vol = xs.length ? xs.reduce((a, b) => a + b, 0) * n / xs.length : 0;
-        w[n] = { rev: vol * p.fpv + p.inc * n / 48, vol };
+        w[n] = { fee: vol * p.fpv, vol };
       }
       const xs = p.vh.map((v, i) => [v || 0, h0 - i * 3600]), v24 = xs.reduce((a, x) => a + x[0], 0);
       const top = xs.reduce((a, x) => x[0] > a[0] ? x : a, [0, 0]);
       const v6 = xs.slice(0, 6).reduce((a, x) => a + x[0], 0);
       if (v24 > 0 && top[0] / v24 >= 0.25)
-        warn = `il ${Math.round(top[0] / v24 * 100)}% del volume delle 24 ore in un'ora sola (intorno alle ${when(top[1])})`;
+        warn = `${art(Math.round(top[0] / v24 * 100))}${Math.round(top[0] / v24 * 100)}% del volume delle 24 ore in un'ora sola (intorno alle ${when(top[1])})`;
       else if (v24 > 0 && v6 / v24 >= 0.55)
-        warn = `il ${Math.round(v6 / v24 * 100)}% del volume delle 24 ore nelle ultime 6 ore`;
+        warn = `${art(Math.round(v6 / v24 * 100))}${Math.round(v6 / v24 * 100)}% del volume delle 24 ore nelle ultime 6 ore`;
     } else if (!(p.fee > 0) && p.inc > 0) {
       src = "incentivi";                     // only scheduled incentives: the same in every window
-      for (const n of RD_WIN) w[n] = { rev: p.inc * n / 48 };
+      for (const n of RD_WIN) w[n] = { fee: 0 };
     } else if (p.fh.length || p.inc24) {
       src = "trasferimenti";
       for (const n of RD_WIN) {
@@ -1447,12 +1449,37 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           const b = h0 - i * 3600, lo = Math.max(b, start), hi = Math.min(b + 3600, now);
           if (hi > lo && v) f += v * (hi - lo) / Math.max(1, Math.min(b + 3600, now) - b);
         });
-        w[n] = { rev: f + p.inc * n / 48 };
+        w[n] = { fee: f };
       }
     }
-    if (src) w[48] = { rev: p.fee + p.inc };
-    return { w, warn, src };
+    if (src) w[48] = { fee: p.fee };
+    // revenue of a window: its fees plus the incentives that streamed in it (past) or the scheduled rate
+    const rev = (n, past) => w[n] ? w[n].fee + (past ? (n >= 48 ? p.incPast : p.inc24 * n / 24) : p.inc * n / 48) : null;
+    return { w, warn, src, rev };
   }
+
+  // the article before a number as it is read: l'8%, l'11%, l'1,5%, lo 0,4%, il 29%; with "di": dell', dello, del
+  function art(text, di) {
+    const n = parseInt(String(text).replace(/\./g, ""), 10);
+    const el1 = n === 1 || n === 11 || (n >= 11000 && n < 12000) || /^8/.test(String(n));
+    if (n === 0) return di ? "dello " : "lo ";
+    return el1 ? (di ? "dell'" : "l'") : (di ? "del " : "il ");
+  }
+
+  // a pool's allocation h hours ago: the hourly history the monitor keeps for the biggest pools, otherwise a straight
+  // line through the totals read on chain 1, 6, 24 and 48 hours ago
+  function allocAgo(p, h) {
+    if (h <= 0) return p.alloc;
+    const sp = p.spark;
+    if (sp && sp.length > h && sp[sp.length - 1 - h]) return sp[sp.length - 1 - h];
+    const pts = [[0, p.alloc]];
+    for (const k of [1, 6, 24, 48]) if (p.dh[k] != null) pts.push([k, Math.max(0, p.alloc - p.dh[k])]);
+    for (let i = 1; i < pts.length; i++)
+      if (h <= pts[i][0]) { const [h0, a0] = pts[i - 1], [h1, a1] = pts[i]; return a0 + (a1 - a0) * (h - h0) / (h1 - h0); }
+    return pts[pts.length - 1][1];
+  }
+  // average allocation over the last n hours, hour by hour
+  const allocAvg = (p, n) => { let t = 0; for (let h = 0; h < n; h++) t += (allocAgo(p, h) + allocAgo(p, h + 1)) / 2; return t / n; };
 
   // the Radar's allocation: 1% slices to the pool that pays most on the next slice, within the options
   function rdAllocate(list) {
@@ -1584,16 +1611,26 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       if (o.p.kind) nm.append(el("span", "kd", o.p.kind));
       const bar = el("div", "bar"), bi = el("i"); bi.style.width = o.k + "%"; bar.append(bi);
       left.append(nm, el("div", "sb", `${o.p.chain} · ${fmtN(o.k * r.ap / 100)} sAERO · ${r$(r.earn(o, o.k))}/48 ore`));
-      // APR you would get over the recent hours, with your own slice in the pool
+      // APR you would get over the recent hours, with your own slice in the pool as it is allocated now
       const rc = recent(o.p), x = o.k * r.ap / 100, pr = rdPrice();
+      const mine = n => { const v = rc.rev(n, false); return v != null ? v / n * 8760 / ((o.A0 + x) * pr) * 100 : null; };
       if (pr > 0 && rc.src) {
-        const aprs = [...RD_WIN, 48].map(n => `${n}h ${fmtPct(rc.w[n].rev / n * 8760 / ((o.A0 + x) * pr) * 100)}`).join(" · ");
         const note = rc.src === "trasferimenti" ? (r.stab ? " (volume orario non disponibile: stabilità non verificabile)" : " (dalle fee arrivate: volume orario non disponibile)") : "";
-        const line = el("div", "sb", "APR " + aprs + note);
-        line.title = "APR con la tua quota nel pool. " + (rc.src === "volume"
+        const line = el("div", "sb", "APR " + [...RD_WIN, 48].map(n => `${n}h ${fmtPct(mine(n))}`).join(" · ") + note);
+        line.title = "APR con la tua quota nel pool, con i voti che ha adesso. " + (rc.src === "volume"
           ? "Fee stimate dal volume di ogni ora per le fee per dollaro scambiato delle ultime 48 ore, più gli incentivi."
           : "Fee arrivate al contratto in quelle ore: su alcune reti arrivano a blocchi una o due volte al giorno.");
         left.append(line);
+        // votes that left in the last 6 hours make the same rewards go further: the 6-hour APR above already counts
+        // the pool as it is now, while each vote really earned less, because there were more of them
+        const a6ago = allocAgo(o.p, 6), avg6 = allocAvg(o.p, 6), out6 = a6ago - o.A0;
+        const up = avg6 > 0 ? avg6 / (o.A0 + x) - 1 : 0, b6 = mine(6);
+        if (out6 > 0 && up >= 0.05 && b6 != null) {
+          const yP = fmtPct(out6 / a6ago * 100), zP = fmtPct(up * 100), wasP = fmtPct(b6 / (1 + up));
+          left.append(el("div", "outflow", `ⓘ Voti in uscita: nelle ultime 6 ore sono usciti ${fmtN(out6)} voti, ${art(yP)}${yP} del totale. ` +
+            `A parità di rewards, con l'allocazione suggerita ci si aspetta un rendimento ${art(zP, true)}${zP} più alto dell'APR a 6 ore: ` +
+            `${fmtPct(b6)} invece ${art(wasP, true)}${wasP} che ha reso ogni voto. Se i voti rientrano, l'aumento sparisce.`));
+        }
       }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
       left.append(bar);
