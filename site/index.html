@@ -221,10 +221,14 @@ label.switch input:checked::after { left: 21px; }
 .kpi .v { font: 500 20px/1.2 var(--f-num); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi .k { font-size: 12px; color: var(--ink-2); }
 .strips { display: grid; gap: 6px; }
-.strip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--bg);
+.strip { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; background: var(--bg);
   border-radius: 10px; padding: 8px 12px; border-left: 4px solid var(--accent); }
 .strip .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strip .sb { font: 12px var(--f-num); color: var(--ink-2); overflow-wrap: anywhere; }
+.strip .x { background: transparent; color: var(--ink-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 9px; font-size: 13px; line-height: 1; align-self: start; }
+.strip .x:hover { color: var(--bad); border-color: var(--bad); filter: none; }
+.toast button.linkish { margin-left: 8px; }
 .strip .spk { font-size: 12px; color: var(--warn); }
 .strip .pct { font: 700 26px/1 var(--f-display); font-variant-numeric: tabular-nums; }
 .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 5px; }
@@ -1554,7 +1558,22 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
       left.append(bar);
-      d.append(left, el("div", "pct", o.k + "%"));
+      // leave this pool out, like unticking it in the table; it comes back from the chips of excluded pools
+      const xb = el("button", "x", "✕");
+      xb.type = "button";
+      xb.title = `Non considerare ${o.p.name} (${o.p.chain})`;
+      xb.setAttribute("aria-label", xb.title);
+      xb.addEventListener("click", () => {
+        XS.keys.add(o.p.key); saveX(); rdRender();
+        const t = $("rd-toast"), undo = el("button", "linkish", "Annulla");
+        undo.type = "button";
+        undo.addEventListener("click", () => { XS.keys.delete(o.p.key); saveX(); rdRender(); t.textContent = ""; });
+        clearTimeout(toast.h);
+        t.classList.remove("bad");
+        t.replaceChildren(`${o.p.name} (${o.p.chain}) escluso: l'allocazione è stata ricalcolata.`, undo);
+        toast.h = setTimeout(() => { if (t.contains(undo)) t.textContent = ""; }, 8000);
+      });
+      d.append(left, el("div", "pct", o.k + "%"), xb);
       strips.append(d);
     }
     $("rd-spk-s").textContent = RD.spk ? "Acceso" : "Spento";
