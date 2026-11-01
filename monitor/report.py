@@ -124,6 +124,30 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
         inc_next = A.incentive_usd(state, prices, key, now, now + 48 * HOUR)
         r = {"key": key, "name": A.gauge_name(state, key), "chain": C.chain_short(cid), "cid": cid,
              "kind": m.get("kind", "?"), "pool": m.get("pool"), "ap": round(ap)}
+        # hourly fees of the last day (index 0: the current hour) and the incentives streamed in it: the page's APR
+        # over 6, 12, 18 and 24 hours and its warning when the fees come from a few hours
+        hourly = state["fees"].get(key) or {}
+        h0 = now - now % HOUR
+        fh = [round(hourly.get(str(h0 - i * HOUR), 0.0), 2) for i in range(25)]
+        while fh and not fh[-1]:
+            fh.pop()
+        if fh:
+            r["fh"] = fh
+        inc24 = A.incentive_usd(state, prices, key, now - 24 * HOUR, now)
+        if inc24 > 0:
+            r["inc24h"] = round(inc24, 2)
+        # hourly traded volume (DexScreener, one snapshot an hour; index 0: this hour) and fees per dollar traded:
+        # fee transfers arrive in batches on some chains, the volume shows when the trading really happened
+        vser = (MD.market_state(state)["hist"]["pools"]).get(key) or {}
+        if vser:
+            vh = [(vser.get(str(h0 - i * HOUR)) or [None])[0] for i in range(24)]
+            if any(v for v in vh if v):
+                r["vh"] = vh
+            cur = vser.get(max(vser, key=int))
+            old = vser.get(str(int(max(vser, key=int)) - 24 * HOUR))
+            v48 = (cur[1] or 0) + (old[1] if old else cur[1] or 0)
+            if v48 > 0 and fees48 > 0:
+                r["fpv"] = round(min(0.01, fees48 / v48), 7)
         mv = mkt_pools.get(key)
         if mv:
             # this pool's volume and liquidity, and the same pair on every DEX of the chain

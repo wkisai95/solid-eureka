@@ -30,6 +30,7 @@ diluisce ogni pool. Tutte le opzioni della vecchia app:
 | Peso del trend fee | Corregge le fee delle ultime 48 ore della loro variazione rispetto alle 48 prima |
 | Concorrenza attesa | Nessun pool rende più del multiplo scelto della media del mercato (o «voti fermi») |
 | Taglia i picchi di volume | Nei pool le cui fee sono salite più del mercato oltre la tolleranza conta le fee delle 48 ore prima, mosse come il mercato; gli incentivi programmati restano |
+| APR 6, 12, 18, 24 ore (pool suggeriti) | APR con la tua quota, dalle fee per dollaro scambiato delle ultime 48 ore applicate al volume orario di DexScreener, più gli incentivi; avviso se un'ora fa almeno il 25% del volume delle 24 ore o le ultime 6 ore almeno il 55% |
 | Minimo e massimo per pool | Quota minima e massima di ogni pool, in percentuale |
 | Reti, pool e ricerche scartati | Le reti spente, i pool senza spunta e le ricerche salvate restano fuori |
 

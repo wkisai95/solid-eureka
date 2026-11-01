@@ -225,6 +225,7 @@ label.switch input:checked::after { left: 21px; }
   border-radius: 10px; padding: 8px 12px; border-left: 4px solid var(--accent); }
 .strip .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strip .sb { font: 12px var(--f-num); color: var(--ink-2); overflow-wrap: anywhere; }
+.strip .spk { font-size: 12px; color: var(--warn); }
 .strip .pct { font: 700 26px/1 var(--f-display); font-variant-numeric: tabular-nums; }
 .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 5px; }
 .bar i { display: block; height: 100%; background: var(--accent); }
@@ -1397,10 +1398,48 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         const q = { key: p.key, name: p.name, kind: p.kind && p.kind !== "?" ? p.kind : "", chain: p.chain || "Base",
           fee: p.fees48h || 0, inc: p.inc_next48h || 0, incPast: p.inc48h || 0, rew: p.rev48h || 0,
           d: p.dfee != null ? p.dfee : null, prev: p.fees_prev48h != null ? p.fees_prev48h : null,
-          alloc: p.ap || 0, dh: { 1: p.d1h, 6: p.d6h, 24: p.d24h, 48: p.d48h }, spark: p.spark };
+          alloc: p.ap || 0, dh: { 1: p.d1h, 6: p.d6h, 24: p.d24h, 48: p.d48h }, spark: p.spark, fh: p.fh || [], inc24: p.inc24h || 0,
+          vh: p.vh || null, fpv: p.fpv || 0 };
         q.on = !(XS.keys.has(q.key) || ruleFor(q) || chainOff(q));
         return q;
       });
+  }
+
+  // recent hours of a pool. With hourly volume (DexScreener): revenue over the last n hours = volume × the pool's
+  // fees per dollar traded in the last 48 hours, plus incentives streamed evenly; the warning looks at how the
+  // volume is spread. Without it, the fee transfers themselves, which on some chains arrive in daily batches.
+  const RD_WIN = [6, 12, 18, 24];
+  function recent(p) {
+    const now = (DATA && DATA.generated) || Date.now() / 1000, h0 = now - now % 3600;
+    const w = {};
+    let warn = null, src = null;
+    if (p.vh && p.vh.some(v => v) && p.fpv) {
+      src = "volume";
+      for (const n of RD_WIN) {
+        const xs = p.vh.slice(0, n).filter(v => v != null);
+        const vol = xs.length ? xs.reduce((a, b) => a + b, 0) * n / xs.length : 0;
+        w[n] = { rev: vol * p.fpv + p.inc24 * n / 24, vol };
+      }
+      const xs = p.vh.map((v, i) => [v || 0, h0 - i * 3600]), v24 = xs.reduce((a, x) => a + x[0], 0);
+      const top = xs.reduce((a, x) => x[0] > a[0] ? x : a, [0, 0]);
+      const v6 = xs.slice(0, 6).reduce((a, x) => a + x[0], 0);
+      if (v24 > 0 && top[0] / v24 >= 0.25)
+        warn = `il ${Math.round(top[0] / v24 * 100)}% del volume delle 24 ore in un'ora sola (intorno alle ${when(top[1])})`;
+      else if (v24 > 0 && v6 / v24 >= 0.55)
+        warn = `il ${Math.round(v6 / v24 * 100)}% del volume delle 24 ore nelle ultime 6 ore`;
+    } else if (p.fh.length || p.inc24) {
+      src = "trasferimenti";
+      for (const n of RD_WIN) {
+        const start = now - n * 3600;
+        let f = 0;
+        p.fh.forEach((v, i) => {
+          const b = h0 - i * 3600, lo = Math.max(b, start), hi = Math.min(b + 3600, now);
+          if (hi > lo && v) f += v * (hi - lo) / Math.max(1, Math.min(b + 3600, now) - b);
+        });
+        w[n] = { rev: f + p.inc24 * n / 24 };
+      }
+    }
+    return { w, warn, src };
   }
 
   // the Radar's allocation: 1% slices to the pool that pays most on the next slice, within the options
@@ -1502,7 +1541,19 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const nm = el("div", "nm", o.p.name);
       if (o.p.kind) nm.append(el("span", "kd", o.p.kind));
       const bar = el("div", "bar"), bi = el("i"); bi.style.width = o.k + "%"; bar.append(bi);
-      left.append(nm, el("div", "sb", `${o.p.chain} · ${fmtN(o.k * r.ap / 100)} sAERO · ${r$(r.earn(o, o.k))}/48 ore`), bar);
+      left.append(nm, el("div", "sb", `${o.p.chain} · ${fmtN(o.k * r.ap / 100)} sAERO · ${r$(r.earn(o, o.k))}/48 ore`));
+      // APR you would get over the recent hours, with your own slice in the pool
+      const rc = recent(o.p), x = o.k * r.ap / 100, pr = rdPrice();
+      if (pr > 0 && rc.src) {
+        const aprs = RD_WIN.map(n => `${n}h ${fmtPct(rc.w[n].rev / n * 8760 / ((o.A0 + x) * pr) * 100)}`).join(" · ");
+        const line = el("div", "sb", "APR " + aprs + (rc.src === "trasferimenti" ? " (dalle fee arrivate: volume orario non disponibile)" : ""));
+        line.title = "APR con la tua quota nel pool. " + (rc.src === "volume"
+          ? "Fee stimate dal volume di ogni ora per le fee per dollaro scambiato delle ultime 48 ore, più gli incentivi."
+          : "Fee arrivate al contratto in quelle ore: su alcune reti arrivano a blocchi una o due volte al giorno.");
+        left.append(line);
+      }
+      if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
+      left.append(bar);
       d.append(left, el("div", "pct", o.k + "%"));
       strips.append(d);
     }
