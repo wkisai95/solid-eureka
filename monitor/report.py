@@ -314,8 +314,8 @@ def positions_export(state, params, now):
     keys = E.gauge_keys(book)
     for tid, pe in (book.get("p") or {}).items():
         sh = shard(tid)
-        r = E.summary(pe, now, keys)
-        r[-1] = [[pool_index(sh, g), v] for g, v in sorted(r[-1].items(), key=lambda kv: -kv[1]) if v >= 0.01]
+        r = E.summary(pe, now, keys, int(book.get("h0") or now - now % HOUR))
+        r[7] = [[pool_index(sh, g), v] for g, v in sorted(r[7].items(), key=lambda kv: -kv[1]) if v >= 0.01]
         sh["r"][tid] = r
     index = {"v": 4, "generated": now, "cooldown_h": round(cooldown / HOUR, 2), "shard": SHARD,
              "shards": sorted(shards), "earnings_from": (state.get("earnings") or {}).get("from"),

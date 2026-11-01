@@ -714,7 +714,14 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
 
   const datePlain = ts => new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(ts * 1000));
-  const apr = (usd, secs, base, price) => usd > 0 && secs > 3600 && base > 0 && price > 0 ? usd / secs * 365 * 86400 / (base * price) * 100 : null;
+  const apr = (usd, secs, base, price) => usd >= 0 && secs >= 900 && base > 0 && price > 0 ? usd / secs * 365 * 86400 / (base * price) * 100 : null;
+  // real APR windows: [hours, label]; the monitor exports 1, 6, 12 and 24 hours, plus 24 hours and 7 days for older data
+  const ME_WIN = [[1, "1 ora"], [6, "6 ore"], [12, "12 ore"], [24, "24 ore"], [168, "7 giorni"]];
+  const winsOf = r => {
+    const w = { 24: [r[2], r[3]], 168: [r[4], r[5]] };
+    for (const [n, usd, secs] of (r[8] || [])) w[n] = [usd, secs];
+    return w;
+  };
   const stat = (k, v, d) => { const s = el("div", "stat"); s.append(el("div", "k", k), el("div", "v", v)); if (d) s.append(el("div", "d", d)); return s; };
 
   function meChart(days) {
@@ -761,7 +768,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const chainName = cid => (POS.chains || {})[cid] || "chain " + cid;
     const pools = new Map(((DATA && DATA.pools) || []).map(p => [p.key, p]));
     const onChain = new Map((ME ? ME.pos : []).map(p => [p.id, p]));
-    let T = { amount: 0, ap: 0, alloc: 0, u24: 0, r24: 0, u7: 0, r7: 0, tot: 0, base: 0, since: 0 };
+    let T = { amount: 0, ap: 0, alloc: 0, rate: {}, tot: 0, base: 0, since: 0 };
     const days = new Map();
     const rows = [];
     for (const id of ids) {
@@ -775,22 +782,22 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       T.alloc += alloc; T.base += base;
       if (oc) { T.amount += oc.amount; T.ap += oc.ap; }
       if (r) {
-        const [since, tot, u24, s24, u7, s7, d] = r;
+        const [since, tot, , , , , d] = r, w = winsOf(r);
         T.tot += tot;
         T.since = T.since ? Math.min(T.since, since) : since;
-        if (s24 > 0) T.r24 += u24 / s24;
-        if (s7 > 0) T.r7 += u7 / s7;
-        T.u24 += u24; T.u7 += u7;
+        for (const [n] of ME_WIN) if (w[n] && w[n][1] > 0) T.rate[n] = (T.rate[n] || 0) + w[n][0] / w[n][1];
         for (const [day, v] of d) days.set(day, (days.get(day) || 0) + v);
       }
     }
     const capital = T.base * price;
-    const a24 = capital > 0 ? T.r24 * 365 * 86400 / capital * 100 : null, a7 = capital > 0 ? T.r7 * 365 * 86400 / capital * 100 : null;
     stats.append(
       stat("sAERO", fmtN(ME ? T.amount : T.alloc), ME ? `AP ${fmtN(T.ap)} · ${price ? "$" + fmtN(T.amount * price) : ""}` : "allocati"),
       stat("Allocati", T.ap > 0 ? fmtPct(Math.min(100, T.alloc / T.ap * 100)) : fmtN(T.alloc), T.ap > 0 ? fmtN(T.alloc) + " su " + fmtN(T.ap) : ""),
-      stat("APR reale 24 ore", fmtPct(a24), "$" + (T.r24 * 86400).toFixed(2).replace(".", ",") + " al giorno"),
-      stat("APR reale 7 giorni", fmtPct(a7), "$" + (T.r7 * 86400).toFixed(2).replace(".", ",") + " al giorno"),
+      ...ME_WIN.map(([n, label]) => {
+        const rate = T.rate[n];
+        return stat("APR " + label, fmtPct(rate != null && capital > 0 ? rate * 365 * 86400 / capital * 100 : null),
+          rate != null ? "$" + (rate * 86400).toFixed(2).replace(".", ",") + " al giorno" : "");
+      }),
       stat("Incassato", "$" + T.tot.toFixed(2).replace(".", ","), T.since ? "dal " + datePlain(T.since) : ""));
     if (ME) $("me-when").textContent = `letto da Base ${when(ME.at)}`;
     if (ME && T.ap > 0 && T.alloc < T.ap * 0.995)
@@ -813,11 +820,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       h.append(el("span", "sub", bits.filter(Boolean).join(" · ")));
       box.append(h);
       if (r) {
-        const [since, tot, u24, s24, u7, s7] = r;
+        const [since, tot, , , u7, s7] = r, w = winsOf(r);
         const kv = el("div", "pills");
-        const p24 = apr(u24, s24, base, price), p7 = apr(u7, s7, base, price);
-        kv.append(el("span", "pill act", `APR 24 ore ${fmtPct(p24)}`), el("span", "pill act", `APR 7 giorni ${fmtPct(p7)}`),
-          el("span", "pill pas", `$${(s7 > 0 ? u7 / s7 * 86400 : 0).toFixed(2).replace(".", ",")}/giorno`),
+        for (const [n, label] of ME_WIN) if (w[n]) kv.append(el("span", "pill act", `${label} ${fmtPct(apr(w[n][0], w[n][1], base, price))}`));
+        kv.append(el("span", "pill pas", `$${(s7 > 0 ? u7 / s7 * 86400 : 0).toFixed(2).replace(".", ",")}/giorno`),
           el("span", "pill pas", `$${tot.toFixed(2).replace(".", ",")} dal ${datePlain(since)}`));
         box.append(kv);
       }

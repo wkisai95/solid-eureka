@@ -9,8 +9,8 @@ from . import aero as A
 
 HOUR = 3600
 DAY = 86400
-QUARTER = 6 * HOUR          # 6-hour buckets for the last 48 hours: enough for a 24-hour figure, small for 14k positions
-KEEP_Q = 2 * DAY
+HOURS = 25                  # hourly buckets for the last day: windows of 1, 6, 12 and 24 hours
+WINDOWS = (1, 6, 12, 24)
 KEEP_D = 35 * DAY
 BACKFILL = 7 * DAY
 
@@ -43,16 +43,38 @@ def _credit(pe, tid, g, usd, ts, since):
         return
     p = pe["p"].get(tid)
     if p is None:
-        p = pe["p"][tid] = {"s": int(since), "t": 0.0, "q": {}, "d": {}, "g": {}}
+        p = pe["p"][tid] = {"s": int(since), "t": 0.0, "h": [], "d": {}, "g": {}}
     gi = pe.setdefault("_gi", {k: i for i, k in enumerate(pe["gi"])})
     if g not in gi:
         gi[g] = len(pe["gi"])
         pe["gi"].append(g)
     p["t"] = round(p["t"] + usd, 5)
-    q, d, i = str(ts - ts % QUARTER), str(ts - ts % DAY), str(gi[g])
-    p["q"][q] = round(p["q"].get(q, 0.0) + usd, 5)
+    _hour_add(pe, p, ts, usd)
+    d, i = str(ts - ts % DAY), str(gi[g])
     p["d"][d] = round(p["d"].get(d, 0.0) + usd, 5)
     p["g"][i] = round(p["g"].get(i, 0.0) + usd, 5)
+
+
+def _hour_add(pe, p, ts, usd):
+    """p["h"][i] is the hour that starts i hours before pe["h0"], the current hour."""
+    i = (int(pe.get("h0") or 0) - (ts - ts % HOUR)) // HOUR
+    if 0 <= i < HOURS:
+        h = p.setdefault("h", [])
+        if len(h) <= i:
+            h.extend([0.0] * (i + 1 - len(h)))
+        h[i] = round(h[i] + usd, 5)
+
+
+def _advance(pe, now):
+    """Moves the hourly buckets so that index 0 is the current hour."""
+    h0 = now - now % HOUR
+    k = (h0 - int(pe.get("h0") or h0)) // HOUR
+    pe["h0"] = h0
+    if k <= 0:
+        return
+    for p in pe["p"].values():
+        keep = (p.get("h") or [])[:max(0, HOURS - k)]
+        p["h"] = [0.0] * k + keep if any(keep) else []
 
 
 def _total(state, g, members, hour=None):
@@ -63,9 +85,11 @@ def _total(state, g, members, hour=None):
     return max(float(ap), sum(a for _, a, _ in members))
 
 
-def _backfill(state, prices, pe, now, log):
-    """First run: the fee hours already collected, for the hours each position has kept its current allocation."""
-    start = max(int(state.get("fee_complete_from") or 0), now - BACKFILL)
+def _backfill(state, prices, pe, now, log, hours_only=False):
+    """First run: the fee hours already collected, for the hours each position has kept its current allocation.
+
+    hours_only: rebuilds just the hourly buckets of the last day (totals, days and pools stay as they are)."""
+    start = max(int(state.get("fee_complete_from") or 0), now - (HOURS * HOUR if hours_only else BACKFILL))
     gauges = _by_gauge(state)
     credited = 0
     for g, members in gauges.items():
@@ -81,9 +105,13 @@ def _backfill(state, prices, pe, now, log):
             for tid, a, last in members:
                 since = max(lo, last - last % HOUR + HOUR)
                 if h >= since and tot > 0:
-                    _credit(pe, tid, g, usd * a / tot, h, since)
+                    if hours_only:
+                        if tid in pe["p"]:
+                            _hour_add(pe, pe["p"][tid], h, usd * a / tot)
+                    else:
+                        _credit(pe, tid, g, usd * a / tot, h, since)
                     credited += 1
-    log(f"earnings: first run, {len(pe['p'])} positions credited from the last {(now - start) / HOUR:.0f} hours "
+    log(f"earnings: {'hourly buckets rebuilt' if hours_only else 'first run'}, {len(pe['p'])} positions credited from the last {(now - start) / HOUR:.0f} hours "
         f"({credited} pool-hours)")
 
 
@@ -92,11 +120,19 @@ def accrue(state, prices, revenue, now, log):
     pe = _book(state)
     last = int(pe.get("last") or 0)
     pe["last"] = now
+    _advance(pe, now)
     if not last:
         pe["from"] = max(int(state.get("fee_complete_from") or 0), now - BACKFILL)
         _backfill(state, prices, pe, now, log)
         pe.pop("_gi", None)
         return pe
+    if not pe.get("hourly"):
+        # books started with 6-hour buckets: rebuild the last day hour by hour from the fees already collected
+        for p in pe["p"].values():
+            p.pop("q", None)
+            p["h"] = []
+        _backfill(state, prices, pe, last, log, hours_only=True)
+        pe["hourly"] = True
     if now <= last:
         return pe
     gauges = _by_gauge(state)
@@ -108,31 +144,44 @@ def accrue(state, prices, revenue, now, log):
         for tid, a, _ in members:
             _credit(pe, tid, g, usd * a / tot, now, last)
     pe.pop("_gi", None)
-    qcut, dcut = now - KEEP_Q, now - KEEP_D
+    dcut = now - KEEP_D
     for tid, p in list(pe["p"].items()):
-        p["q"] = {k: v for k, v in p["q"].items() if int(k) >= qcut - QUARTER}
         p["d"] = {k: v for k, v in p["d"].items() if int(k) >= dcut}
         if not p["d"]:
             del pe["p"][tid]
     return pe
 
 
-def windows(p, now):
-    """(USD, seconds) over about the last day (the last four 6-hour buckets) and the last week (seven days),
-    each measured from the start of its oldest bucket or from when the position started earning."""
+def windows(p, now, h0):
+    """{hours: (USD, seconds)} for the last 1, 6, 12 and 24 hours, plus 7 days under 168.
+
+    The oldest hourly bucket of a window counts for the part of it inside the window; the seconds start from when
+    the position started earning if that is later."""
     s = int(p["s"])
-    q0 = now - now % QUARTER - 3 * QUARTER
+    h = p.get("h") or []
+    out = {}
+    for n in WINDOWS:
+        start = now - n * HOUR
+        usd = 0.0
+        for i, v in enumerate(h[:n + 2]):
+            b = h0 - i * HOUR
+            lo, hi = max(b, start), min(b + HOUR, now)
+            if hi > lo and v:
+                usd += v * (hi - lo) / max(1, min(b + HOUR, now) - b)
+        out[n] = (usd, max(0, now - max(start, s)))
     d0 = now - now % DAY - 6 * DAY
-    u24 = sum(v for k, v in p["q"].items() if int(k) >= q0)
-    u7 = sum(v for k, v in p["d"].items() if int(k) >= d0)
-    return (u24, max(0, now - max(q0, s))), (u7, max(0, now - max(d0, s)))
+    out[168] = (sum(v for k, v in p["d"].items() if int(k) >= d0), max(0, now - max(d0, s)))
+    return out
 
 
-def summary(p, now, keys):
-    """[since, total, USD ~24 h, its seconds, USD 7 days, its seconds, [[day, USD], ...] 14 days, {gauge: USD}].
+def summary(p, now, keys, h0):
+    """[since, total, USD 24 h, its seconds, USD 7 days, its seconds, [[day, USD], ...] 14 days, {gauge: USD},
+    [[hours, USD, seconds], ...] for 1, 6, 12 and 24 hours].
 
-    keys: the book's gauge keys (gauge_keys), which the position's pools refer to by index."""
-    (u24, s24), (u7, s7) = windows(p, now)
+    keys: the book's gauge keys (gauge_keys), which the position's pools refer to by index; h0: the book's
+    current hour."""
+    w = windows(p, now, h0)
     days = sorted((int(k), round(v, 2)) for k, v in p["d"].items() if int(k) + DAY > now - 14 * DAY)
-    return [p["s"], round(p["t"], 2), round(u24, 2), s24, round(u7, 2), s7, [list(x) for x in days],
-            {keys[int(i)]: round(v, 2) for i, v in p["g"].items() if int(i) < len(keys)}]
+    return [p["s"], round(p["t"], 2), round(w[24][0], 2), w[24][1], round(w[168][0], 2), w[168][1],
+            [list(x) for x in days], {keys[int(i)]: round(v, 2) for i, v in p["g"].items() if int(i) < len(keys)},
+            [[n, round(w[n][0], 4), w[n][1]] for n in WINDOWS]]

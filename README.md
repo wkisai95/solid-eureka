@@ -48,7 +48,8 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
 - **allocazione** di ogni posizione su ogni rete, con la quota del pool e l'APR del pool nelle ultime 48 ore;
 - **cooldown** di ogni rete;
 - **APR reale**: a ogni giro il monitor divide le fee e gli incentivi arrivati a ogni pool tra tutte le posizioni
-  allocate, in proporzione alla loro quota. Da qui gli incassi delle ultime ~24 ore, degli ultimi 7 giorni, per pool
+  allocate, in proporzione alla loro quota. Da qui gli incassi dell'ultima ora, delle ultime 6, 12 e 24 ore
+  (secchi orari), degli ultimi 7 giorni, per pool
   e per giorno. L'APR è calcolato sul valore degli AERO in stake al prezzo attuale.
 
 Il primo giro ricostruisce gli ultimi 7 giorni dalle fee già raccolte, solo per le ore in cui ogni posizione aveva già
