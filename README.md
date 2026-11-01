@@ -54,6 +54,8 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
   allocate, in proporzione alla loro quota. Da qui gli incassi dell'ultima ora, delle ultime 6, 12 e 24 ore
   (secchi orari), degli ultimi 7 giorni, per pool
   e per giorno. L'APR è calcolato sul valore degli AERO in stake al prezzo attuale.
+  Accanto a ogni APR c'è il multiplo della resa di mercato: quanto ha reso ogni voto allocato della posizione
+  rispetto alla media di tutti i voti allocati nella stessa finestra (×1 = come il mercato).
 
 Il primo giro ricostruisce gli ultimi 7 giorni dalle fee già raccolte, solo per le ore in cui ogni posizione aveva già
 l'allocazione di adesso. I numeri sono una stima dai dati pubblici, non i claim effettivi del contratto.

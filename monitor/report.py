@@ -325,19 +325,34 @@ def positions_export(state, params, now):
             sh["names"].append(A.gauge_name(state, g))
         return sh["idx"][g]
 
+    alloc = {}
     for cid, tid, t, size, end, active in positions(state, cooldown):
+        alloc[tid] = alloc.get(tid, 0.0) + size
         sh = shard(tid)
         pools = [[pool_index(sh, g), round(a)] for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])]
         sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools])
     book = state.get("earnings") or {}
     keys = E.gauge_keys(book)
+    h0 = int(book.get("h0") or now - now % HOUR)
+    # the market: what an allocated sAERO earned on average over each window. Every allocated position counts, with
+    # what it earned per second over its own window (nothing if it earned nothing), against all the allocation
+    rates = {}
+    for tid in alloc:
+        pe = (book.get("p") or {}).get(tid)
+        for n, (usd, secs) in (E.windows(pe, now, h0).items() if pe else ()):
+            if secs > 0:
+                rates[n] = rates.get(n, 0.0) + usd / secs
+    total = sum(alloc.values())
+    market = {str(n): float(f"{v / total:.6g}") for n, v in rates.items()} if total > 0 else {}
     for tid, pe in (book.get("p") or {}).items():
         sh = shard(tid)
-        r = E.summary(pe, now, keys, int(book.get("h0") or now - now % HOUR))
+        r = E.summary(pe, now, keys, h0)
         r[7] = [[pool_index(sh, g), v] for g, v in sorted(r[7].items(), key=lambda kv: -kv[1]) if v >= 0.01]
         sh["r"][tid] = r
     index = {"v": 4, "generated": now, "cooldown_h": round(cooldown / HOUR, 2), "shard": SHARD,
              "shards": sorted(shards), "earnings_from": (state.get("earnings") or {}).get("from"),
+             # USD per second earned by one allocated sAERO, by window in hours (168: 7 days)
+             "market": market, "market_alloc": round(total),
              "chains": {cid: C.chain_short(cid) for cid in sorted({int(c) for c in state["chains"]})}}
     return index, {k: {"generated": now, "names": v["names"], "keys": v["keys"], "p": v["p"], "r": v["r"]}
                    for k, v in shards.items()}

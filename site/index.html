@@ -728,6 +728,17 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   const apr = (usd, secs, base, price) => usd >= 0 && secs >= 900 && base > 0 && price > 0 ? usd / secs * 365 * 86400 / (base * price) * 100 : null;
   // real APR windows: [hours, label]; the monitor exports 1, 6, 12 and 24 hours, plus 24 hours and 7 days for older data
   const ME_WIN = [[1, "1 ora"], [6, "6 ore"], [12, "12 ore"], [24, "24 ore"], [168, "7 giorni"]];
+  // how many times the market's yield a vote earned: USD per second per allocated sAERO against the average of every
+  // allocated sAERO over the same window (positions.json "market")
+  const mktRate = n => (POS && POS.market && POS.market[String(n)]) || null;
+  const multOf = (usdPerSec, alloc, n) => { const m = mktRate(n); return m && alloc > 0 ? usdPerSec / alloc / m : null; };
+  const fmtX = m => m == null || !isFinite(m) ? "" : "×" + (m >= 10 ? m.toFixed(1) : m.toFixed(2)).replace(".", ",");
+  const mktTip = (n, label, m) => {
+    const r = mktRate(n), price = (DATA && DATA.aero_usd) || 0;
+    if (!r || m == null) return "";
+    return `Nelle ultime ${label} ogni voto allocato ha reso in media ${price ? fmtPct(r * 365 * 86400 / price * 100) + " di APR" : "$" + (r * 86400 * 1000).toFixed(2).replace(".", ",") + " al giorno ogni 1.000 voti"}: ` +
+      `i tuoi voti allocati hanno reso ${fmtX(m).slice(1)} volte la media.`;
+  };
   const winsOf = r => {
     const w = { 24: [r[2], r[3]], 168: [r[4], r[5]] };
     for (const [n, usd, secs] of (r[8] || [])) w[n] = [usd, secs];
@@ -806,8 +817,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       stat("Allocati", T.ap > 0 ? fmtPct(Math.min(100, T.alloc / T.ap * 100)) : fmtN(T.alloc), T.ap > 0 ? fmtN(T.alloc) + " su " + fmtN(T.ap) : ""),
       ...ME_WIN.map(([n, label]) => {
         const rate = T.rate[n];
-        return stat("APR " + label, fmtPct(rate != null && capital > 0 ? rate * 365 * 86400 / capital * 100 : null),
-          rate != null ? "$" + (rate * 86400).toFixed(2).replace(".", ",") + " al giorno" : "");
+        const m = rate != null ? multOf(rate, T.alloc, n) : null;
+        const st = stat("APR " + label, fmtPct(rate != null && capital > 0 ? rate * 365 * 86400 / capital * 100 : null),
+          rate != null ? "$" + (rate * 86400).toFixed(2).replace(".", ",") + " al giorno" + (m != null ? " · " + fmtX(m) + " il mercato" : "") : "");
+        if (m != null) st.title = mktTip(n, label, m);
+        return st;
       }),
       stat("Incassato", "$" + T.tot.toFixed(2).replace(".", ","), T.since ? "dal " + datePlain(T.since) : ""));
     if (ME) $("me-when").textContent = `letto da Base ${when(ME.at)}`;
@@ -833,7 +847,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       if (r) {
         const [since, tot, , , u7, s7] = r, w = winsOf(r);
         const kv = el("div", "pills");
-        for (const [n, label] of ME_WIN) if (w[n]) kv.append(el("span", "pill act", `${label} ${fmtPct(apr(w[n][0], w[n][1], base, price))}`));
+        for (const [n, label] of ME_WIN) if (w[n]) {
+          const m = w[n][1] > 0 ? multOf(w[n][0] / w[n][1], alloc, n) : null;
+          const pill = el("span", "pill act", `${label} ${fmtPct(apr(w[n][0], w[n][1], base, price))}` + (m != null ? ` ${fmtX(m)}` : ""));
+          if (m != null) pill.title = mktTip(n, label, m);
+          kv.append(pill);
+        }
         kv.append(el("span", "pill pas", `$${(s7 > 0 ? u7 / s7 * 86400 : 0).toFixed(2).replace(".", ",")}/giorno`),
           el("span", "pill pas", `$${tot.toFixed(2).replace(".", ",")} dal ${datePlain(since)}`));
         box.append(kv);
