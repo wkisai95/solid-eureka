@@ -230,6 +230,10 @@ label.switch input:checked::after { left: 21px; }
 .strip .x:hover { color: var(--bad); border-color: var(--bad); filter: none; }
 .toast button.linkish { margin-left: 8px; }
 .strip .outflow { font-size: 12px; color: var(--accent); }
+.exits { display: grid; gap: 4px; }
+.exits .lbl { margin-top: 6px; }
+.exits .sb { font: 12px var(--f-num); color: var(--ink-2); overflow-wrap: anywhere; }
+.mypos { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .strip .spk { font-size: 12px; color: var(--warn); }
 .strip .pct { font: 700 26px/1 var(--f-display); font-variant-numeric: tabular-nums; }
 .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 5px; }
@@ -363,6 +367,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     </details>
 
     <div class="opts" id="rd-opts">
+      <div class="field" id="rd-mypos-f" hidden><span class="flabel">Posizioni da riallocare</span><div class="mypos" id="rd-mypos"></div><small id="rd-mypos-s"></small></div>
       <div class="field"><label for="rd-ap">Allocation Power</label><input id="rd-ap" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>I tuoi sAERO, dalla card del tuo stake</small></div>
       <div class="field"><label for="rd-price">Prezzo AERO $</label><input id="rd-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="rd-price-s">Solo per l'APR. Vuoto: il prezzo letto dal monitor</small></div>
       <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
@@ -392,6 +397,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           <div class="kpi"><div class="v" id="rd-kn">—</div><div class="k">pool usati</div></div>
         </div>
         <div class="strips" id="rd-strips"></div>
+        <div class="exits" id="rd-exits"></div>
         <div class="controls"><button type="button" id="rd-use">Usa questa allocazione</button><button type="button" class="ghost" id="rd-copy">Copia pesi</button><a href="https://app.aero.xyz" target="_blank" rel="noopener">Apri Aero ↗</a></div>
         <div class="toast" id="rd-toast" role="status"></div>
       </div>
@@ -441,6 +447,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p><b>Concorrenza.</b> I pool con pochi voti e molte fee o incentivi non restano così: gli altri allocatori ci arrivano. Il radar tratta ogni pool come se avesse abbastanza voti da rendere al massimo il multiplo scelto della media del mercato (o li lascia fermi con «voti fermi»).</p>
         <p><b>Picchi di volume (interruttore).</b> Calcola la variazione delle fee 48 ore di tutto il mercato rispetto alle 48 ore prima, e quella di ogni pool. Un pool è in picco se sale oltre il Δ del mercato più la tolleranza: con mercato +50% e tolleranza 75%, la soglia è +50% + 0,75 × 50% = +87,5%. Un picco così raramente si ripete nelle 47 ore dopo, quindi il radar non conta le sue fee attuali ma quelle delle 48 ore prima, mosse come il mercato (+50% nell'esempio). Il pool non sparisce: gli incentivi programmati per le prossime 47 ore arrivano comunque e restano nel conto.</p>
         <p><b>APR instabile (interruttore, acceso di default).</b> Per ogni pool confronta l'APR delle ultime 6, 12, 18 e 24 ore con quello delle 48 ore su cui il radar decide. Le fee di ogni finestra vengono dal volume orario per le fee per dollaro scambiato delle 48 ore, gli incentivi contano al ritmo programmato. Il confronto è al netto del mercato: se tutto il mercato nelle ultime 6 ore rende 0,72× le 48 ore, un pool a 0,72× è normale. Con scarto 2 il pool viene scartato se in una finestra rende più del doppio o meno della metà di quanto ci si aspetta. I pool senza volume orario non si possono verificare e restano, con una nota.</p>
+        <p><b>Posizioni da riallocare.</b> Se in alto hai scritto il tuo indirizzo, il radar sa dove sono adesso i voti delle tue posizioni. Quelle spuntate escono dai loro pool quando le sposti, quindi il radar le toglie: un pool dove sei già viene valutato con l'APR che ha senza di te, e non diluisci te stesso due volte. Sotto i pool suggeriti trovi quelli da cui esci, con l'APR senza i tuoi voti e perché non sono stati scelti.</p>
         <p><b>Voti in uscita.</b> Il radar divide le fee per i voti che il pool ha adesso. Se nelle ultime 6 ore sono usciti voti, le stesse rewards si dividono tra meno voti, quindi l'APR a 6 ore con l'allocazione suggerita è più alto di quanto ha reso davvero ogni voto in quelle ore, quando i voti erano di più. Se la differenza, già al netto dei tuoi voti, supera il 5%, sotto il pool compare una nota con i voti usciti, la loro quota del totale e l'aumento atteso. Vale finché i voti non rientrano.</p>
         <p><b>Minimo e massimo per pool.</b> Con un minimo del 10% ogni pool scelto riceve almeno il 10% dei voti, quindi al massimo 10 pool: il radar toglie il pool con la quota più piccola sotto il minimo e ridistribuisce, finché tutti lo rispettano. Il massimo limita la quota di ogni pool; se i pool rimasti sono troppo pochi per arrivare al 100%, sale quanto basta. Su ogni rete si votano al massimo 20 pool.</p>
         <p><b>Autodiluizione.</b> Ogni voto che aggiungi abbassa il rendimento del successivo. Il radar distribuisce la tua AP a fette dell'1%, ogni volta al pool che rende di più sulla fetta successiva.</p>
@@ -586,6 +593,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // and nothing is downloaded again until there is a new commit. If GitHub cannot be asked (rate limit, offline), the
   // site's own copy is used as before.
   var dataSha = null, dataShaAt = 0, loadedSha = null;
+  // the viewer's positions as "I tuoi sAERO" last read them: number, Allocation Power, cooldown end, votes per pool
+  var MY_POS = [], MY_POS_SIG = "";
   function dataRepo() { return (DATA && DATA.repo) || "wkisai95/solid-eureka"; }
   async function headSha(force) {
     if (!force && Date.now() - dataShaAt < 60000) return dataSha;
@@ -849,6 +858,19 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         for (const [day, v] of d) days.set(day, (days.get(day) || 0) + v);
       }
     }
+    // the Radar takes these votes out of the pools they are in when it plans where to move them
+    const myPos = rows.map(({ id, sh, ent, oc, alloc }) => {
+      const votes = {}, names = {};
+      for (const e of ent) for (const [i, a] of e[5]) {
+        const k = sh && sh.keys ? sh.keys[i] : null;
+        if (!k) continue;
+        votes[k] = (votes[k] || 0) + a;
+        names[k] = `${sh.names[i]} (${chainName(e[0])})`;
+      }
+      return { id, ap: oc ? oc.ap : alloc, ends: ent.reduce((m, e) => Math.max(m, e[1]), 0), votes, names };
+    });
+    const sig = JSON.stringify(myPos);
+    if (sig !== MY_POS_SIG) { MY_POS = myPos; MY_POS_SIG = sig; try { rdSchedule(); } catch (e) { /* the Radar is not set up yet */ } }
     const capital = T.base * price;
     stats.append(
       stat("sAERO", fmtN(ME ? T.amount : T.alloc), ME ? `AP ${fmtN(T.ap)} · ${price ? "$" + fmtN(T.amount * price) : ""}` : "allocati"),
@@ -1418,7 +1440,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---------------------------------------------------------------- Radar sAERO: the old app, on the monitor's data
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-  const RD_DEF = { ap: "235000", price: "", trend: "0", comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
+  const RD_DEF = { ap: "235000", price: "", trend: "0", comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", exitOff: [], minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
   let RD = { ...RD_DEF };
   try { RD = { ...RD_DEF, ...(JSON.parse(lsGet("radar-rd") || "null") || {}) }; } catch (e) {}
   let XS = { keys: new Set(), rules: [], chainsOff: [] };
@@ -1459,14 +1481,53 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   const chainOff = p => XS.chainsOff.includes(p.chain);
   const projected = (p, w) => Math.max(0, p.inc + p.fee * (1 + w * Math.max(-100, Math.min(200, p.d || 0)) / 100));
 
+  // votes of the positions being reallocated, per pool: when they move, they leave these pools
+  function myVotes() {
+    const off = new Set(RD.exitOff || []), out = {};
+    for (const p of MY_POS) if (!off.has(p.id)) for (const k in p.votes) out[k] = (out[k] || 0) + p.votes[k];
+    return out;
+  }
+  function rdMyPos() {
+    const f = $("rd-mypos-f"), box = $("rd-mypos");
+    f.hidden = !MY_POS.length;
+    if (!MY_POS.length) return;
+    const off = new Set(RD.exitOff || []), now = Date.now() / 1000;
+    box.replaceChildren();
+    for (const p of MY_POS) {
+      const lab = el("label", "toggle"), cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = !off.has(p.id);
+      cb.addEventListener("change", () => {
+        const o = new Set(RD.exitOff || []);
+        if (cb.checked) o.delete(p.id); else o.add(p.id);
+        RD.exitOff = [...o];
+        const ap = MY_POS.filter(x => !o.has(x.id)).reduce((t, x) => t + x.ap, 0);
+        if (ap > 0) { RD.ap = String(Math.round(ap)); $("rd-ap").value = RD.ap; }
+        saveRD(); rdSchedule();
+      });
+      lab.append(cb, ` #${p.id} · ${fmtN(p.ap)} · ${p.ends > now ? "cooldown fino " + when(p.ends) : "libera"}`);
+      box.append(lab);
+    }
+    const sel = MY_POS.filter(p => !off.has(p.id)), ap = sel.reduce((t, p) => t + p.ap, 0), info = $("rd-mypos-s");
+    info.replaceChildren();
+    if (!sel.length) { info.textContent = "Nessuna posizione scelta: i loro voti restano contati nei pool"; return; }
+    info.append(`Il radar toglie i loro voti attuali dai pool dove sono, come quando le sposti: ${fmtN(ap)} di Allocation Power.`);
+    if (fmtN(rdNum(RD.ap, 0)) !== fmtN(ap)) {
+      const b = el("button", "linkish", `Usa ${fmtN(ap)} invece di ${fmtN(rdNum(RD.ap, 0))}`);
+      b.type = "button";
+      b.addEventListener("click", () => { RD.ap = String(Math.round(ap)); $("rd-ap").value = RD.ap; saveRD(); rdSchedule(); });
+      info.append(" ", b);
+    }
+  }
+
   function rdPools() {
+    const mine = myVotes();
     return ((DATA && DATA.pools) || []).filter(p => p.key && !p.blocked && ((p.fees48h || 0) + (p.inc_next48h || 0) > 0 || (p.ap || 0) > 0))
       .map(p => {
         const q = { key: p.key, name: p.name, kind: p.kind && p.kind !== "?" ? p.kind : "", chain: p.chain || "Base",
           fee: p.fees48h || 0, inc: p.inc_next48h || 0, incPast: p.inc48h || 0, rew: p.rev48h || 0,
           d: p.dfee != null ? p.dfee : null, prev: p.fees_prev48h != null ? p.fees_prev48h : null,
           alloc: p.ap || 0, dh: { 1: p.d1h, 6: p.d6h, 24: p.d24h, 48: p.d48h }, spark: p.spark, fh: p.fh || [], inc24: p.inc24h || 0,
-          vh: p.vh || null, fpv: p.fpv || 0 };
+          vh: p.vh || null, fpv: p.fpv || 0, mine: mine[p.key] || 0 };
         q.on = !(XS.keys.has(q.key) || ruleFor(q) || chainOff(q));
         return q;
       });
@@ -1591,7 +1652,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       return p.inc + Math.min(R - p.inc, Math.max(0, p.prev * (1 + spike.Dm / 100)));
     };
     const act = list.filter(p => p.on && !(stab && stab.ids.has(p.key))).map(p => {
-      const R = value(p), A0 = Math.max(0, p.alloc);
+      const R = value(p), A0 = Math.max(0, p.alloc - p.mine);     // your moving votes leave the pool
       return { p, R, A0, A: N && avg > 0 ? Math.max(A0, R / (N * avg)) : A0, k: 0 };
     });
     const slice = ap / 100;
@@ -1680,7 +1741,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         left.append(line);
         // votes that left in the last 6 hours make the same rewards go further: the 6-hour APR above already counts
         // the pool as it is now, while each vote really earned less, because there were more of them
-        const a6ago = allocAgo(o.p, 6), avg6 = allocAvg(o.p, 6), out6 = a6ago - o.A0;
+        const a6ago = allocAgo(o.p, 6), avg6 = allocAvg(o.p, 6), out6 = a6ago - o.p.alloc;
         const up = avg6 > 0 ? avg6 / (o.A0 + x) - 1 : 0, b6 = mine(6);
         if (out6 > 0 && up >= 0.05 && b6 != null) {
           const yP = fmtPct(out6 / a6ago * 100), zP = fmtPct(up * 100), wasP = fmtPct(b6 / (1 + up));
@@ -1688,6 +1749,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
             `A parità di rewards, con l'allocazione suggerita ci si aspetta un rendimento ${art(zP, true)}${zP} più alto dell'APR a 6 ore: ` +
             `${fmtPct(b6)} invece ${art(wasP, true)}${wasP} che ha reso ogni voto. Se i voti rientrano, l'aumento sparisce.`));
         }
+      }
+      if (o.p.mine > 0 && pr > 0) {
+        const r48 = (o.p.fee + o.p.inc) / 48 * 8760 / pr * 100;
+        left.append(el("div", "outflow", `↺ Ci sono già ${fmtN(o.p.mine)} tuoi voti: il radar li toglie, perché riallocando escono, e ci rimette ${fmtN(x)}. ` +
+          `Senza i tuoi voti il pool rende ${fmtPct(o.A0 > 0 ? r48 / o.A0 : null)} a 48 ore, con i tuoi ${fmtPct(o.p.alloc > 0 ? r48 / o.p.alloc : null)}.`));
       }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
       left.append(bar);
@@ -1709,6 +1775,31 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       d.append(left, el("div", "pct", o.k + "%"), xb);
       strips.append(d);
     }
+    {
+      const exits = $("rd-exits"), mine = myVotes(), pr = rdPrice(), chosen = new Set(used.map(o => o.p.key));
+      exits.replaceChildren();
+      const names = {};
+      for (const p of MY_POS) Object.assign(names, p.names);
+      const rows2 = Object.entries(mine).filter(([k, a]) => a > 0 && !chosen.has(k)).sort((a, b) => b[1] - a[1]);
+      if (rows2.length) exits.append(el("div", "lbl", "Pool da cui esci"));
+      for (const [k, a] of rows2) {
+        const p = list.find(q => q.key === k), o = r.act.find(q => q.p.key === k), raw = ((DATA && DATA.pools) || []).find(q => q.key === k);
+        const name = p ? `${p.name} (${p.chain})` : (names[k] || k);
+        let why;
+        if (!p) why = raw && raw.blocked ? "non votabile" : "nessuna fee e nessun incentivo nelle ultime 48 ore";
+        else if (XS.keys.has(k)) why = "escluso da te";
+        else if (ruleFor(p)) why = `scartato dalla ricerca «${ruleFor(p)}»`;
+        else if (chainOff(p)) why = "rete spenta";
+        else if (r.stab && r.stab.ids.has(k)) { const v = r.stab.ids.get(k); why = `APR instabile (${v.n} ore ×${v.r > 0 ? v.r.toFixed(2).replace(".", ",") : "0"} rispetto alle 48)`; }
+        else if (o && pr > 0) {
+          const s1 = r.ap / 100, e1 = r.earn(o, 1);
+          why = `rende meno dei pool scelti: con l'1% della tua AP prenderesti ${fmtPct(e1 / 2 * 365 / (s1 * pr) * 100)} di APR`;
+        } else why = "rende meno dei pool scelti";
+        const r48 = p && pr > 0 ? (p.fee + p.inc) / 48 * 8760 / pr * 100 : null, others = p ? Math.max(0, p.alloc - a) : 0;
+        exits.append(el("div", "sb", `${name} · ${fmtN(a)} tuoi voti` + (r48 != null && others > 0 ? ` · senza i tuoi rende ${fmtPct(r48 / others)} a 48 ore` : "") + ` · ${why}`));
+      }
+    }
+    rdMyPos();
     $("rd-stb-s").textContent = RD.stb ? "Acceso" : "Spento";
     {
       const sb = r.stab, bi = $("rd-stb-info"), x2 = v => v.toFixed(2).replace(".", ",");
