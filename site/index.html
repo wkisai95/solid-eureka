@@ -251,6 +251,14 @@ label.switch input:checked::after { left: 21px; }
 .apmoves .mv { font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
 .apmoves .mv b { color: var(--ink); font-weight: 600; }
 .strip .apx { font-size: 12px; color: var(--ink-2); }
+.pfind { display: grid; gap: 6px; }
+.pfind input[type=search] { width: 100%; box-sizing: border-box; }
+.pf-res { display: grid; gap: 6px; }
+.pf-res:empty { display: none; }
+.strip.pf { border: 1px solid var(--line); }
+.strip.pf .st { font-size: 12px; color: var(--ink-2); }
+.strip.pf .st.on { color: var(--good); font-weight: 600; }
+.strip.pf .pct:empty { display: none; }
 #top10 a { color: var(--accent); }
 .toprow .r { min-width: 7.5em; }
 .exits .lbl { margin-top: 6px; }
@@ -411,6 +419,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
 
     <div class="rd-result">
       <div class="rd-main">
+        <div class="pfind">
+          <input id="pf-q" type="search" placeholder="Cerca un pool: token, coppia, rete o tipo (es. WETH/USDC, Ink, CL100)" autocomplete="off" spellcheck="false" aria-label="Cerca un pool">
+          <div class="pf-res" id="pf-res"></div>
+        </div>
         <div class="reco-h">Allocazione suggerita</div>
         <p class="note">Percentuali intere che sommano esattamente a 100, il formato della card Allocate.</p>
         <div class="kpis">
@@ -1569,14 +1581,16 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // fees per dollar traded in the last 48 hours, plus incentives at the rate scheduled for the next 48 hours; the warning looks at how the
   // volume is spread. Without it, the fee transfers themselves, which on some chains arrive in daily batches.
   const RD_WIN = [6, 12, 18, 24];
+  const RD_SHOW = [1, ...RD_WIN, 48];     // shown; the stability filter and the market comparison use RD_WIN only
   function recent(p) {
     const now = (DATA && DATA.generated) || Date.now() / 1000, h0 = now - now % 3600;
     const w = {};
     let warn = null, src = null;
     if (p.vh && p.vh.some(v => v) && p.fpv) {
       src = "volume";
-      for (const n of RD_WIN) {
-        const xs = p.vh.slice(0, n).filter(v => v != null);
+      for (const n of [1, ...RD_WIN]) {
+        // each hourly snapshot is the volume of the 60 minutes before it; the last hour is the latest snapshot
+        const xs = (n === 1 ? [p.vh.slice(0, 2).find(v => v != null)] : p.vh.slice(0, n)).filter(v => v != null);
         const vol = xs.length ? xs.reduce((a, b) => a + b, 0) * n / xs.length : 0;
         w[n] = { fee: vol * p.fpv, vol };
       }
@@ -1589,10 +1603,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         warn = `${art(Math.round(v6 / v24 * 100))}${Math.round(v6 / v24 * 100)}% del volume delle 24 ore nelle ultime 6 ore`;
     } else if (!(p.fee > 0) && p.inc > 0) {
       src = "incentivi";                     // only scheduled incentives: the same in every window
-      for (const n of RD_WIN) w[n] = { fee: 0 };
+      for (const n of [1, ...RD_WIN]) w[n] = { fee: 0 };
     } else if (p.fh.length || p.inc24) {
       src = "trasferimenti";
-      for (const n of RD_WIN) {
+      for (const n of [1, ...RD_WIN]) {
         const start = now - n * 3600;
         let f = 0;
         p.fh.forEach((v, i) => {
@@ -1606,6 +1620,71 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     // revenue of a window: its fees plus the incentives that streamed in it (past) or the scheduled rate
     const rev = (n, past) => w[n] ? w[n].fee + (past ? (n >= 48 ? p.incPast : p.inc24 * n / 24) : p.inc * n / 48) : null;
     return { w, warn, src, rev };
+  }
+
+  function whyNot(p, r, pr) {
+    const k = p.key, o = r.act.find(q => q.p.key === k);
+    if (XS.keys.has(k)) return "escluso da te";
+    if (ruleFor(p)) return `scartato dalla ricerca «${ruleFor(p)}»`;
+    if (chainOff(p)) return "rete spenta";
+    if (r.stab && r.stab.ids.has(k)) { const v = r.stab.ids.get(k); return `APR instabile (${v.n} ore ×${v.r > 0 ? v.r.toFixed(2).replace(".", ",") : "0"} rispetto alle 48)`; }
+    if (!(p.fee + p.inc > 0)) return "nessuna fee e nessun incentivo nelle ultime 48 ore";
+    if (o && pr > 0 && r.ap > 0) {
+      const s1 = r.ap / 100, e1 = r.earn(o, 1);
+      return `rende meno dei pool scelti: con l'1% della tua AP prenderesti ${fmtPct(e1 / 2 * 365 / (s1 * pr) * 100)} di APR`;
+    }
+    return r.ap > 0 ? "rende meno dei pool scelti" : "inserisci la tua Allocation Power";
+  }
+
+  // ---------------------------------------------------------------- pool search: any pool of the radar, with its APR
+  // over the last 1, 6, 12, 18, 24 and 48 hours, whether the radar suggests it and why not
+  const PF_MAX = 8;
+  let pfT = 0;
+  function pfRender() {
+    const box = $("pf-res"), q = $("pf-q").value.trim();
+    box.replaceChildren();
+    if (!q || !rdLast) return;
+    const { list, r } = rdLast, pr = rdPrice();
+    const kOf = p => { const o = r.act.find(x => x.p.key === p.key); return o ? o.k : 0; };
+    const hits = list.filter(p => qmatch(p, q)).sort((a, b) => kOf(b) - kOf(a) || (b.fee + b.inc) - (a.fee + a.inc));
+    if (!hits.length) { box.append(el("p", "note", "Nessun pool del radar corrisponde: prova con un token, la rete o il tipo (CL100, sAMM…).")); return; }
+    for (const p of hits.slice(0, PF_MAX)) box.append(pfCard(p, r, pr));
+    if (hits.length > PF_MAX) box.append(el("p", "note", `Altri ${hits.length - PF_MAX} pool: aggiungi una parola per restringere (rete, tipo, token).`));
+  }
+  function pfCard(p, r, pr) {
+    const o = r.act.find(x => x.p.key === p.key), k = o ? o.k : 0, off = XS.keys.has(p.key);
+    const A0 = o ? o.A0 : Math.max(0, p.alloc - p.mine), x = k * r.ap / 100, now = Date.now() / 1000;
+    const d = el("div", "strip pf"), left = el("div"); left.style.minWidth = "0";
+    const nm = el("div", "nm", p.name);
+    if (p.kind) nm.append(el("span", "kd", p.kind));
+    left.append(nm);
+    const a6 = allocAgo(p, 6), dv = p.alloc - a6;
+    left.append(el("div", "sb", `${p.chain} · ${fmtN(p.alloc)} voti` +
+      (a6 > 0 && Math.abs(dv) >= Math.max(1000, a6 * 0.01) ? ` (${dv > 0 ? "+" : "−"}${fmtN(Math.abs(dv))} in 6 ore)` : "") +
+      ` · rewards 48 ore ${r$(p.rew)}` + (p.inc > 0 ? ` · incentivi prossime 48 ore ${r$(p.inc)}` : "")));
+    const rc = recent(p);
+    const apr = n => { const v = rc.rev(n, false); return v != null && pr > 0 && A0 + x > 0 ? v / n * 8760 / ((A0 + x) * pr) * 100 : null; };
+    if (!(A0 + x > 0) && p.fee + p.inc > 0) left.append(el("div", "sb", "Nessun voto: chi entra per primo prende tutte le rewards"));
+    else if (rc.src && pr > 0) {
+      const line = el("div", "sb", (k > 0 ? "APR con la tua quota " : "APR per voto adesso ") + RD_SHOW.map(n => `${n}h ${fmtPct(apr(n))}`).join(" · "));
+      line.title = k > 0 ? "Con i voti che suggerisce il radar, sul pool come è allocato adesso." : "Quanto rende ogni voto del pool, come è allocato adesso, senza i tuoi voti che si spostano.";
+      left.append(line);
+    } else left.append(el("div", "sb", pr > 0 ? "Né fee né volume nelle ultime ore" : "Manca il prezzo di AERO per l'APR"));
+    const st = el("div", "st" + (k > 0 ? " on" : ""));
+    st.textContent = k > 0 ? `Nell'allocazione suggerita: ${k}% della tua AP (${fmtN(x)} voti)` : "Non suggerito: " + whyNot(p, r, pr);
+    left.append(st);
+    if (p.mine > 0) left.append(el("div", "outflow", `↺ Ci sono già ${fmtN(p.mine)} tuoi voti, che escono quando riallochi`));
+    const apx = autopilotIn(p.key);
+    if (apx) left.append(el("div", "apx", `🤖 ${apx.who.join(", ")}: ${fmtPct(apx.share * 100)} dei voti del pool` +
+      (apx.ends ? (apx.ends > now ? `, può riallocare tra ${inT(apx.ends - now)}` : ", può riallocare in qualsiasi momento") : "")));
+    if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
+    if (r.spike && r.spike.ids.has(p.key)) left.append(el("div", "spk", "Il filtro dei picchi gli conta le fee delle 48 ore prima"));
+    const b = el("button", "x", off ? "↺" : "✕");
+    b.type = "button";
+    b.title = off ? `Considera di nuovo ${p.name} (${p.chain})` : `Non considerare ${p.name} (${p.chain})`;
+    b.addEventListener("click", () => { if (off) XS.keys.delete(p.key); else XS.keys.add(p.key); saveX(); rdRender(); });
+    d.append(left, el("div", "pct", k > 0 ? k + "%" : ""), b);
+    return d;
   }
 
   // the article before a number as it is read: l'8%, l'11%, l'1,5%, lo 0,4%, il 29%; with "di": dell', dello, del
@@ -1736,6 +1815,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (!DATA) return;
     const list = rdPools(), r = rdAllocate(list), price = rdPrice();
     rdLast = { list, r };
+    pfRender();
     $("rd-when").textContent = "dati del " + when(DATA.generated);
     $("rd-trend-v").textContent = (+RD.trend || 0) + "%";
     $("rd-price").placeholder = DATA.aero_usd ? DATA.aero_usd.toFixed(3).replace(".", ",") : "es. 0,80";
@@ -1766,7 +1846,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const mine = n => { const v = rc.rev(n, false); return v != null ? v / n * 8760 / ((o.A0 + x) * pr) * 100 : null; };
       if (pr > 0 && rc.src) {
         const note = rc.src === "trasferimenti" ? (r.stab ? " (volume orario non disponibile: stabilità non verificabile)" : " (dalle fee arrivate: volume orario non disponibile)") : "";
-        const line = el("div", "sb", "APR " + [...RD_WIN, 48].map(n => `${n}h ${fmtPct(mine(n))}`).join(" · ") + note);
+        const line = el("div", "sb", "APR " + RD_SHOW.map(n => `${n}h ${fmtPct(mine(n))}`).join(" · ") + note);
         line.title = "APR con la tua quota nel pool, con i voti che ha adesso. " + (rc.src === "volume"
           ? "Fee stimate dal volume di ogni ora per le fee per dollaro scambiato delle ultime 48 ore, più gli incentivi."
           : "Fee arrivate al contratto in quelle ore: su alcune reti arrivano a blocchi una o due volte al giorno.");
@@ -1822,18 +1902,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const rows2 = Object.entries(mine).filter(([k, a]) => a > 0 && !chosen.has(k)).sort((a, b) => b[1] - a[1]);
       if (rows2.length) exits.append(el("div", "lbl", "Pool da cui esci"));
       for (const [k, a] of rows2) {
-        const p = list.find(q => q.key === k), o = r.act.find(q => q.p.key === k), raw = ((DATA && DATA.pools) || []).find(q => q.key === k);
+        const p = list.find(q => q.key === k), raw = ((DATA && DATA.pools) || []).find(q => q.key === k);
         const name = p ? `${p.name} (${p.chain})` : (names[k] || k);
-        let why;
-        if (!p) why = raw && raw.blocked ? "non votabile" : "nessuna fee e nessun incentivo nelle ultime 48 ore";
-        else if (XS.keys.has(k)) why = "escluso da te";
-        else if (ruleFor(p)) why = `scartato dalla ricerca «${ruleFor(p)}»`;
-        else if (chainOff(p)) why = "rete spenta";
-        else if (r.stab && r.stab.ids.has(k)) { const v = r.stab.ids.get(k); why = `APR instabile (${v.n} ore ×${v.r > 0 ? v.r.toFixed(2).replace(".", ",") : "0"} rispetto alle 48)`; }
-        else if (o && pr > 0) {
-          const s1 = r.ap / 100, e1 = r.earn(o, 1);
-          why = `rende meno dei pool scelti: con l'1% della tua AP prenderesti ${fmtPct(e1 / 2 * 365 / (s1 * pr) * 100)} di APR`;
-        } else why = "rende meno dei pool scelti";
+        const why = !p ? (raw && raw.blocked ? "non votabile" : "nessuna fee e nessun incentivo nelle ultime 48 ore") : whyNot(p, r, pr);
         const r48 = p && pr > 0 ? (p.fee + p.inc) / 48 * 8760 / pr * 100 : null, others = p ? Math.max(0, p.alloc - a) : 0;
         exits.append(el("div", "sb", `${name} · ${fmtN(a)} tuoi voti` + (r48 != null && others > 0 ? ` · senza i tuoi rende ${fmtPct(r48 / others)} a 48 ore` : "") + ` · ${why}`));
       }
@@ -2175,6 +2246,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   document.querySelectorAll("#rd-mov-seg button").forEach(b => b.addEventListener("click", () => { RD.movH = +b.dataset.h; saveRD(); rdRender(); }));
   let rdQt = 0;
   $("rd-q").addEventListener("input", () => { clearTimeout(rdQt); rdQt = setTimeout(rdRender, 180); });
+  $("pf-q").addEventListener("input", () => { clearTimeout(pfT); pfT = setTimeout(pfRender, 120); });
+  $("pf-q").addEventListener("keydown", e => { if (e.key === "Escape") { $("pf-q").value = ""; pfRender(); } });
   $("rd-q-drop").addEventListener("click", () => { const q = $("rd-q").value.trim(); if (!q || !rdLast) return; rdLast.list.filter(p => qmatch(p, q)).forEach(p => XS.keys.add(p.key)); saveX(); rdRender(); });
   $("rd-q-rule").addEventListener("click", () => { const q = $("rd-q").value.trim(); if (!q) return; if (!XS.rules.some(r => r.toLowerCase() === q.toLowerCase())) XS.rules.push(q); saveX(); rdRender(); });
   $("rd-more").addEventListener("click", () => { rdShowAll = !rdShowAll; rdRender(); });
