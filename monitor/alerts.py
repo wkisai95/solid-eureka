@@ -239,7 +239,9 @@ def evaluate(report, state, cfg, now, new_incentives):
         on = ", ".join(f"{where(r)} {fmt_n(r[3])}" for r in p["pools"][:3])
         out.append({"key": f"bigcd:{p['id']}:{e}", "prio": 3, "tags": ["hourglass_flowing_sand"],
                     "title": f"{p.get('who') or 'Autopilot'}: il cooldown finisce alle {fmt_time(e, tz, now)}",
-                    "body": f"Tra {fmt_in(e - now)} può riallocare {fmt_n(p['alloc'])} voti. Ora è su: {on}."})
+                    "body": f"Tra {fmt_in(e - now)} può riallocare {fmt_n(max(p['ap'], p['alloc']))} voti" +
+                            (f", di cui {fmt_n(p['ap'] - p['alloc'])} depositati dopo l'ultima allocazione"
+                             if p["ap"] - p["alloc"] > max(100_000, p["alloc"] * 0.02) else "") + f". Ora è su: {on}."})
     sent = state.setdefault("alerts", {})
     fresh = [a for a in out if a["key"] not in sent]
     return fresh

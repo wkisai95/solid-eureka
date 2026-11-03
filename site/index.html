@@ -2391,6 +2391,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       foldOpen(row, "ap-" + p.id);
       const sm = el("summary"), t = el("div", "t");
       t.append(el("span", null, whoOf(p)), el("span", "sub", `${fmtN(p.alloc)} voti · ${fmtPct(p.alloc / total * 100)} del totale`));
+      const fresh = p.ap - p.alloc;
+      if (fresh > Math.max(100000, p.alloc * 0.02)) {
+        const f = el("span", "sub", `+${fmtN(fresh)} depositati, in arrivo con la prossima allocazione`);
+        f.title = "Allocation Power entrata nel relay dopo l'ultima allocazione: finché non rialloca non vota per nessun pool.";
+        t.append(f);
+      }
       const cd = el("div", "cd"); cd.dataset.ends = p.ends || 0;
       sm.append(t, cd);
       const body = el("div", "apbody");

@@ -30,7 +30,11 @@ SEL = {k: C.sel(v) for k, v in {
     "relayConfig": "relayConfig()",
 }.items()}
 RELAY_TYPES = {0: "Maxi", 1: "Protocol", 2: "Protocol"}
-RELAY_CONFIG = ["(uint256,uint256,uint256,uint256,uint256,uint48,uint48,string,string)"]
+# relayConfig() of the first relays (October) and of the newer ones (no minWithdrawal); the strings start right after
+# the fixed fields, so the offset of the first one tells the two apart
+RELAY_CONFIGS = {9: "(uint256,uint256,uint256,uint256,uint256,uint48,uint48,string,string)",
+                 8: "(uint256,uint256,uint256,uint256,uint48,uint48,string,string)"}
+OWNER_CHECK_V = 2          # owners checked with an older version of the relay check are checked again
 SCAN_PER_RUN = 1500        # positions whose Allocation Power is read per run
 ID_MARGIN = 300            # numbers past the highest one seen, for new positions that have not allocated yet
 KEEP_MIN_AP = 50_000       # smaller positions are not kept from the scan
@@ -94,13 +98,19 @@ def _scan(rpc, state, b, now, log):
 
 
 def _relay_config(ok, data):
-    if not ok or not data:
+    if not ok or not data or len(data) < 64:
         return None
     try:
-        c = decode(RELAY_CONFIG, data)[0]
-        return {"token": int(c[0]), "name": "".join(ch for ch in c[7] if ch.isprintable()).strip()[:60]}
+        at = int.from_bytes(data[:32], "big")                      # where the struct starts
+        word = lambda k: int.from_bytes(data[at + 32 * k:at + 32 * k + 32], "big")
+        for n, layout in RELAY_CONFIGS.items():
+            if len(data) >= at + 32 * n and word(n - 2) == 32 * n:  # offset of the name = size of the fixed part
+                c = decode([layout], data)[0]
+                name = "".join(ch for ch in c[n - 2] if ch.isprintable()).strip()[:60]
+                return {"token": int(c[0]), "name": name}
     except Exception:
-        return None
+        pass
+    return None
 
 
 def allocation_of(state, tid):
@@ -154,13 +164,14 @@ def _refresh(rpc, state, b, cfg, now, log):
         i["at"] = now
     # which owners are relays: relayType() and relayConfig() answer only on a relay
     owners = sorted({i["owner"] for i in b["info"].values() if i.get("owner")})
-    todo = [o for o in owners if now - (b["owners"].get(o) or {}).get("at", 0) > OWNER_TTL]
+    todo = [o for o in owners if now - (b["owners"].get(o) or {}).get("at", 0) > OWNER_TTL
+            or (b["owners"].get(o) or {}).get("v") != OWNER_CHECK_V]
     if todo:
         res = rpc.multicall([(o, SEL["relayType"]) for o in todo] + [(o, SEL["relayConfig"]) for o in todo])
         for j, o in enumerate(todo):
             rt = C._dec(["uint8"], *res[j])
             rc = _relay_config(*res[len(todo) + j])
-            rec = {"at": now}
+            rec = {"at": now, "v": OWNER_CHECK_V}
             if rt is not None and rc is not None:
                 rec.update({"relay": True, "type": RELAY_TYPES.get(int(rt), str(rt)), "name": rc["name"],
                             "token": rc["token"]})
@@ -245,12 +256,19 @@ def _who(i):
     return i.get("label")
 
 
+def _name(state, g):
+    """Pool name with its kind (CL100, sAMM, ...): the same pair often has several pools."""
+    kind = ((state["gauges"].get(g) or {}).get("kind") or "").strip()
+    name = A.gauge_name(state, g)
+    return f"{name} {kind}" if kind and kind != "?" else name
+
+
 def _pools(state, alloc, limit=None):
     ap = state["ap"]
     rows = []
     for g, a in sorted(alloc.items(), key=lambda kv: -kv[1])[:limit]:
         tot = float(ap.get(g, 0.0))
-        rows.append([g, A.gauge_name(state, g), C.chain_short(A.chain_of(g)), round(a), round(tot),
+        rows.append([g, _name(state, g), C.chain_short(A.chain_of(g)), round(a), round(tot),
                      round(a / tot, 4) if tot > 0 else None])
     return rows
 
@@ -286,7 +304,7 @@ def report(state, now, cooldown_of, cooldown_end):
         rows = []
         for g, d in sorted(m["d"].items(), key=lambda kv: kv[1]):
             after = float(ap.get(g, 0.0))
-            rows.append([g, A.gauge_name(state, g), C.chain_short(A.chain_of(g)), round(d), round(after)])
+            rows.append([g, _name(state, g), C.chain_short(A.chain_of(g)), round(d), round(after)])
         moves.append({"t": m["t"], "t_last": m.get("t_last"), "id": int(m["id"]), "relay": m.get("relay"),
                       "who": m.get("label") or m.get("name") or (("Autopilot" if m.get("relay") else None)),
                       "name": m.get("name"), "new": m["id"] in (b.get("new") or []), "rows": rows})
