@@ -14,7 +14,9 @@
     "flow_min_pct": 25,
     "flow_min_saero": 1000000,
     "apr_alert_min_alloc": 1000000,
-    "apr_alert_multiple": 2.0
+    "apr_alert_multiple": 2.0,
+    "autopilot_move_min_saero": 500000,
+    "autopilot_heads_up_min": 45
   },
   "routing": {
     "top_pools": 15,
@@ -151,5 +153,13 @@
       "min_pair_volume_usd": 250000,
       "max_pair_share": 0.5
     }
+  },
+  "labels": {
+    "0xbde0c70bdc242577c52dfad53389f82fd149ea5a": "Aerodrome Foundation",
+    "0x6b1c4829073e8c3fc4a56d5631e6d2d1d745119c": "Aerodrome Foundation",
+    "0x834c0da026d5f933c2c18fa9f8ba7f1f792fda52": "Public Goods Fund",
+    "0x0a65a482482af4fa00438424d5cd1dfefb93bbe2": "Public Goods Fund",
+    "0x339992af7ecee43b5a13af03e392ee77c6ab342e": "Public Goods Fund e altri",
+    "0x8682518bb652d58dd673ce594e85cec9ea338695": "Public Goods Fund e altri"
   }
 }

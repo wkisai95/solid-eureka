@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from . import aero as A
 from . import earnings as E
 from . import alerts as N
+from . import big as B
 from . import chain as C
 from . import market as M
 from . import marketdata as MD
@@ -212,6 +213,13 @@ def run(args):
     if not state["chains"][str(C.BASE_CHAIN)]["status"].get("ok"):
         raise RuntimeError("Base could not be read: " + str(results[C.BASE_CHAIN].get("error")))
 
+    # the Autopilot relays and the biggest positions: who they are and how they move
+    try:
+        B.refresh(RPC[C.BASE_CHAIN], state, cfg, now, log)
+    except Exception:
+        status["errors"].append("autopilot: " + traceback.format_exc()[-200:])
+        log(f"autopilot/top positions failed: {traceback.format_exc()[-600:]}")
+
     # 3. prices, rewards, simulation, routing
     want = {A.tkey(C.BASE_CHAIN, params["aero"])}
     want |= {A.tkey(p[1], p[3]) for p in state["fees_pending"]}
@@ -296,6 +304,11 @@ def run(args):
     status["finished"] = int(time.time())
     status["seconds"] = round(wall_clock() - t_start, 1)
     report = R.build(state, params, prices, now, cfg, routing_errors, status)
+    try:
+        report["big"] = B.report(state, now, lambda cid: R.chain_cooldown(state, cid, params["cooldown"]),
+                                 R.cooldown_end)
+    except Exception:
+        log(f"autopilot report failed: {traceback.format_exc()[-600:]}")
     report["block"] = state["chains"][str(C.BASE_CHAIN)].get("head")
     report["page_url"] = N.page_url(cfg)
     report["repo"] = os.environ.get("GITHUB_REPOSITORY") or cfg.get("repo")

@@ -40,6 +40,25 @@ diluisce ogni pool. Tutte le opzioni della vecchia app:
 Ci sono anche «Usa questa allocazione» con il confronto tra fee attese ed effettive, il cooldown di 47 ore, la
 media del mercato, i movimenti di allocazione (1, 6, 24 e 48 ore) e la tabella dei pool con ricerca e ordinamento.
 
+### Voti dell'Autopilot
+
+Sotto l'allocazione suggerita c'è la finestra **Voti dell'Autopilot**. L'Autopilot di Aero è fatto di contratti
+*relay*: ognuno possiede una sola posizione sAERO e la alloca per tutti i suoi depositanti, con lo stesso cooldown di
+47 ore delle altre. Il monitor li trova sulla chain (chiede `relayType()` e `relayConfig()` ai proprietari delle
+posizioni più grandi) e per ognuno mostra i voti, il conto alla rovescia alla fine del cooldown (al secondo), i pool
+in cui è con la sua quota del pool e quanto renderebbe in più chi resta se uscisse, e gli ultimi spostamenti. Nei
+pool suggeriti in cui l'Autopilot ha almeno il 20% dei voti c'è una nota con la sua quota e quando può riallocare.
+
+### Le 10 posizioni più grandi
+
+A ogni giro il monitor legge l'Allocation Power di 1.500 posizioni (tutte in circa 14 giri) e aggiorna le 40 più
+grandi e le 40 più allocate: numero, AERO in stake, lock, quota di tutti i voti, proprietario, cooldown, pool e
+ultima allocazione. La **Aerodrome Foundation** non ha una posizione sua: il 24 ottobre ha depositato le sue nel relay
+«Autopilot Internal 004» (#10426), lo dicono la [pagina security della documentazione di
+Aerodrome](https://github.com/aerodrome-finance/docs/blob/main/content/security.mdx) (multisig «Aerodrome Foundation
+and Incentives», `0xBDE0…EA5a`) e i depositi sulla chain. I nomi degli indirizzi noti sono in `config.json`
+(`labels`).
+
 **Carica queste opzioni nelle simulazioni** manda le opzioni al monitor (avvia un giro con il token GitHub della
 pagina): da quel giro in poi tutti i metodi della simulazione le seguono. Restano valide finché non ne carichi altre
 e sono in `tracker.json` (`options`).
@@ -129,6 +148,8 @@ Gli avvisi sulle tue posizioni arrivano solo su ntfy e non compaiono nei dati pu
 | Routing | La quota di routing su $10.000 cambia di almeno `routing_change_pts` punti in 24 ore |
 | Rendimento anomalo | Un pool sopra `apr_alert_min_alloc` rende almeno `apr_alert_multiple` volte la mediana |
 | Parametri del protocollo | Cambia la durata del cooldown o si attivano le riduzioni del cooldown su una chain |
+| Autopilot o balena riallocano | Un relay dell'Autopilot o una delle 10 posizioni più grandi sposta almeno `autopilot_move_min_saero` voti: da quali pool esce (con quanto prende in più chi resta) e dove entra |
+| Cooldown dell'Autopilot | Mancano `autopilot_heads_up_min` minuti alla fine del cooldown di un relay da almeno 5 milioni di voti |
 | Riepilogo | Ogni mattina dopo le `digest_hour` |
 
 Le soglie, le chain e i loro RPC pubblici, e le regole del metodo «Chain nuove» (`strategies.nuove`) si cambiano in

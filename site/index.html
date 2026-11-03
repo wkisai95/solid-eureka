@@ -231,6 +231,28 @@ label.switch input:checked::after { left: 21px; }
 .toast button.linkish { margin-left: 8px; }
 .strip .outflow { font-size: 12px; color: var(--accent); }
 .exits { display: grid; gap: 4px; }
+.apwin { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+.apwin .aphead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; }
+.aprow { border: 1px solid var(--line); border-radius: 10px; }
+.aprow > summary { list-style: none; cursor: pointer; padding: 8px 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; }
+.aprow > summary::-webkit-details-marker { display: none; }
+.aprow > summary .t { font-weight: 600; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.aprow > summary .t::before { content: "▸"; color: var(--ink-2); font-size: 11px; }
+.aprow[open] > summary .t::before { content: "▾"; }
+.aprow > summary .t .sub { font-weight: 400; font-size: 13px; }
+.aprow .apbody { padding: 0 12px 10px; display: grid; gap: 4px; }
+.cd { font: 600 13px var(--f-num); }
+.cd.free { color: var(--good); }
+.cd.soon { color: var(--warn); }
+.apwin .pl { font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.appools { display: grid; gap: 1px; font: 12px/1.45 var(--f-num); color: var(--ink-2); }
+.appools b { color: var(--ink); font-weight: 600; font-family: var(--f-body); }
+.apmoves { display: grid; gap: 3px; margin-top: 4px; }
+.apmoves .mv { font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.apmoves .mv b { color: var(--ink); font-weight: 600; }
+.strip .apx { font-size: 12px; color: var(--ink-2); }
+#top10 a { color: var(--accent); }
+.toprow .r { min-width: 7.5em; }
 .exits .lbl { margin-top: 6px; }
 .exits .sb { font: 12px var(--f-num); color: var(--ink-2); overflow-wrap: anywhere; }
 .mypos { display: flex; flex-wrap: wrap; gap: 4px 14px; }
@@ -400,6 +422,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <div class="exits" id="rd-exits"></div>
         <div class="controls"><button type="button" id="rd-use">Usa questa allocazione</button><button type="button" class="ghost" id="rd-copy">Copia pesi</button><a href="https://app.aero.xyz" target="_blank" rel="noopener">Apri Aero ↗</a></div>
         <div class="toast" id="rd-toast" role="status"></div>
+        <div class="apwin" id="autopilot"></div>
       </div>
       <div class="rd-side">
         <div class="box"><div class="lbl">Media del mercato</div><div class="compare" id="rd-mkt"></div><div class="lbl">Perché non tutto nel primo</div><div class="compare" id="rd-top"></div></div>
@@ -456,6 +479,14 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       </div>
     </details>
   </section>
+
+  <details class="panel fold" data-fold="top10" open id="top10">
+    <summary class="panel-head"><h2>Le 10 posizioni più grandi</h2><span class="sub" id="top10-sub"></span></summary>
+    <div class="fold-body">
+    <p class="note">Le posizioni sAERO con più Allocation Power, lette dalla chain. Molte sono Autopilot: un solo contratto che alloca i depositi di tanti. La Aerodrome Foundation non ha una posizione sua: il 24/10 ha depositato tutte le sue posizioni nel relay «Autopilot Internal 004». Lo dicono la pagina security della documentazione di Aerodrome (multisig «Aerodrome Foundation and Incentives») e i depositi sulla chain.</p>
+    <div class="list" id="top10-list"></div>
+    </div>
+  </details>
 
   <details class="panel fold" data-fold="sim" open id="sim">
     <summary class="panel-head"><h2>Simulazione <span id="sim-size">235k</span> sAERO</h2><span class="sub" id="sim-since"></span></summary>
@@ -637,12 +668,13 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   const fmtSigned = x => x == null ? "—" : (x > 0 ? "+" : x < 0 ? "−" : "") + fmtN(Math.abs(x));
   const timeFmt = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
   const dayFmt = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, weekday: "short" });
+  const dateFmt = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "numeric", month: "short" });
   const dateKey = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
   const when = ts => {
     const d = new Date(ts * 1000), now = new Date();
     const diff = Math.round((new Date(dateKey.format(d).split("/").reverse().join("-")) - new Date(dateKey.format(now).split("/").reverse().join("-"))) / 864e5);
     const t = timeFmt.format(d);
-    return diff === 0 ? t : diff === 1 ? "domani " + t : diff === -1 ? "ieri " + t : dayFmt.format(d) + " " + t;
+    return diff === 0 ? t : diff === 1 ? "domani " + t : diff === -1 ? "ieri " + t : (Math.abs(diff) >= 6 ? dateFmt : dayFmt).format(d) + " " + t;
   };
   const inT = s => {
     const m = Math.max(0, Math.round(s / 60));
@@ -1755,6 +1787,13 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         left.append(el("div", "outflow", `↺ Ci sono già ${fmtN(o.p.mine)} tuoi voti: il radar li toglie, perché riallocando escono, e ci rimette ${fmtN(x)}. ` +
           `Senza i tuoi voti il pool rende ${fmtPct(o.A0 > 0 ? r48 / o.A0 : null)} a 48 ore, con i tuoi ${fmtPct(o.p.alloc > 0 ? r48 / o.p.alloc : null)}.`));
       }
+      const apx = autopilotIn(o.p.key);
+      if (apx && apx.share >= 0.2) {
+        const now2 = Date.now() / 1000, sh = fmtPct(apx.share * 100);
+        left.append(el("div", "apx", `🤖 ${apx.who.join(", ")}, cioè l'Autopilot, ha ${art(sh)}${sh} dei voti di questo pool` +
+          (apx.ends ? (apx.ends > now2 ? ` e può riallocare tra ${inT(apx.ends - now2)}` : " e può riallocare in qualsiasi momento") : "") +
+          `: se esce, ${exitGain(Math.min(apx.share, 0.99))}.`));
+      }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
       left.append(bar);
       // leave this pool out, like unticking it in the table; it comes back from the chips of excluded pools
@@ -2069,6 +2108,26 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     note.textContent = `Prossima modifica possibile: ${w}. Le revenue continuano ad accumularsi nel frattempo.`;
   }
   setInterval(rdCooldown, 30000);
+  // live countdowns: every element with data-ends counts down to that moment
+  const cdText = s => {
+    s = Math.max(0, Math.round(s));
+    const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+    if (d) return `${d} g ${h} h ${String(m).padStart(2, "0")} min`;
+    if (h) return `${h} h ${String(m).padStart(2, "0")} min ${String(sec).padStart(2, "0")} s`;
+    return `${m} min ${String(sec).padStart(2, "0")} s`;
+  };
+  function tickCountdowns() {
+    const now = Date.now() / 1000;
+    document.querySelectorAll("[data-ends]").forEach(e => {
+      const end = +e.dataset.ends;
+      if (!end) { e.textContent = "nessuna allocazione"; return; }
+      const left = end - now;
+      e.classList.toggle("free", left <= 0);
+      e.classList.toggle("soon", left > 0 && left <= 3600);
+      e.textContent = left <= 0 ? `può riallocare adesso · cooldown finito ${when(end)}` : `può riallocare tra ${cdText(left)} · ${when(end)}`;
+    });
+  }
+  setInterval(tickCountdowns, 1000);
 
   // ---- the options the simulations follow: sent to the monitor with "Carica queste opzioni nelle simulazioni"
   function rdOptions() {
@@ -2297,7 +2356,119 @@ table.rank th { white-space: normal; vertical-align: bottom; }
 
   function render() {
     if (!DATA) return;
-    header(DATA); rdRender(); meRender(); waves(DATA); calendar(DATA); incentives(DATA); chainOptions(DATA); pools(DATA); chains(DATA); alertsList(DATA);
+    header(DATA); rdRender(); meRender(); autopilotRender(DATA); top10Render(DATA); waves(DATA); calendar(DATA); incentives(DATA); chainOptions(DATA); pools(DATA); chains(DATA); alertsList(DATA);
+  }
+
+  // ---------------------------------------------------------------- Autopilot and the biggest positions
+  const POOLS_SHOWN = 12;
+  const short = a => a ? a.slice(0, 6) + "…" + a.slice(-4) : "";
+  const whoOf = p => p.who || (p.relay ? (p.name || "Autopilot") : "#" + p.id);
+  const poolLabel = r => r[2] === "Base" ? r[1] : `${r[1]} (${r[2]})`;
+  const xTimes = m => "×" + m.toFixed(m >= 10 ? 0 : 1).replace(".", ",");
+  // how much more each remaining vote earns if a position holding this share of a pool leaves it
+  const exitMult = share => (m => m >= 2 ? xTimes(m) : "+" + fmtPct((m - 1) * 100))(1 / (1 - share));
+  const exitGain = share => share >= 0.995 ? "il pool resta vuoto" : `chi resta prende ${exitMult(share)} per voto`;
+  const foldOpen = (d, id) => {
+    try { if (id in FOLD) d.open = !!FOLD[id]; } catch (e) {}
+    d.addEventListener("toggle", () => { try { FOLD[id] = d.open; lsSet("radar-fold", JSON.stringify(FOLD)); } catch (e) {} });
+  };
+
+  function autopilotRender(d) {
+    const box = $("autopilot");
+    box.replaceChildren();
+    const big = d && d.big;
+    const head = el("div", "aphead");
+    head.append(el("div", "reco-h", "Voti dell'Autopilot"));
+    box.append(head);
+    if (!big || !big.autopilot) { box.append(el("p", "note", "I dati sull'Autopilot arrivano con il prossimo giro del monitor.")); return; }
+    const rel = big.autopilot, total = big.total || 1, sum = rel.reduce((t, p) => t + p.alloc, 0);
+    head.append(el("span", "sub", `${fmtN(sum)} voti in ${rel.length} relay, ${art(fmtPct(sum / total * 100))}${fmtPct(sum / total * 100)} di tutti i voti allocati`));
+    box.append(el("p", "note", "Ogni relay è una sola posizione che vota per tutti i suoi depositanti e, come le altre, dopo ogni allocazione aspetta 47 ore. " +
+      "Quando sposta i voti, nei pool che lascia chi resta guadagna di più finché altri non entrano: «se esce» dice quanto renderebbe in più ogni voto che resta. " +
+      "Ti arriva una notifica a ogni spostamento e 45 minuti prima della fine del cooldown dei relay più grandi."));
+    for (const p of rel) {
+      const row = el("details", "aprow");
+      foldOpen(row, "ap-" + p.id);
+      const sm = el("summary"), t = el("div", "t");
+      t.append(el("span", null, whoOf(p)), el("span", "sub", `${fmtN(p.alloc)} voti · ${fmtPct(p.alloc / total * 100)} del totale`));
+      const cd = el("div", "cd"); cd.dataset.ends = p.ends || 0;
+      sm.append(t, cd);
+      const body = el("div", "apbody");
+      body.append(el("div", "pl", [p.name && p.name !== whoOf(p) ? p.name : null, "#" + p.id,
+        p.type === "Maxi" ? "strategia che gli utenti scelgono nell'app" : "relay del protocollo",
+        p.last ? "ultima allocazione " + when(p.last) : null, p.chains.length > 1 ? p.chains.length + " reti" : null,
+        p.ends_max > p.ends + 600 ? "sull'ultima rete può riallocare " + when(p.ends_max) : null].filter(Boolean).join(" · ")));
+      const list = el("div", "appools");
+      for (const r of p.pools.slice(0, POOLS_SHOWN)) {
+        const line = el("div");
+        line.append(el("b", null, poolLabel(r)), ` ${fmtN(r[3])}` + (r[5] != null ? ` · ${fmtPct(r[5] * 100)} del pool` + (r[5] >= 0.05 ? " · se esce: " + (r[5] >= 0.995 ? "pool vuoto" : "chi resta " + exitMult(r[5])) : "") : ""));
+        list.append(line);
+      }
+      if (p.pools.length > POOLS_SHOWN) list.append(el("div", null, `e altri ${p.pools.length - POOLS_SHOWN} pool`));
+      body.append(list);
+      row.append(sm, body);
+      box.append(row);
+    }
+    // the last moves: where votes left (who stays earns more) and where they went (each vote there earns less)
+    const mv = (big.moves || []).filter(m => m.relay).slice(0, 5);
+    const ml = el("div", "apmoves");
+    ml.append(el("div", "lbl", "Ultimi spostamenti"));
+    if (!mv.length) ml.append(el("div", "mv", "Nessuno spostamento dell'Autopilot da quando il monitor lo segue."));
+    for (const m of mv) {
+      const out = m.rows.filter(r => r[3] < 0).slice(0, 4).map(r => `${poolLabel(r)} −${fmtN(-r[3])}` + (r[4] > 1 ? ` (chi resta +${fmtPct(-r[3] / r[4] * 100)} per voto)` : " (pool rimasto vuoto)"));
+      const inn = m.rows.filter(r => r[3] > 0).sort((x, y) => y[3] - x[3]).slice(0, 4).map(r => `${poolLabel(r)} +${fmtN(r[3])}` + (r[4] - r[3] > 1 ? ` (−${fmtPct(r[3] / r[4] * 100)} per voto)` : " (primo ad allocare)"));
+      const line = el("div", "mv");
+      line.append(el("b", null, `${when(m.t)} · ${m.who || "#" + m.id}`), ": " + [out.length ? "esce da " + out.join(", ") : "", inn.length ? "entra in " + inn.join(", ") : ""].filter(Boolean).join("; "));
+      ml.append(line);
+    }
+    box.append(ml);
+    tickCountdowns();
+  }
+
+  function top10Render(d) {
+    const box = $("top10-list");
+    box.replaceChildren();
+    const big = d && d.big;
+    if (!big || !big.top) { empty(box, "La classifica arriva con il prossimo giro del monitor."); return; }
+    const total = big.total || 1;
+    $("top10-sub").textContent = big.scan && big.scan.full_at ? `tra tutte le ${big.scan.live ? Math.round(big.scan.live).toLocaleString("it-IT") + " " : ""}posizioni con voti, lette tutte l'ultima volta ${when(big.scan.full_at)}` : "prima lettura di tutte le posizioni in corso";
+    const dmy = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" });
+    for (const p of big.top) {
+      const w = el("div", "row toprow");
+      const t = el("div", "t");
+      t.append(`${p.rank}. ${whoOf(p)}`);
+      const sub = [whoOf(p) !== "#" + p.id ? "#" + p.id : null, p.relay && p.name && p.name !== whoOf(p) ? p.name : null, p.relay ? "Autopilot" : null].filter(Boolean);
+      if (sub.length) t.append(el("span", "sub", " · " + sub.join(" · ")));
+      w.append(t, el("div", "r num", `${fmtN(p.ap)} voti`));
+      const dl = el("div", "d");
+      const stake = p.perm ? "lock perpetuo" : (p.end ? "lock fino al " + dmy.format(new Date(p.end * 1000)) : "");
+      dl.append((p.amount > 0 ? `${fmtN(p.amount)} AERO${stake ? ", " + stake : ""} · ` : "") + `${fmtPct(p.ap / total * 100)} di tutti i voti allocati` +
+        (p.ap > 0 && p.alloc < p.ap * 0.995 ? ` · allocato ${fmtPct(p.alloc / p.ap * 100)}` : ""));
+      if (!p.relay && p.owner) {
+        dl.append(" · proprietario ");
+        const a = el("a", null, short(p.owner)); a.href = `https://basescan.org/address/${p.owner}`; a.target = "_blank"; a.rel = "noopener";
+        dl.append(a);
+      }
+      w.append(dl);
+      const cd = el("div", "d cd"); cd.dataset.ends = p.ends || 0; w.append(cd);
+      if (p.pools.length) w.append(el("div", "d", p.pools.slice(0, 3).map(x => `${poolLabel(x)} ${fmtN(x[3])}` + (x[5] != null ? ` (${fmtPct(x[5] * 100)} del pool)` : "")).join(" · ") +
+        (p.pools.length > 3 ? ` · altri ${p.pools.length - 3}` : "") + (p.last ? ` · ultima allocazione ${when(p.last)}` : "")));
+      box.append(w);
+    }
+    tickCountdowns();
+  }
+
+  // the Autopilot's share of a pool, for the suggested pools
+  function autopilotIn(key) {
+    const big = DATA && DATA.big;
+    if (!big || !big.autopilot) return null;
+    let share = 0, ends = 0;
+    const who = [];
+    for (const p of big.autopilot) {
+      const r = p.pools.find(x => x[0] === key);
+      if (r && r[5]) { share += r[5]; who.push(whoOf(p)); ends = ends ? Math.min(ends, p.ends || ends) : (p.ends || 0); }
+    }
+    return share > 0 ? { share: Math.min(share, 1), who, ends } : null;
   }
 
   async function load() {
