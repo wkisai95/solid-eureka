@@ -102,6 +102,16 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .stat .d { font-size: 12px; color: var(--ink-2); font-family: var(--f-num); }
 #me-addr { flex: 1 1 260px; font-family: var(--f-num); }
 .mepos { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.merank { display: grid; gap: 6px; }
+.merank:empty { display: none; }
+.rkgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 8px; }
+.rkg { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.rkg .rkh { grid-column: 1 / -1; font-weight: 600; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.rkg .rkh .sub { font-weight: 400; font-size: 13px; }
+.rkc { display: grid; gap: 1px; align-content: start; min-width: 0; }
+.rkc .k { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .06em; }
+.rkc .rk { font: 600 16px/1.3 var(--f-num); }
+.rkc .d { font: 12px/1.4 var(--f-num); color: var(--ink-2); }
 .mepos h3 { margin: 0; font: 600 16px/1.3 var(--f-body); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .mepos h3 .sub { font-weight: 400; }
 .mepos .pills { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -373,6 +383,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     </form>
     <p class="note">L'indirizzo resta solo su questo dispositivo: la pagina legge da Base quali sAERO possiede e prende dal monitor quanto ha incassato ognuno. Gli incassi sono fee e incentivi dei pool, divisi in base alla quota di ogni posizione nel pool.</p>
     <div class="stats" id="me-stats"></div>
+    <div class="merank" id="me-rank"></div>
     <div class="chartbox"><div class="chart" id="me-chart"></div></div>
     <div id="me-list"></div>
     <details class="sub-fold" data-fold="me-ids">
@@ -866,10 +877,54 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     box.replaceChildren(svg);
   }
 
+  // where the viewer's votes stand among the positions with at least 100k and 10k allocated sAERO: what each allocated
+  // vote earned over the window, as hundredths of the market (positions.json "peers", best first)
+  const RANK_GROUPS = [["100000", "Oltre 100k"], ["10000", "Oltre 10k"]], RANK_WIN = [[24, "24 ore"], [168, "7 giorni"]];
+  function meRank(T) {
+    const box = $("me-rank"), peers = POS && POS.peers, price = (DATA && DATA.aero_usd) || 0;
+    box.replaceChildren();
+    if (!peers || !(T.alloc > 0)) return;
+    const int = x => Math.round(x).toLocaleString("it-IT");
+    // a multiple of the market (x100) as the APR of one allocated vote, or as the multiple when the price is missing
+    const asApr = (m, n) => { const mk = mktRate(n); return mk && price > 0 ? fmtPct(m / 100 * mk * 365 * 86400 / price * 100) : fmtX(m / 100); };
+    box.append(el("div", "lbl", "In classifica: quanto rende ogni voto allocato"));
+    const grid = el("div", "rkgrid");
+    for (const [thr, label] of RANK_GROUPS) {
+      const g = peers[thr];
+      if (!g) continue;
+      const card = el("div", "rkg"), h = el("div", "rkh");
+      h.append(el("span", null, `${label} sAERO allocati`), el("span", "sub", `${int(g.n)} posizioni`));
+      card.append(h);
+      for (const [n, wl] of RANK_WIN) {
+        const c = el("div", "rkc"), G = g[String(n)], mk = mktRate(n), rate = T.rate[n];
+        c.append(el("div", "k", wl));
+        if (!G || !G.m.length || !mk || rate == null || !(T.secs[n] >= n * 1800)) {
+          c.append(el("div", "d", rate != null && T.secs[n] < n * 1800 ? "la tua posizione incassa da troppo poco" : "—"));
+          card.append(c); continue;
+        }
+        const me = rate / T.alloc / mk * 100, L = G.m.length;
+        const above = G.m.filter(v => v > me + 0.5).length, below = G.m.filter(v => v < me - 0.5).length;
+        const inside = T.alloc >= +thr, pct = fmtPct(below / L * 100);
+        c.append(el("div", "rk", inside ? `${above + 1}ª su ${int(L)}` : `sarebbe ${above + 1}ª su ${int(L + 1)}`),
+          el("div", "d", `meglio ${art(pct, true)}${pct}`),
+          el("div", "d", `tu ${asApr(me, n)}`),
+          el("div", "d", `a metà classifica ${asApr(G.m[Math.floor(L / 2)], n)}`),
+          el("div", "d", `primo 10% da ${asApr(G.m[Math.max(0, Math.ceil(L / 10) - 1)], n)}`));
+        c.title = `APR di un voto allocato nelle ultime ${wl}. Contano le posizioni che incassano o sono allocate da almeno metà del periodo, comprese quelle dell'Autopilot; ` +
+          `la media del gruppo pesata sui voti è ${asApr(G.avg, n)}.`;
+        card.append(c);
+      }
+      grid.append(card);
+    }
+    box.append(grid);
+    if (!(T.alloc >= 10000)) box.append(el("p", "note", "La tua posizione ha meno di 10k sAERO allocati: «sarebbe» dice dove starebbe in quei gruppi."));
+  }
+
   function meRender() {
     const stats = $("me-stats"), list = $("me-list");
     $("me-ids-sum").textContent = myIds.length ? myIds.map(i => "#" + i).join(" ") : "";
     stats.replaceChildren(); list.replaceChildren(); $("me-chart").replaceChildren(); $("me-when").textContent = "";
+    $("me-rank").replaceChildren();
     if (meErr) list.append(el("div", "warnline", meErr));
     if (meLoading) return empty(stats, "Leggo i tuoi sAERO su Base…");
     const ids = allIds();
@@ -881,7 +936,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const chainName = cid => (POS.chains || {})[cid] || "chain " + cid;
     const pools = new Map(((DATA && DATA.pools) || []).map(p => [p.key, p]));
     const onChain = new Map((ME ? ME.pos : []).map(p => [p.id, p]));
-    let T = { amount: 0, ap: 0, alloc: 0, rate: {}, tot: 0, base: 0, since: 0 };
+    let T = { amount: 0, ap: 0, alloc: 0, rate: {}, secs: {}, tot: 0, base: 0, since: 0 };
     const days = new Map();
     const rows = [];
     for (const id of ids) {
@@ -898,7 +953,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         const [since, tot, , , , , d] = r, w = winsOf(r);
         T.tot += tot;
         T.since = T.since ? Math.min(T.since, since) : since;
-        for (const [n] of ME_WIN) if (w[n] && w[n][1] > 0) T.rate[n] = (T.rate[n] || 0) + w[n][0] / w[n][1];
+        for (const [n] of ME_WIN) if (w[n] && w[n][1] > 0) {
+          T.rate[n] = (T.rate[n] || 0) + w[n][0] / w[n][1];
+          T.secs[n] = T.secs[n] == null ? w[n][1] : Math.min(T.secs[n], w[n][1]);
+        }
         for (const [day, v] of d) days.set(day, (days.get(day) || 0) + v);
       }
     }
@@ -928,6 +986,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         return st;
       }),
       stat("Incassato", "$" + T.tot.toFixed(2).replace(".", ","), T.since ? "dal " + datePlain(T.since) : ""));
+    meRank(T);
     if (ME) $("me-when").textContent = `letto da Base ${when(ME.at)}`;
     if (ME && T.ap > 0 && T.alloc < T.ap * 0.995)
       list.append(el("div", "warnline", `${fmtN(T.ap - T.alloc)} di Allocation Power non sono allocati: non incassano nulla.`));

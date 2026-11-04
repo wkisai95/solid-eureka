@@ -302,6 +302,40 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
 
 
 SHARD = 1000
+PEER_GROUPS = (100_000, 10_000)    # positions with at least this many allocated sAERO, for the viewer's ranking
+PEER_WINDOWS = (24, 168)          # hours
+
+
+def _peers(book, alloc, last, rates, total, now, h0):
+    """{threshold: {"n": positions, window: {"m": [...], "avg": ...}}}: for every position with at least `threshold`
+    allocated sAERO, what one of its allocated votes earned per second over the window as a multiple of the market
+    (x100, rounded, best first), and the group's average weighted by votes. A position counts once it has been
+    earning, or allocated, for at least half the window; one that earned nothing counts as zero."""
+    out = {}
+    pp = book.get("p") or {}
+    for thr in PEER_GROUPS:
+        group = {t: a for t, a in alloc.items() if a >= thr}
+        g = {"n": len(group)}
+        for n in PEER_WINDOWS:
+            mk = rates.get(n, 0.0) / total if total > 0 else 0.0
+            if mk <= 0:
+                continue
+            ms, usd_s, votes = [], 0.0, 0.0
+            for t, a in group.items():
+                pe = pp.get(t)
+                if pe:
+                    usd, secs = E.windows(pe, now, h0)[n]
+                else:
+                    usd, secs = 0.0, max(0, now - max(last.get(t, now), now - n * HOUR))
+                if secs < n * HOUR / 2:
+                    continue
+                ms.append(round(usd / secs / a / mk * 100))
+                usd_s += usd / secs
+                votes += a
+            ms.sort(reverse=True)
+            g[str(n)] = {"m": ms, "avg": round(usd_s / votes / mk * 100) if votes > 0 else None}
+        out[str(thr)] = g
+    return out
 
 
 def positions_export(state, params, now):
@@ -325,9 +359,10 @@ def positions_export(state, params, now):
             sh["names"].append(A.gauge_name(state, g))
         return sh["idx"][g]
 
-    alloc = {}
+    alloc, last = {}, {}
     for cid, tid, t, size, end, active in positions(state, cooldown):
         alloc[tid] = alloc.get(tid, 0.0) + size
+        last[tid] = max(last.get(tid, 0), int(t.get("last") or 0))
         sh = shard(tid)
         pools = [[pool_index(sh, g), round(a)] for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])]
         sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools])
@@ -344,6 +379,7 @@ def positions_export(state, params, now):
                 rates[n] = rates.get(n, 0.0) + usd / secs
     total = sum(alloc.values())
     market = {str(n): float(f"{v / total:.6g}") for n, v in rates.items()} if total > 0 else {}
+    peers = _peers(book, alloc, last, rates, total, now, h0)
     for tid, pe in (book.get("p") or {}).items():
         sh = shard(tid)
         r = E.summary(pe, now, keys, h0)
@@ -353,6 +389,9 @@ def positions_export(state, params, now):
              "shards": sorted(shards), "earnings_from": (state.get("earnings") or {}).get("from"),
              # USD per second earned by one allocated sAERO, by window in hours (168: 7 days)
              "market": market, "market_alloc": round(total),
+             # positions of at least 100k and 10k allocated sAERO: what each of their allocated votes earned per window,
+             # in hundredths of the market ("m", best first), and the group's average; see _peers
+             "peers": peers,
              "chains": {cid: C.chain_short(cid) for cid in sorted({int(c) for c in state["chains"]})}}
     return index, {k: {"generated": now, "names": v["names"], "keys": v["keys"], "p": v["p"], "r": v["r"]}
                    for k, v in shards.items()}

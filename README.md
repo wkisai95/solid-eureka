@@ -77,6 +77,11 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
   e per giorno. L'APR è calcolato sul valore degli AERO in stake al prezzo attuale.
   Accanto a ogni APR c'è il multiplo della resa di mercato: quanto ha reso ogni voto allocato della posizione
   rispetto alla media di tutti i voti allocati nella stessa finestra (×1 = come il mercato).
+- **in classifica**: dove stanno i tuoi voti tra le posizioni con più di 100k e con più di 10k sAERO allocati
+  (Autopilot compreso), per quanto ha reso ogni voto allocato nelle ultime 24 ore e negli ultimi 7 giorni: posto,
+  quota delle posizioni che fai meglio, il tuo APR per voto, quello a metà classifica e la soglia del primo 10%. Se
+  la tua posizione è più piccola della soglia, dice in che posto sarebbe. Contano le posizioni che incassano o sono
+  allocate da almeno metà del periodo; il monitor le mette in `positions.json` (`peers`).
 
 Il primo giro ricostruisce gli ultimi 7 giorni dalle fee già raccolte, solo per le ore in cui ogni posizione aveva già
 l'allocazione di adesso. I numeri sono una stima dai dati pubblici, non i claim effettivi del contratto.
