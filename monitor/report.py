@@ -340,7 +340,8 @@ def positions_export(state, params, now):
 
     Split by position number (SHARD numbers per file) so the page downloads only the files it needs.
     Returns (index, {shard: {"names": [...], "keys": [...], "p": {id: [[chainId, cooldown end, sAERO, active,
-    moves, [[pool index, sAERO], ...]], ...]}, "r": {id: earnings.summary with pool indexes}}}).
+    moves, [[pool index, sAERO], ...]], ...]}, "r": {id: earnings.summary with pool indexes, plus [last allocation
+    change, USD since then, export time] when that change was within the last day}}}).
     """
     cooldown = params["cooldown"]
     shards = {}
@@ -380,6 +381,10 @@ def positions_export(state, params, now):
         sh = shard(tid)
         r = E.summary(pe, now, keys, h0)
         r[7] = [[pool_index(sh, g), v] for g, v in sorted(r[7].items(), key=lambda kv: -kv[1]) if v >= 0.01]
+        # what it earned since its last allocation change, when that was within the last day: [since, USD, until]
+        got = E.since(pe, last.get(tid, 0), now, h0)
+        if got is not None:
+            r.append([last[tid], round(got, 4), now])
         sh["r"][tid] = r
     index = {"v": 4, "generated": now, "cooldown_h": round(cooldown / HOUR, 2), "shard": SHARD,
              "shards": sorted(shards), "earnings_from": (state.get("earnings") or {}).get("from"),

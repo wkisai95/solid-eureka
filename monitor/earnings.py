@@ -276,6 +276,19 @@ def windows(p, now, h0):
     return out
 
 
+def since(p, t0, now, h0):
+    """USD credited to the position since t0, from its hourly buckets; None when t0 is older than they reach."""
+    if not t0 or t0 < h0 - (HOURS - 1) * HOUR or t0 >= now:
+        return None
+    usd = 0.0
+    for i, v in enumerate(p.get("h") or []):
+        b = h0 - i * HOUR
+        lo, hi = max(b, t0), min(b + HOUR, now)
+        if hi > lo and v:
+            usd += v * (hi - lo) / max(1, min(b + HOUR, now) - b)
+    return usd
+
+
 def summary(p, now, keys, h0):
     """[since, total, USD 24 h, its seconds, USD 7 days, its seconds, [[day, USD], ...] 14 days, {gauge: USD},
     [[hours, USD, seconds], ...] for 1, 6, 12 and 24 hours].

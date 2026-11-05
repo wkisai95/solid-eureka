@@ -115,6 +115,11 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .mepos h3 { margin: 0; font: 600 16px/1.3 var(--f-body); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .mepos h3 .sub { font-weight: 400; }
 .mepos .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.claim { display: grid; gap: 4px; border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; }
+.claim form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; }
+.claim input { width: 7em; font: inherit; font-family: var(--f-num); }
+.claim .res { font: 600 15px/1.35 var(--f-num); }
+.claim .d { font-size: 12px; color: var(--ink-2); }
 .warnline { color: var(--warn); font-size: 13px; }
 .stat .k { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .06em; }
 .stat .v { font: 500 20px/1.2 var(--f-num); }
@@ -240,7 +245,8 @@ label.switch input:checked::after { left: 21px; }
 .toast button.linkish { margin-left: 8px; }
 .strip .outflow { font-size: 12px; color: var(--accent); }
 .exits { display: grid; gap: 4px; }
-.apwin { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+.apwin { display: grid; gap: 6px; margin-top: 10px; }
+details.apfold { margin-top: 4px; }
 .apwin .aphead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; }
 .aprow { border: 1px solid var(--line); border-radius: 10px; }
 .aprow > summary { list-style: none; cursor: pointer; padding: 8px 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; }
@@ -444,7 +450,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <div class="exits" id="rd-exits"></div>
         <div class="controls"><button type="button" id="rd-use">Usa questa allocazione</button><button type="button" class="ghost" id="rd-copy">Copia pesi</button><a href="https://app.aero.xyz" target="_blank" rel="noopener">Apri Aero ↗</a></div>
         <div class="toast" id="rd-toast" role="status"></div>
-        <div class="apwin" id="autopilot"></div>
+        <details class="sub-fold apfold" data-fold="autopilot" open>
+          <summary><span class="fold-t">Voti dell'Autopilot</span><span class="sub" id="autopilot-sum"></span></summary>
+          <div class="apwin" id="autopilot"></div>
+        </details>
       </div>
       <div class="rd-side">
         <div class="box"><div class="lbl">Media del mercato</div><div class="compare" id="rd-mkt"></div><div class="lbl">Perché non tutto nel primo</div><div class="compare" id="rd-top"></div></div>
@@ -919,7 +928,67 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (!(T.alloc >= 10000)) box.append(el("p", "note", "La tua posizione ha meno di 10k sAERO allocati: «sarebbe» dice dove starebbe in quei gruppi."));
   }
 
+  // what a position has earned since its last allocation change, as the Aero app shows it: typed in, kept on this
+  // device until the position allocates again; the APR then needs no data from the monitor
+  let CLAIM = {};
+  try { CLAIM = JSON.parse(localStorage.getItem("radar-claim") || "{}") || {}; } catch (e) { CLAIM = {}; }
+  const saveClaim = () => { try { localStorage.setItem("radar-claim", JSON.stringify(CLAIM)); } catch (e) {} };
+  const DRAFT = {};
+  let meDeferred = false;
+  const hrsTxt = s => { const h = s / 3600; return h < 10 ? h.toFixed(1).replace(".", ",") : String(Math.round(h)); };
+  function claimBox(id, allocAt, base, alloc, est) {
+    const price = (DATA && DATA.aero_usd) || 0, box = el("div", "claim");
+    let c = CLAIM[id];
+    if (c && c.alloc_at !== allocAt) { delete CLAIM[id]; saveClaim(); c = null; }      // the position has moved since
+    const f = el("form"), inp = el("input"), hIn = el("input");
+    inp.type = "text"; inp.inputMode = "decimal"; inp.placeholder = "es. 12,40"; inp.setAttribute("aria-label", "Dollari maturati dal cambio di allocazione");
+    hIn.type = "text"; hIn.inputMode = "decimal"; hIn.setAttribute("aria-label", "Ore");
+    const now = Date.now() / 1000, elapsed = allocAt ? now - allocAt : 0;
+    const dr = DRAFT[id];
+    inp.value = dr ? dr.usd : (c ? String(c.usd).replace(".", ",") : "");
+    hIn.value = dr && dr.h != null ? dr.h : (c ? hrsTxt(c.secs) : (allocAt ? hrsTxt(elapsed) : ""));
+    inp.addEventListener("input", () => { DRAFT[id] = { ...(DRAFT[id] || {}), usd: inp.value }; });
+    hIn.addEventListener("input", () => { DRAFT[id] = { usd: inp.value, ...(DRAFT[id] || {}), h: hIn.value }; });
+    for (const x of [inp, hIn]) x.addEventListener("blur", () => setTimeout(() => {
+      if (meDeferred && !(document.activeElement && document.activeElement.closest && document.activeElement.closest(".claim"))) { meDeferred = false; meRender(); }
+    }, 0));
+    const ok = el("button", "ghost", "Calcola"); ok.type = "submit";
+    f.append("Maturato dal cambio di allocazione: $", inp, "in", hIn, "ore", ok);
+    box.append(f);
+    const out = el("div");
+    const show = () => {
+      out.replaceChildren();
+      const cc = CLAIM[id];
+      if (!cc) {
+        out.append(el("div", "d", allocAt ? `Scrivi quanto mostra l'app di Aero per questa posizione: le ore partono dal cambio di allocazione (${when(allocAt)}).`
+          : "Scrivi quanto mostra l'app di Aero e in quante ore l'ha maturato."));
+        return;
+      }
+      const capital = base * price, perSec = cc.usd / cc.secs;
+      const a = capital > 0 ? perSec * 365 * 86400 / capital * 100 : null, m = multOf(perSec, alloc, 24);
+      out.append(el("div", "res", `APR ${fmtPct(a)} · $${(perSec * 86400).toFixed(2).replace(".", ",")} al giorno` + (m != null ? ` · ${fmtX(m)} il mercato` : "")));
+      out.append(el("div", "d", `Da $${cc.usd.toFixed(2).replace(".", ",")} in ${hrsTxt(cc.secs)} ore, scritti ${when(cc.at)}` +
+        (est != null && cc.secs > 0 && Math.abs(cc.secs - (est[2] - est[0])) < 2 * 3600 ? `; il monitor stima $${est[1].toFixed(2).replace(".", ",")} dallo stesso cambio di allocazione` : "") + "."));
+      const clr = el("button", "linkish", "Cancella"); clr.type = "button";
+      clr.addEventListener("click", () => { delete CLAIM[id]; saveClaim(); inp.value = ""; show(); });
+      out.append(clr);
+    };
+    f.addEventListener("submit", e => {
+      e.preventDefault();
+      const usd = numIn(inp.value), h = numIn(hIn.value);
+      if (!(usd >= 0) || !(h > 0)) { out.replaceChildren(el("div", "d", "Servono i dollari e le ore, per esempio 12,40 e 4.")); return; }
+      CLAIM[id] = { usd, secs: Math.round(h * 3600), at: Math.round(Date.now() / 1000), alloc_at: allocAt };
+      delete DRAFT[id];
+      saveClaim(); show();
+    });
+    show();
+    box.append(out);
+    return box;
+  }
+
   function meRender() {
+    const ae = document.activeElement;
+    if (ae && ae.closest && ae.closest(".claim")) { meDeferred = true; return; }      // a figure is being typed
     const stats = $("me-stats"), list = $("me-list");
     $("me-ids-sum").textContent = myIds.length ? myIds.map(i => "#" + i).join(" ") : "";
     stats.replaceChildren(); list.replaceChildren(); $("me-chart").replaceChildren(); $("me-when").textContent = "";
@@ -1018,6 +1087,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         kv.append(el("span", "pill pas", `$${(s7 > 0 ? u7 / s7 * 86400 : 0).toFixed(2).replace(".", ",")}/giorno`),
           el("span", "pill pas", `$${tot.toFixed(2).replace(".", ",")} dal ${datePlain(since)}`));
         box.append(kv);
+      }
+      if (ent.length) {
+        // the last allocation change: the latest cooldown start over the chains it allocates on
+        const cdH = (POS && POS.cooldown_h) || 47, allocAt = Math.max(...ent.map(e => e[1])) - cdH * 3600;
+        box.append(claimBox(id, allocAt > 0 ? allocAt : 0, base, alloc, r && r[9] ? r[9] : null));
       }
       if (!ent.length) {
         box.append(el("div", "empty", oc && oc.ap > 0 ? "Nessuna allocazione: questa posizione non incassa nulla finché non la allochi." : "Nessuna allocazione trovata per questo numero."));
@@ -2490,12 +2564,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const box = $("autopilot");
     box.replaceChildren();
     const big = d && d.big;
-    const head = el("div", "aphead");
-    head.append(el("div", "reco-h", "Voti dell'Autopilot"));
-    box.append(head);
+    $("autopilot-sum").textContent = "";
     if (!big || !big.autopilot) { box.append(el("p", "note", "I dati sull'Autopilot arrivano con il prossimo giro del monitor.")); return; }
     const rel = big.autopilot, total = big.total || 1, sum = rel.reduce((t, p) => t + p.alloc, 0);
-    head.append(el("span", "sub", `${fmtN(sum)} voti in ${rel.length} relay, ${art(fmtPct(sum / total * 100))}${fmtPct(sum / total * 100)} di tutti i voti allocati`));
+    $("autopilot-sum").textContent = `${fmtN(sum)} voti in ${rel.length} relay, ${art(fmtPct(sum / total * 100))}${fmtPct(sum / total * 100)} di tutti i voti allocati`;
     box.append(el("p", "note", "Ogni relay è una sola posizione che vota per tutti i suoi depositanti e, come le altre, dopo ogni allocazione aspetta 47 ore. " +
       "Quando sposta i voti, nei pool che lascia chi resta guadagna di più finché altri non entrano: «se esce» dice quanto renderebbe in più ogni voto che resta. " +
       "Ti arriva una notifica a ogni spostamento e 45 minuti prima della fine del cooldown dei relay più grandi."));
