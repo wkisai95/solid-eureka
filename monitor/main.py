@@ -271,8 +271,7 @@ def run(args):
     T.accrue(tr, state, prices, fresh_fees, now, params["cooldown"])
     # what every real position earns, for the page's "I tuoi sAERO"
     try:
-        e_last = int((state.get("earnings") or {}).get("last") or 0)
-        E.accrue(state, prices, T.interval_revenue(state, prices, fresh_fees, e_last, now) if e_last else {}, now, log)
+        E.accrue(state, prices, fresh_fees, now, log)
     except Exception:
         status["errors"].append("earnings: " + traceback.format_exc()[-200:])
         log(f"earnings failed: {traceback.format_exc()[-600:]}")

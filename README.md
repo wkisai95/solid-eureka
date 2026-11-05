@@ -71,8 +71,12 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
 
 - **allocazione** di ogni posizione su ogni rete, con la quota del pool e l'APR del pool nelle ultime 48 ore;
 - **cooldown** di ogni rete;
-- **APR reale**: a ogni giro il monitor divide le fee e gli incentivi arrivati a ogni pool tra tutte le posizioni
-  allocate, in proporzione alla loro quota. Da qui gli incassi dell'ultima ora, delle ultime 6, 12 e 24 ore
+- **APR reale**: a ogni giro il monitor divide le fee e gli incentivi di ogni pool tra tutte le posizioni
+  allocate, in proporzione alla loro quota. Il contratto di Aero accredita le fee ai voti allocati mentre maturano
+  (ogni cambio di allocazione nel pool accredita prima quanto è maturato fino a lì), ma le fee arrivano al contratto
+  solo quando qualcuno le raccoglie, su alcune reti ogni qualche ora: dove il volume orario del pool è noto il monitor
+  le stima mentre maturano (volume × fee per dollaro scambiato nelle ultime 48 ore) e i trasferimenti aggiungono solo
+  quello che la stima non aveva contato. Da qui gli incassi dell'ultima ora, delle ultime 6, 12 e 24 ore
   (secchi orari), degli ultimi 7 giorni, per pool
   e per giorno. L'APR è calcolato sul valore degli AERO in stake al prezzo attuale.
   Accanto a ogni APR c'è il multiplo della resa di mercato: quanto ha reso ogni voto allocato della posizione

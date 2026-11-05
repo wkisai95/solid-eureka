@@ -1,11 +1,19 @@
 """What every sAERO position really earns: fees and incentives of its pools, split by its share of each pool.
 
-Every run, the revenue that reached each gauge (new fee transfers and streamed incentives) is divided among the
-positions allocated to it, in proportion to their allocation over the pool's total allocation. Positions are keyed
-by number, across every chain they allocate on. Nothing here knows who owns a position: the page finds the
-viewer's positions from their address and reads their numbers from the public export.
+Every run, the revenue of each gauge since the last run is divided among the positions allocated to it, in
+proportion to their allocation over the pool's total allocation. Positions are keyed by number, across every chain
+they allocate on. Nothing here knows who owns a position: the page finds the viewer's positions from their address
+and reads their numbers from the public export.
+
+Fees. Aero's rewards manager credits a pool's fees to the votes allocated while they accrue: every allocation change
+in the pool first credits what accrued until then, at the votes of that moment. The fees themselves reach the
+contract (FeesCollected) only when someone collects them, every few hours on some chains. So where the pool's hourly
+volume is known, its fees are estimated as they accrue (volume x the pool's fees per dollar traded over the last 48
+hours) and the transfers only add what the estimate missed; elsewhere the transfers are credited as they arrive.
+Incentives stream by their schedule.
 """
 from . import aero as A
+from . import marketdata as MD
 
 HOUR = 3600
 DAY = 86400
@@ -13,6 +21,7 @@ HOURS = 25                  # hourly buckets for the last day: windows of 1, 6, 
 WINDOWS = (1, 6, 12, 24)
 KEEP_D = 35 * DAY
 BACKFILL = 7 * DAY
+EST_V = 1                   # version of the fee estimate; a new one sets the uncollected estimates up again
 
 
 def _book(state):
@@ -115,8 +124,98 @@ def _backfill(state, prices, pe, now, log, hours_only=False):
         f"({credited} pool-hours)")
 
 
-def accrue(state, prices, revenue, now, log):
-    """revenue: {gauge: USD that reached its allocators since the last run} (tracker.interval_revenue)."""
+def _vol_between(vser, start, end):
+    """Volume traded between start and end, from the hourly snapshots: the one taken in an hour is the volume of the
+    60 minutes before it, so an hour is best covered by the next hour's snapshot, then by its own, then by the last
+    one before it."""
+    tot, t = 0.0, start
+    known = sorted(int(h) for h in vser)
+    while t < end:
+        h = t - t % HOUR
+        nxt = min(end, h + HOUR)
+        snap = vser.get(str(h + HOUR)) or vser.get(str(h))
+        if snap is None:
+            prev = [x for x in known if x <= h]
+            snap = vser.get(str(prev[-1])) if prev and h - prev[-1] <= 3 * HOUR else None
+        tot += float((snap or [0])[0] or 0) * (nxt - t) / HOUR
+        t = nxt
+    return tot
+
+
+def _fee_rate(state, g, now):
+    """(fees per dollar traded over the last 48 hours, the pool's volume snapshots, fees of the last 48 hours)."""
+    vser = (MD.market_state(state)["hist"]["pools"]).get(g) or {}
+    if not vser:
+        return 0.0, {}, 0.0
+    _, v48 = MD.hourly_volume(state, g, now)
+    f48 = A.fees_usd(state, g, now - 48 * HOUR, now + HOUR)
+    return (min(0.01, f48 / v48) if v48 and f48 > 0 else 0.0), vser, f48
+
+
+def interval_revenue(state, prices, fresh_fees, start, end, pe):
+    """{gauge: USD credited to its allocators between start and end}; pe["est"] keeps, per gauge, the fees estimated
+    and credited that no transfer has brought yet."""
+    est_left = pe.setdefault("est", {})
+    got = {}
+    for ts, k, usd in fresh_fees:
+        if start - 2 * HOUR < ts <= end:
+            got[k] = got.get(k, 0.0) + usd
+    rev = {}
+    for g in set(_by_gauge(state)) | set(got):
+        fpv, vser, f48 = _fee_rate(state, g, end)
+        est = _vol_between(vser, start, end) * fpv if fpv > 0 else 0.0
+        left = est_left.get(g, 0.0) + est
+        arrived = got.get(g, 0.0)
+        extra = max(0.0, arrived - left)          # what the estimate missed: credited now
+        left = min(max(0.0, left - arrived), max(f48, 1.0))
+        if left > 0.005:
+            est_left[g] = round(left, 4)
+        else:
+            est_left.pop(g, None)
+        if est + extra > 0:
+            rev[g] = est + extra
+    for k in {p["g"] for p in state["incentives"].values()}:
+        r = A.incentive_usd(state, prices, k, start, end)
+        if r > 0:
+            rev[k] = rev.get(k, 0.0) + r
+    return rev
+
+
+def _setup_estimates(state, pe, now, log):
+    """Once: the fees that accrued since each pool's last transfer, estimated hour by hour from its volume and
+    credited to the positions allocated in it for the hours they were there; they are what the next transfer
+    brings, so they are kept as already credited."""
+    gauges = _by_gauge(state)
+    est_left, credited = pe.setdefault("est", {}), 0.0
+    for g, members in gauges.items():
+        fpv, vser, f48 = _fee_rate(state, g, now)
+        if fpv <= 0:
+            continue
+        hours = [int(h) for h, v in (state["fees"].get(g) or {}).items() if v > 0 and int(h) >= now - 48 * HOUR]
+        if not hours:
+            continue
+        t0 = max(hours) + HOUR // 2                 # the last transfer, within its hour
+        left = 0.0
+        t = t0
+        while t < now:
+            nxt = min(now, t - t % HOUR + HOUR)
+            usd = _vol_between(vser, t, nxt) * fpv
+            left += usd
+            tot = _total(state, g, members, t - t % HOUR)
+            if usd > 0 and tot > 0:
+                for tid, a, last in members:
+                    if last <= t:
+                        _credit(pe, tid, g, usd * a / tot, t, t)
+                        credited += usd * a / tot
+            t = nxt
+        if left > 0.005:
+            est_left[g] = round(min(left, max(f48, 1.0)), 4)
+    pe["est_v"] = EST_V
+    log(f"earnings: fees accrued since the last transfer estimated in {len(est_left)} pools, ${credited:,.2f} credited")
+
+
+def accrue(state, prices, fresh_fees, now, log):
+    """fresh_fees: [(time, gauge, USD)] fee transfers priced in this run (aero.settle_rewards)."""
     pe = _book(state)
     last = int(pe.get("last") or 0)
     pe["last"] = now
@@ -135,6 +234,9 @@ def accrue(state, prices, revenue, now, log):
         pe["hourly"] = True
     if now <= last:
         return pe
+    if pe.get("est_v") != EST_V:
+        _setup_estimates(state, pe, last, log)
+    revenue = interval_revenue(state, prices, fresh_fees, last, now, pe)
     gauges = _by_gauge(state)
     for g, usd in revenue.items():
         members = gauges.get(g)
