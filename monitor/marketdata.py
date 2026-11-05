@@ -1,4 +1,4 @@
-"""Market data for the strategies and for a future predictive model.
+"""Market data for the simulation and for a future predictive model.
 
 Every hour:
 - volume and liquidity of every Aero pool (DexScreener, by pool address);

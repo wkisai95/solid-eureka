@@ -243,8 +243,7 @@ def run(args):
             log(f"market data failed: {traceback.format_exc()[-400:]}")
 
     # paper allocation of a fixed size, followed through every cooldown
-    T.RULES.clear()
-    # options loaded from the page ("Carica queste opzioni nelle simulazioni"): kept until the next load
+    # options loaded from the page ("Carica queste opzioni nella simulazione"): kept until the next load
     raw_opts = (os.environ.get("OPTIONS_JSON") or "").strip()
     if raw_opts:
         try:
