@@ -60,8 +60,8 @@ Aerodrome](https://github.com/aerodrome-finance/docs/blob/main/content/security.
 and Incentives», `0xBDE0…EA5a`) e i depositi sulla chain. I nomi degli indirizzi noti sono in `config.json`
 (`labels`).
 
-**Carica queste opzioni nelle simulazioni** manda le opzioni al monitor (avvia un giro con il token GitHub della
-pagina): da quel giro in poi tutti i metodi della simulazione le seguono. Restano valide finché non ne carichi altre
+**Carica queste opzioni nella simulazione** manda le opzioni al monitor (avvia un giro con il token GitHub della
+pagina): da quel giro in poi la simulazione le segue. Restano valide finché non ne carichi altre
 e sono in `tracker.json` (`options`).
 
 ## I tuoi sAERO
@@ -88,24 +88,16 @@ l'allocazione di adesso. I numeri sono una stima dai dati pubblici, non i claim 
 
 ## Simulazione
 
-Ogni giro (circa ogni 15 minuti) calcola con cinque metodi l'allocazione migliore per una posizione di
+Ogni giro (circa ogni 15 minuti) calcola con il metodo del Radar l'allocazione migliore per una posizione di
 `tracker.size` sAERO (235.000 di default) tra i pool di tutte le chain, con al massimo 20 pool per chain come il
 LeafVoter, la salva e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti
-dall'allocazione reale degli altri:
+dall'allocazione reale degli altri. Segue le opzioni caricate dal Radar: trend, concorrenza, massimo e minimo per
+pool, reti, pool e ricerche scartati, picchi di volume.
 
-| Metodo | Come stima la resa delle prossime 47 ore |
-|---|---|
-| Ultime 48 ore | Fee delle ultime 48 ore più gli incentivi programmati |
-| Tendenza 12 ore | Metà peso alle ultime 48 ore, metà alle ultime 12 |
-| Prudente | Come il primo, ma prevede che gli altri allocatori arrivino sui pool che rendono molto più della media |
-| Chain nuove | Come il primo, ma solo sulle coppie più grosse (per volume su tutti i DEX) delle chain fuori da Base e OP dove Aero ha meno del 15% del volume DEX, e solo dove Aero ha meno della metà del volume della coppia |
-| Radar | Il metodo del Radar con il trend e la concorrenza caricati dalla pagina |
-
-Tutti i metodi rispettano le opzioni caricate dal Radar: massimo e minimo per pool, reti, pool e ricerche scartati,
-picchi di volume. A ogni giro il monitor misura quanto hanno incassato tutte le allocazioni salvate e ne fa una
-classifica: dollari al giorno nelle ultime 24 ore, negli ultimi 7 giorni e dall'inizio, con il confronto tra
-incassato e previsto. Ogni metodo ha anche una posizione virtuale che si sposta solo a fine cooldown. I risultati
-sono in `tracker.json` sul ramo `data` e nella pagina. La raccolta non si azzera mai da sola né da un tasto.
+A ogni giro il monitor misura quanto hanno incassato tutte le allocazioni salvate: dollari al giorno nelle ultime 24
+ore, negli ultimi 7 giorni e dall'inizio, con il confronto tra incassato e previsto. C'è anche una posizione virtuale
+che si sposta solo a fine cooldown. I risultati sono in `tracker.json` sul ramo `data` e nella pagina. La raccolta non
+si azzera mai da sola né da un tasto.
 
 ## Pagina e app
 
@@ -158,8 +150,7 @@ Gli avvisi sulle tue posizioni arrivano solo su ntfy e non compaiono nei dati pu
 | Cooldown dell'Autopilot | Mancano `autopilot_heads_up_min` minuti alla fine del cooldown di un relay da almeno 5 milioni di voti |
 | Riepilogo | Ogni mattina dopo le `digest_hour` |
 
-Le soglie, le chain e i loro RPC pubblici, e le regole del metodo «Chain nuove» (`strategies.nuove`) si cambiano in
-`config.json`.
+Le soglie, le chain e i loro RPC pubblici si cambiano in `config.json`.
 
 ## Esecuzione manuale
 

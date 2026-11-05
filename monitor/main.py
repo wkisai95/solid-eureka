@@ -244,7 +244,6 @@ def run(args):
 
     # paper allocation of a fixed size, followed through every cooldown
     T.RULES.clear()
-    T.RULES.update(cfg.get("strategies") or {})
     # options loaded from the page ("Carica queste opzioni nelle simulazioni"): kept until the next load
     raw_opts = (os.environ.get("OPTIONS_JSON") or "").strip()
     if raw_opts:
@@ -263,6 +262,9 @@ def run(args):
         state["tracker"] = T.new_tracker(size, now)
         log(f"tracker: new collection with {size:,.0f} sAERO")
     tr = state["tracker"]
+    gone = T.prune(tr)
+    if gone:
+        log("tracker: methods no longer simulated, records dropped: " + ", ".join(gone))
     if "broken_prices_1" not in state.setdefault("repairs", []):
         T.repair_broken_prices(tr, now, log)
         state["repairs"].append("broken_prices_1")

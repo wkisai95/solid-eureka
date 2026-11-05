@@ -115,7 +115,6 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .mepos h3 { margin: 0; font: 600 16px/1.3 var(--f-body); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .mepos h3 .sub { font-weight: 400; }
 .mepos .pills { display: flex; flex-wrap: wrap; gap: 6px; }
-.mepos table td.old { color: var(--ink-2); }
 .warnline { color: var(--warn); font-size: 13px; }
 .stat .k { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .06em; }
 .stat .v { font: 500 20px/1.2 var(--f-num); }
@@ -424,8 +423,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field"><label for="rd-cap">Massimo per pool</label><select id="rd-cap"><option value="100">Nessun limite</option><option value="50">50%</option><option value="34">34%</option><option value="25">25%</option><option value="20">20%</option><option value="10">10%</option></select><small>Distribuisce il rischio di previsione</small></div>
     </div>
     <div class="loadbar" id="rd-loadbar">
-      <span class="sub" id="rd-load-state">Le simulazioni qui sotto non usano ancora queste opzioni.</span>
-      <button type="button" class="ghost" id="rd-load">Carica queste opzioni nelle simulazioni</button>
+      <span class="sub" id="rd-load-state">La simulazione qui sotto non usa ancora queste opzioni.</span>
+      <button type="button" class="ghost" id="rd-load">Carica queste opzioni nella simulazione</button>
     </div>
 
     <div class="rd-result">
@@ -497,7 +496,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p><b>Voti in uscita.</b> Il radar divide le fee per i voti che il pool ha adesso. Se nelle ultime 6 ore sono usciti voti, le stesse rewards si dividono tra meno voti, quindi l'APR a 6 ore con l'allocazione suggerita è più alto di quanto ha reso davvero ogni voto in quelle ore, quando i voti erano di più. Se la differenza, già al netto dei tuoi voti, supera il 5%, sotto il pool compare una nota con i voti usciti, la loro quota del totale e l'aumento atteso. Vale finché i voti non rientrano.</p>
         <p><b>Minimo e massimo per pool.</b> Con un minimo del 10% ogni pool scelto riceve almeno il 10% dei voti, quindi al massimo 10 pool: il radar toglie il pool con la quota più piccola sotto il minimo e ridistribuisce, finché tutti lo rispettano. Il massimo limita la quota di ogni pool; se i pool rimasti sono troppo pochi per arrivare al 100%, sale quanto basta. Su ogni rete si votano al massimo 20 pool.</p>
         <p><b>Autodiluizione.</b> Ogni voto che aggiungi abbassa il rendimento del successivo. Il radar distribuisce la tua AP a fette dell'1%, ogni volta al pool che rende di più sulla fetta successiva.</p>
-        <p><b>Simulazioni.</b> «Carica queste opzioni nelle simulazioni» le manda al monitor: da quel giro in poi tutti e cinque i metodi della simulazione rispettano massimo, minimo, reti, pool e ricerche scartati e picchi di volume; trend e concorrenza definiscono il metodo «Radar». La dimensione della simulazione resta la sua: la tua Allocation Power resta solo su questo dispositivo.</p>
+        <p><b>Simulazione.</b> «Carica queste opzioni nella simulazione» le manda al monitor: da quel giro in poi la simulazione del Radar segue massimo, minimo, reti, pool e ricerche scartati, picchi di volume, trend e concorrenza. La dimensione della simulazione resta la sua: la tua Allocation Power resta solo su questo dispositivo.</p>
         <p><b>Cosa non sa.</b> Non vede i movimenti degli altri allocatori durante le 47 ore di cooldown, non prevede incentivi nuovi o picchi di volume, e ignora i limiti di emissione dei gauge, che limitano le ricompense AERO di un pool ma non la revenue che ricevi. Non è una consulenza finanziaria: è aritmetica su dati pubblici.</p>
       </div>
     </details>
@@ -514,7 +513,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   <details class="panel fold" data-fold="sim" open id="sim">
     <summary class="panel-head"><h2>Simulazione <span id="sim-size">235k</span> sAERO</h2><span class="sub" id="sim-since"></span></summary>
     <div class="fold-body">
-    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore con cinque metodi, la salva e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. A ogni giro misura quanto stanno rendendo tutte le allocazioni salvate: la classifica dice quale metodo rende di più nel tempo.</p>
+    <p class="note">Ogni 15 minuti il monitor calcola l'allocazione migliore con il metodo del Radar, la salva e la segue per tutto il cooldown con le fee e gli incentivi che arrivano davvero, diluiti dall'allocazione degli altri. A ogni giro misura quanto stanno rendendo tutte le allocazioni salvate e quanto rispetto alla previsione.</p>
     <p class="note" id="sim-opts"></p>
     <div class="tbl">
       <table class="rank">
@@ -523,11 +522,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       </table>
     </div>
     <p class="note" id="sim-rank-note"></p>
-    <div class="seg" id="sim-mode" role="group" aria-label="Grafico"><button type="button" data-m="rate" aria-pressed="true">Reso al giorno</button><button type="button" data-m="virtual" aria-pressed="false">Posizioni virtuali</button></div>
+    <div class="seg" id="sim-mode" role="group" aria-label="Grafico"><button type="button" data-m="rate" aria-pressed="true">Reso al giorno</button><button type="button" data-m="virtual" aria-pressed="false">Posizione virtuale</button></div>
     <div class="legend" id="sim-legend"></div>
     <div class="chartbox"><div class="chart" id="sim-chart"></div></div>
     <details class="sub-fold" data-fold="sim-cards" open>
-      <summary><span class="fold-t">I cinque metodi nel dettaglio</span><span class="sub">consiglio di adesso e posizione virtuale</span></summary>
+      <summary><span class="fold-t">Nel dettaglio</span><span class="sub">consiglio di adesso e posizione virtuale</span></summary>
       <div class="fold-body"><div class="cards" id="sim-cards"></div></div>
     </details>
     </div>
@@ -1037,26 +1036,20 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const thead = document.createElement("thead"); thead.append(thr);
       const tbody = document.createElement("tbody");
       const ap = oc && oc.ap > 0 ? oc.ap : alloc;
-      const line = (name, chain, a, key, usd, old) => {
+      const line = (name, chain, a, key, usd) => {
         const tr = document.createElement("tr");
         const pool = key ? pools.get(key) : null;
         const td = el("td"); td.append(el("span", "nm", name)); if (pool && pool.kind && pool.kind !== "?") td.append(el("span", "kd", pool.kind));
         tr.append(td, el("td", "ch muted", chain));
-        tr.append(el("td", "num" + (old ? " old" : ""), old ? "—" : fmtN(a)), el("td", "num", old ? "—" : fmtPct(a / ap * 100)));
-        tr.append(el("td", "num", !old && pool && pool.ap > 0 ? fmtPct(a / pool.ap * 100) : "—"));
+        tr.append(el("td", "num", fmtN(a)), el("td", "num", fmtPct(a / ap * 100)));
+        tr.append(el("td", "num", pool && pool.ap > 0 ? fmtPct(a / pool.ap * 100) : "—"));
         tr.append(el("td", "num", pool && pool.apr != null ? fmtPct(pool.apr) : "—"));
         tr.append(el("td", "num", usd != null ? "$" + usd.toFixed(2).replace(".", ",") : "—"));
         tbody.append(tr);
       };
-      const shown = new Set();
       for (const [cid, , , , , pls] of ent) for (const [i, a] of pls) {
         const key = sh.keys ? sh.keys[i] : null;
-        shown.add(i);
-        line(sh.names[i], chainName(cid), a, key, earned.has(i) ? earned.get(i) : null, false);
-      }
-      for (const [i, v] of earned) if (!shown.has(i) && v >= 0.01) {
-        const key = sh.keys ? sh.keys[i] : null, cid = key ? +key.split(":")[0] : null;
-        line(sh.names[i] + " (prima)", cid ? chainName(cid) : "", 0, key, v, true);
+        line(sh.names[i], chainName(cid), a, key, earned.has(i) ? earned.get(i) : null);
       }
       table.append(thead, tbody); tb.append(table); box.append(tb);
       list.append(box);
@@ -1190,7 +1183,6 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       c0.append(el("span", "nm", p.name), el("span", "kd", p.kind && p.kind !== "?" ? p.kind : ""));
       if (p.unallocated) c0.append(el("span", "kd", "nessuna allocazione"));
       if (p.blocked) c0.append(el("span", "kd", "non votabile"));
-      if (p.new_chain_pair) c0.append(el("span", "tag", "chain nuova"));
       tr.append(c0);
       tr.append(el("td", "ch muted", p.chain || "Base"));
       const cAp = el("td", "num", fmtN(p.ap));
@@ -1242,7 +1234,6 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           (was != null ? ` (${c.share_7d != null ? "7 giorni fa" : "ieri"} ${sharePct(was)})` : "") +
           (c.legacy_vol24h && c.dex_vol24h ? `, più ${sharePct(c.legacy_vol24h / c.dex_vol24h)} sui vecchi Aerodrome e Velodrome` : ""));
       }
-      if (c.new) parts.push("chain nuova per la simulazione");
       let st = "";
       if (!c.ok) st = c.error === "chain non configurata" ? "Non ancora monitorata." : "Ultima lettura non riuscita" + (c.checked ? ": dati del " + when(c.checked) : "") + ".";
       else if (!c.synced) st = "Sto ancora leggendo lo storico delle allocazioni.";
@@ -1337,15 +1328,6 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         c.append(el("div", "method", o ? `Il metodo dell'app Radar con le opzioni caricate: trend ${String(o.trend).replace(".", ",")}%, concorrenza ${compText(o.comp)}.`
           : "Il metodo dell'app Radar con trend 0% e concorrenza 3× la media, finché non carichi le tue opzioni."));
       }
-      if (s.id === "nuove" && t.new_chains) {
-        const nc = t.new_chains;
-        const sh = nc.shares || {};
-        const names = nc.chains.map(n => sh[n] != null ? `${n} (Aero ${sharePct(sh[n])})` : n);
-        c.append(el("div", "method", nc.chains.length
-          ? `Solo le ${nc.pairs_per_chain} coppie più grosse (volume su tutti i DEX) di ${names.join(", ")}: chain dove Aero ha meno del ${Math.round(nc.max_share * 100)}% del volume DEX.` +
-            (nc.max_pair_share != null ? ` Salta le coppie dove Aero ha già almeno il ${Math.round(nc.max_pair_share * 100)}% del volume.` : "")
-          : "Nessuna chain sotto la soglia di quota di Aero per ora."));
-      }
       // before a full day the real figure is the total so far: a daily rate from a few hours of lumpy fees misleads
       const daily = s.usd_day != null && s.hours >= 24;
       const big = el("div", "big", daily ? fmtUsd(s.usd_day) : usdCents(s.usd_total));
@@ -1395,7 +1377,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const pts = series.flat();
     // a line needs points at different times: until then the axis labels would all sit on one spot
     if (pts.length < 4 || new Set(pts.map(p => p[0])).size < 3) {
-      host.replaceChildren(el("div", "empty", rate ? "Il grafico compare dopo qualche ora di misure: il reso di ogni metodo viene misurato a ogni giro." : "Il grafico compare dopo qualche ora di raccolta."));
+      host.replaceChildren(el("div", "empty", rate ? "Il grafico compare dopo qualche ora di misure: il reso viene misurato a ogni giro." : "Il grafico compare dopo qualche ora di raccolta."));
       return;
     }
     const w = Math.max(520, Math.round(host.clientWidth || 720)), h = 200, padL = 52, padR = 112, padB = 26, padT = 10;
@@ -1408,7 +1390,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const svg = document.createElementNS(ns, "svg");
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", rate ? "Dollari al giorno incassati dalle allocazioni salvate di ogni metodo, media delle 24 ore" : "Dollari guadagnati dalle posizioni virtuali nel tempo");
+    svg.setAttribute("aria-label", rate ? "Dollari al giorno incassati dalle allocazioni salvate del Radar, media delle 24 ore" : "Dollari guadagnati dalla posizione virtuale nel tempo");
     const add = (name, attrs, text) => { const e = document.createElementNS(ns, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
     for (let i = 0; i <= 4; i++) {
       const v = nice * i / 4, yy = Y(v);
@@ -1492,8 +1474,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       if (!s) return;
       const p = s.perf || {};
       const tr = el("tr");
-      if (i === 0 && p["rate_" + by] != null) tr.className = "top";
-      const td = el("td"), sw = el("i"); sw.style.background = SCOL[k]; td.append(sw, `${i + 1}. ${s.label}`); tr.append(td);
+      const td = el("td"), sw = el("i"); sw.style.background = SCOL[k]; td.append(sw, s.label); tr.append(td);
       const main = p["rate_" + by], apr = p["apr_" + by];
       tr.append(el("td", "num", main != null ? usdCents(main) : "—"));
       tr.append(el("td", "num", apr != null ? fmtPct(apr) : "—"));
@@ -1507,12 +1488,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     });
     const byTxt = by === "7d" ? "gli ultimi 7 giorni" : by === "24h" ? "le ultime 24 ore" : "tutto il periodo";
     $("sim-rank-h").textContent = "Al giorno, " + (by === "7d" ? "7 giorni" : by === "24h" ? "24 ore" : "dall'inizio");
-    $("sim-rank-note").textContent = `Dollari al giorno incassati in media dalle allocazioni che ogni metodo ha salvato a ogni giro, per una posizione di ${kSize(t.size)} sAERO. ` +
-      `24 ore e 7 giorni: quello che è arrivato in quel periodo; dall'inizio: ogni allocazione salvata dalla sua nascita. La classifica usa ${byTxt}, la finestra più lunga che tutti i metodi coprono. ` +
+    $("sim-rank-note").textContent = `Dollari al giorno incassati in media dalle allocazioni che il Radar ha salvato a ogni giro, per una posizione di ${kSize(t.size)} sAERO. ` +
+      `24 ore e 7 giorni: quello che è arrivato in quel periodo; dall'inizio: ogni allocazione salvata dalla sua nascita. La seconda colonna usa ${byTxt}, la finestra più lunga coperta dai dati. ` +
       `«Reale / previsto» confronta l'incassato con la stima fatta al momento del salvataggio.`;
     const o = t.options;
-    $("sim-opts").textContent = o ? `Tutti i metodi seguono le opzioni caricate dal Radar ${when(o.at)}: ${optsText(o)}.`
-      : "Nessuna opzione caricata dal Radar: per ora i metodi non hanno limiti per pool. Le carichi dal Radar in cima alla pagina.";
+    $("sim-opts").textContent = o ? `La simulazione segue le opzioni caricate dal Radar ${when(o.at)}: ${optsText(o)}.`
+      : "Nessuna opzione caricata dal Radar: per ora la simulazione non ha limiti per pool. Le carichi dal Radar in cima alla pagina.";
   }
 
   function simRender() { if (SIM) { simRank(SIM); simLegend(SIM); simCards(SIM); simChart(SIM); yieldTable(SIM); rdLoadState(); } }
@@ -2259,7 +2240,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
   setInterval(tickCountdowns, 1000);
 
-  // ---- the options the simulations follow: sent to the monitor with "Carica queste opzioni nelle simulazioni"
+  // ---- the options the simulation follows: sent to the monitor with "Carica queste opzioni nella simulazione"
   function rdOptions() {
     return { cap: +RD.cap || 100, min: +RD.minA || 0, chains_off: XS.chainsOff.slice().sort(), excl: [...XS.keys].sort(),
       rules: XS.rules.slice(), spike: !!RD.spk, spike_k: Math.min(1000, Math.max(0, rdNum(RD.spkK, 0))), trend: +RD.trend || 0, comp: +RD.comp || 0,
@@ -2283,12 +2264,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (optsRun) return;
     const same = !!srv && optsKey(srv) === optsKey(rdOptions());
     bar.classList.toggle("diff", !same);
-    if (!SIM) box.textContent = "Carico lo stato delle simulazioni…";
-    else if (!srv) box.textContent = "Le simulazioni non usano ancora le tue opzioni: per ora i metodi non hanno limiti per pool.";
-    else if (same) box.textContent = `Le simulazioni usano queste opzioni dal ${when(srv.at)}.`;
-    else box.textContent = `Le simulazioni usano le opzioni caricate ${when(srv.at)}: ${optsText(srv)}; Radar con trend ${String(srv.trend).replace(".", ",")}% e concorrenza ${compText(srv.comp)}.`;
+    if (!SIM) box.textContent = "Carico lo stato della simulazione…";
+    else if (!srv) box.textContent = "La simulazione non usa ancora le tue opzioni: per ora non ha limiti per pool.";
+    else if (same) box.textContent = `La simulazione usa queste opzioni dal ${when(srv.at)}.`;
+    else box.textContent = `La simulazione usa le opzioni caricate ${when(srv.at)}: ${optsText(srv)}; trend ${String(srv.trend).replace(".", ",")}% e concorrenza ${compText(srv.comp)}.`;
     btn.disabled = same;
-    btn.textContent = same ? "Opzioni già caricate" : "Carica queste opzioni nelle simulazioni";
+    btn.textContent = same ? "Opzioni già caricate" : "Carica queste opzioni nella simulazione";
   }
 
   // ---- events
@@ -2323,7 +2304,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (js.length > 60000) { $("rd-load-state").textContent = "Troppi pool scartati uno per uno: usa una ricerca salvata o il menù Reti."; return; }
     optsRun = true;
     $("rd-load").disabled = true;
-    startRun({ options: js }, "Carico le opzioni nelle simulazioni…").finally(() => { optsRun = false; rdLoadState(); });
+    startRun({ options: js }, "Carico le opzioni nella simulazione…").finally(() => { optsRun = false; rdLoadState(); });
   });
   document.addEventListener("click", e => { const dd = $("rd-chains-dd"); if (dd.open && !dd.contains(e.target)) dd.open = false; });
 

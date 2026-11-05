@@ -114,7 +114,6 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
     rows = []
     mkt = state.get("market") or {}
     mkt_pools = mkt.get("pools") or {}
-    universe, new_ok = MD.new_chain_universe(state, (cfg.get("strategies") or {}).get("nuove"))
 
     def pool_row(key, ap):
         m = state["gauges"].get(key) or {}
@@ -150,8 +149,6 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             if mv[4]:
                 r["pair_vol24h"] = mv[4]
                 r["pair_share"] = round(min(1.0, mv[2] / mv[4]), 4)
-        if key in universe:
-            r["new_chain_pair"] = True
         return m, r, fees48, inc48, inc_next
 
     for key, ap in sorted(state["ap"].items(), key=lambda kv: -kv[1])[:500]:
@@ -240,7 +237,6 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             "share": _r4(MD.chain_share(mkt, cid)),
             "share_24h": _r4(MD.chain_share(mkt, cid, ago=24 * HOUR, now=now)),
             "share_7d": _r4(MD.chain_share(mkt, cid, ago=7 * 24 * HOUR, now=now)),
-            "new": cid in new_ok,
         })
     for cid in params.get("chains", []):
         if str(cid) not in state["chains"]:

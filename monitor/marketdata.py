@@ -452,12 +452,10 @@ def chain_share(mk, cid, ago=0, now=None):
     return _share(best[1])
 
 
-# ---------------------------------------------------------------- "Chain nuove" universe
+# ---------------------------------------------------------------- blue chips
 
 MAJORS = {"ETH", "WETH", "WBTC", "CBBTC", "TBTC", "LBTC", "BTC", "USDC", "USDC.E", "USDT", "USDT0", "USD₮0", "DAI",
           "USDS", "EURC", "USDG", "PYUSD", "GHO", "FRAX", "USDE"}
-NEW_CHAIN_RULES = {"home_chains": [8453, 10], "max_chain_share": 0.15, "pairs_per_chain": 10,
-                   "min_pair_volume_usd": 250000, "max_pair_share": 0.5}
 
 
 def _both_majors(state, key):
@@ -466,44 +464,3 @@ def _both_majors(state, key):
     syms = [((state["erc20"].get(A.tkey(cid, t)) or {}).get("sym") or "").upper() for t in (m.get("t0"), m.get("t1"))
             if t]
     return len(syms) == 2 and all(s in MAJORS for s in syms)
-
-
-def new_chain_universe(state, rules=None):
-    """Big pairs on the chains where Aero is still small: the pools the 'Chain nuove' method may choose.
-
-    Chains: outside the home chains (Base and OP by default) and with Aero below max_chain_share of the chain's DEX
-    volume. Pairs: the pairs_per_chain largest by volume on every DEX of that chain, at least min_pair_volume_usd a
-    day, where Aero's pools have less than max_pair_share of the pair's volume, with every Aero pool of the pair;
-    pools DexScreener does not list yet count when both tokens are blue chips.
-    """
-    r = {**NEW_CHAIN_RULES, **(rules or {})}
-    mk = market_state(state)
-    home = {int(c) for c in r["home_chains"]}
-    ok = set()
-    for cid in {A.chain_of(k) for k in state["gauges"]} - home:
-        share = chain_share(mk, cid)
-        if share is None or share < float(r["max_chain_share"]):
-            ok.add(cid)
-    pairs = {}
-    for k, v in (mk.get("pools") or {}).items():
-        cid = A.chain_of(k)
-        if cid not in ok or not v[4]:
-            continue
-        m = state["gauges"].get(k) or {}
-        pair = (cid, tuple(sorted(((m.get("t0") or "").lower(), (m.get("t1") or "").lower()))))
-        e = pairs.setdefault(pair, [0.0, 0.0, []])
-        e[0] = max(e[0], v[4])
-        e[1] += v[2] or 0
-        e[2].append(k)
-    by_chain = {}
-    for (cid, _pair), (vol, aero, keys) in pairs.items():
-        if vol < float(r["min_pair_volume_usd"]) or aero / vol >= float(r["max_pair_share"]):
-            continue
-        by_chain.setdefault(cid, []).append((vol, keys))
-    out = set()
-    for lst in by_chain.values():
-        for _vol, keys in sorted(lst, key=lambda x: -x[0])[: int(r["pairs_per_chain"])]:
-            out |= set(keys)
-    covered = set(mk.get("pools") or {})
-    out |= {k for k in state["gauges"] if A.chain_of(k) in ok and k not in covered and _both_majors(state, k)}
-    return out, ok

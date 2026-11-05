@@ -1,10 +1,11 @@
-"""Paper allocation of a fixed sAERO size.
+"""Paper allocation of a fixed sAERO size, with the Radar's method.
 
-Every run (about every 15 minutes) it records, for each method, the allocation it would recommend now and what that
-allocation is expected to earn during one cooldown. Each of these allocations is then followed for the whole cooldown
-with the fees and incentives that really arrive, diluted by the real allocation of everybody else, so over time it
-shows which pools and which way of choosing them actually pay the most. Every method follows the options loaded from
-the page: largest and smallest share per pool, chains, excluded pools and searches, volume spikes.
+Every run (about every 15 minutes) it records the allocation the Radar would recommend now and what that allocation
+is expected to earn during one cooldown. Each of these allocations is then followed for the whole cooldown with the
+fees and incentives that really arrive, diluted by the real allocation of everybody else, so over time it shows how
+the method and its pools really pay. It follows the options loaded from the page: largest and smallest share per
+pool, chains, excluded pools and searches, volume spikes, trend and competition. (The first versions also simulated
+four other methods; prune() drops what is left of them.)
 """
 import heapq
 import math
@@ -21,19 +22,24 @@ HIST_HOURS = 8 * 24
 DAILY_DAYS = 90
 CLOSED_DAYS = 30
 PERF_DAYS = 30
-STRATEGIES = {
-    "48h": "Ultime 48 ore",
-    "trend": "Tendenza 12 ore",
-    "prudente": "Prudente",
-    "nuove": "Chain nuove",
-    "radar": "Radar",
-}
-RULES = {}          # per-strategy settings from config.json ("strategies"), set by main
+STRATEGIES = {"radar": "Radar"}
 OPTIONS = {}        # the page's options loaded into the simulations (state["options"]), set by main
 DEFAULT_OPTIONS = {"cap": 100, "min": 0, "chains_off": [], "excl": [], "rules": [], "spike": False, "spike_k": 75,
                    "trend": 0, "comp": 3, "stable": False, "stable_k": 2}
 STABLE_WINDOWS = (6, 12, 18, 24)
 KEY_RE = re.compile(r"\d{1,7}:0x[0-9a-f]{40}")
+
+
+def prune(tr):
+    """Drops the records of the methods that are no longer simulated; returns their names."""
+    gone = set()
+    for part in ("open", "closed", "virtual", "perf"):
+        d = tr.get(part)
+        if isinstance(d, dict):
+            for k in [k for k in d if k not in STRATEGIES]:
+                del d[k]
+                gone.add(k)
+    return sorted(gone)
 
 
 def new_tracker(size, now):
@@ -230,8 +236,9 @@ def _inputs(state, prices, now, cooldown):
     return _INPUTS["rows"]
 
 
-def candidates(state, prices, now, cooldown, strategy, opts=None):
-    """{gauge: (expected revenue during one cooldown in USD, allocation of everybody else)}, within the options."""
+def candidates(state, prices, now, cooldown, opts=None):
+    """{gauge: (expected revenue during one cooldown in USD, allocation of everybody else)}, within the options:
+    the Radar's method, with its trend weight and its competition."""
     opts = opts if opts is not None else options()
     ap = state["ap"]
     rows = _inputs(state, prices, now, cooldown)
@@ -242,20 +249,11 @@ def candidates(state, prices, now, cooldown, strategy, opts=None):
     if opts.get("spike"):
         spiked, mk = spikes(state, rows, now, float(opts.get("spike_k", 75)))
         dm = mk[0] if mk else 0.0
-    if strategy == "nuove":
-        # only big pairs on the chains where Aero is still small, valued like "Ultime 48 ore"
-        universe, _ = MD.new_chain_universe(state, RULES.get("nuove"))
-        allowed &= universe
     out, mkt_rev, mkt_ap = {}, 0.0, 0.0
     w = float(opts.get("trend", 0)) / 100
     for k, (f48, f12, inc, d) in rows.items():
-        if strategy == "trend":
-            base = 0.5 * f48 + 0.5 * f12 * 4
-        elif strategy == "radar":
-            # the fee part follows its 48-hour change as much as the trend weight says; incentives are scheduled
-            base = f48 * (1 + w * max(-100.0, min(200.0, d or 0.0)) / 100)
-        else:
-            base = f48
+        # the fee part follows its 48-hour change as much as the trend weight says; incentives are scheduled
+        base = f48 * (1 + w * max(-100.0, min(200.0, d or 0.0)) / 100)
         if k in spiked:
             # a spike rarely repeats: fees go back to the 48 hours before, moved like the market; incentives stay
             base = min(base, max(0.0, spiked[k] * (1 + dm / 100)))
@@ -267,20 +265,11 @@ def candidates(state, prices, now, cooldown, strategy, opts=None):
             continue  # left out by the options, or not activated / zero emission cap: cannot be voted
         if rev > 0.01:
             out[k] = (rev, a)
-    if strategy == "prudente" and out:
-        # pools far above the typical yield attract other allocators: assume their allocation grows
-        ys = [r / a for r, a in out.values() if a >= 1_000_000]
-        med = statistics.median(ys) if ys else None
-        if med:
-            for k, (r, a) in list(out.items()):
-                y = r / max(a, 1.0)
-                out[k] = (r, a * (1 + 0.5 * min(2.0, max(0.0, y / med - 1))) if a > 0 else a)
-    if strategy == "radar" and out:
-        n = float(opts.get("comp", 0))
-        avg = mkt_rev / mkt_ap if mkt_ap > 0 else 0.0
-        if n > 0 and avg > 0:
-            # other allocators come where it pays: no pool keeps more than n times the market's yield per vote
-            out = {k: (r, max(a, r / (n * avg))) for k, (r, a) in out.items()}
+    n = float(opts.get("comp", 0))
+    avg = mkt_rev / mkt_ap if mkt_ap > 0 else 0.0
+    if out and n > 0 and avg > 0:
+        # other allocators come where it pays: no pool keeps more than n times the market's yield per vote
+        out = {k: (r, max(a, r / (n * avg))) for k, (r, a) in out.items()}
     return out
 
 
@@ -508,7 +497,7 @@ def snapshot(tr, state, prices, now, cooldown, max_pools):
     opts = options()
     opt_at = int(OPTIONS.get("at") or 0)
     for s in STRATEGIES:
-        cands = candidates(state, prices, now, cooldown, s, opts)
+        cands = candidates(state, prices, now, cooldown, opts)
         alloc, pred = recommend(cands, tr["size"], max_pools, cap=opts["cap"], min_pct=opts["min"])
         rows = {k: [round(x, 2), round(cands[k][0] * x / (cands[k][1] + x), 6), 0.0] for k, x in alloc.items()}
         if rows:
@@ -715,14 +704,6 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
                 row[f"apr_{label}"] = apr(v, 1000) if v is not None else None
             pools.append(row)
     pools.sort(key=lambda r: -(r.get("m1000_7d") or r.get("m1000_24h") or 0))
-    universe, ok = MD.new_chain_universe(state, RULES.get("nuove"))
-    rules = {**MD.NEW_CHAIN_RULES, **(RULES.get("nuove") or {})}
-    mk = MD.market_state(state)
-    new_chains = {"chains": [C.chain_short(c) for c in sorted(ok)], "pools": len(universe),
-                  "shares": {C.chain_short(c): (round(MD.chain_share(mk, c), 4)
-                                                if MD.chain_share(mk, c) is not None else None) for c in sorted(ok)},
-                  "max_share": rules["max_chain_share"], "pairs_per_chain": rules["pairs_per_chain"],
-                  "min_pair_volume_usd": rules["min_pair_volume_usd"], "max_pair_share": rules["max_pair_share"]}
     # the ranking: the longest window every method has data for
     def best(st):
         p = st["perf"]
@@ -735,6 +716,5 @@ def summary(tr, state, now, aero_usd, cooldown, latest):
     return {"generated": now, "size": size, "start": tr["start"], "collected_h": round(collected_h, 1),
             "options": {**opts, "at": OPTIONS.get("at")} if OPTIONS else None,
             "ranking": ranking, "rank_by": rank_by,
-            "new_chains": new_chains,
             "cooldown_h": round(cooldown / HOUR, 2), "aero_usd": aero_usd, "strategies": strategies,
             "pools": pools[:150]}
