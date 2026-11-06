@@ -96,6 +96,22 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
 Il primo giro ricostruisce gli ultimi 7 giorni dalle fee già raccolte, solo per le ore in cui ogni posizione aveva già
 l'allocazione di adesso. I numeri sono una stima dai dati pubblici, non i claim effettivi del contratto.
 
+## Stocks onchain
+
+Le azioni tokenizzate su Robinhood Chain (NVDA, TSLA, SPY…: i token dei pool Aero il cui simbolo è un ticker USA) e
+su Base (NVDAc, TSLAc…: i token azionari con la «c» finale, 8 decimali e indirizzo che inizia con `0xb2` e venti zeri;
+più i fondi WisdomTree `wt…`). Una volta all'ora il monitor legge per ognuno, da DexScreener, tutti i suoi pool sui DEX
+della rete: volume e operazioni dell'ultima ora (acquisti e vendite), prezzo, variazione del prezzo, liquidità e
+volume delle 24 ore; dalla chain legge la supply (`totalSupply`), che da un'ora all'altra dice quante azioni sono state
+portate sulla chain o tolte. Tiene 7 giorni di storia oraria in `state.json.gz` e scrive `stocks.json` sul ramo
+`data` (72 ore per rete, 48 per titolo).
+
+Nella pagina, sotto il Radar: per ogni rete il volume dell'ultima ora con la variazione sull'ora prima e sulla stessa
+ora di ieri, le operazioni, la supply portata sulla chain o tolta e il grafico delle ultime 72 ore con la fascia della
+borsa di New York aperta; poi la tabella dei titoli della rete scelta (prezzo, prezzo nell'ultima ora, volume e sua
+variazione, operazioni con la quota di acquisti, supply dell'ora, volume 24 ore, barre delle ultime 24 ore), con
+ricerca. In `config.json` `"stocks": {"add": [...], "skip": [...]}` aggiunge o toglie token (chiavi `chain:indirizzo`).
+
 ## Simulazione
 
 Ogni giro (circa ogni 15 minuti) calcola con il metodo del Radar l'allocazione migliore per una posizione di
@@ -117,6 +133,11 @@ dal ramo `data`, quindi non va aggiornata quando cambia la pagina.
 
 Nella sezione «Le tue posizioni» scrivi i numeri delle tue sAERO: restano salvati solo nel dispositivo. Le sezioni
 lunghe si aprono e si chiudono toccando il titolo, e la pagina ricorda quali hai lasciato aperte.
+
+Per ora la pagina non mostra Le 10 posizioni più grandi, Simulazione (con il tasto che le carica le opzioni del
+Radar), Ondate di cooldown, Posizioni grandi in uscita, Pool, Chain e Avvisi recenti: il monitor continua a
+raccoglierne tutti i dati e gli avvisi continuano ad arrivare. La riga in fondo alla pagina le rimostra su quel
+dispositivo; per toglierle dall'elenco basta togliere il loro nome da `HIDDEN` in `site/index.html`.
 
 «Raccogli i dati adesso» avvia subito un giro. La prima volta chiede un token GitHub *fine-grained* limitato a
 questo repository con il solo permesso **Actions: Read and write**; il token resta salvato solo nel dispositivo.

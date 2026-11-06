@@ -22,6 +22,7 @@ from . import chain as C
 from . import market as M
 from . import marketdata as MD
 from . import report as R
+from . import stocks as S
 from . import tracker as T
 from .rpc import Rpc
 
@@ -237,10 +238,17 @@ def run(args):
     if not args.no_market:
         try:
             MD.discover(state, now, log)
-            MD.refresh(state, chains_cfg, now, log)
+            markets_read = MD.refresh(state, chains_cfg, now, log)
         except Exception as e:
+            markets_read = False
             status["errors"].append(f"market: {e}")
             log(f"market data failed: {traceback.format_exc()[-400:]}")
+        # tokenized stocks on Base and Robinhood Chain, once an hour
+        try:
+            S.refresh(state, cfg, rpc_for, now, log, markets_read=markets_read)
+        except Exception as e:
+            status["errors"].append(f"stocks: {e}")
+            log(f"stocks failed: {traceback.format_exc()[-400:]}")
 
     # paper allocation of a fixed size, followed through every cooldown
     # options loaded from the page ("Carica queste opzioni nella simulazione"): kept until the next load
@@ -361,6 +369,10 @@ def run(args):
         save_json(pos_dir / f"{k}.json", shard)
     save_json(out / "positions.json", pos_index)
     save_json(out / "tracker.json", tracker_report)
+    try:
+        save_json(out / "stocks.json", S.export(state, now))
+    except Exception:
+        log(f"stocks export failed: {traceback.format_exc()[-400:]}")
     save_json(out / "state.json.gz", state, gz=True)
     publish_site(out)
     write_run_log(out)

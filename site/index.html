@@ -102,6 +102,21 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .stat .d { font-size: 12px; color: var(--ink-2); font-family: var(--f-num); }
 #me-addr { flex: 1 1 260px; font-family: var(--f-num); }
 .mepos { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.stk-chains { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.stkc { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.stkc .h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 10px; }
+.stkc .h b { font-size: 15px; }
+.stkc .big { font: 600 20px/1.2 var(--f-num); }
+.stkc .d { font: 12px/1.45 var(--f-num); color: var(--ink-2); }
+.stkc svg { width: 100%; height: 70px; display: block; }
+.up { color: var(--good); }
+.down { color: var(--bad, #c0392b); }
+.stk-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin-top: 4px; }
+.stk-bar input[type=search] { flex: 1 1 180px; max-width: 280px; }
+table.stk td, table.stk th { white-space: nowrap; }
+table.stk td.num { font-family: var(--f-num); }
+table.stk svg { width: 72px; height: 18px; display: block; }
+.hidden-note { text-align: center; }
 .merank { display: grid; gap: 6px; }
 .merank:empty { display: none; }
 .rkgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 8px; }
@@ -511,6 +526,23 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     </details>
   </section>
 
+  <details class="panel fold" data-fold="stocks" open id="stocks">
+    <summary class="panel-head"><h2>Stocks onchain</h2><span class="sub" id="stk-sub"></span></summary>
+    <div class="fold-body">
+    <p class="note">Le azioni tokenizzate su Robinhood Chain (NVDA, TSLA…) e su Base (NVDAc, TSLAc…), ora per ora: quanto si scambia su tutti i DEX della rete, quante operazioni, il prezzo e quante azioni vengono portate sulla chain o tolte (la supply). Il monitor le legge una volta all'ora; le variazioni sono rispetto all'ora prima e alla stessa ora di ieri. La fascia chiara nei grafici è la borsa di New York aperta.</p>
+    <div class="stk-chains" id="stk-chains"></div>
+    <div class="stk-bar">
+      <div class="seg" id="stk-tabs" role="group" aria-label="Rete"><button type="button" data-c="4663" aria-pressed="true">Robinhood Chain</button><button type="button" data-c="8453" aria-pressed="false">Base</button></div>
+      <input id="stk-q" type="search" placeholder="Cerca un titolo" autocomplete="off" spellcheck="false" aria-label="Cerca un titolo">
+    </div>
+    <div class="tbl"><table class="stk">
+      <thead><tr><th>Titolo</th><th class="num">Prezzo</th><th class="num">Prezzo 1h</th><th class="num">Volume 1h</th><th class="num">Sull'ora prima</th><th class="num">Operazioni 1h</th><th class="num">Supply 1h</th><th class="num">Volume 24h</th><th>Ultime 24 ore</th></tr></thead>
+      <tbody id="stk-rows"></tbody>
+    </table></div>
+    <button type="button" class="linkish" id="stk-more" hidden></button>
+    </div>
+  </details>
+
   <details class="panel fold" data-fold="top10" open id="top10">
     <summary class="panel-head"><h2>Le 10 posizioni più grandi</h2><span class="sub" id="top10-sub"></span></summary>
     <div class="fold-body">
@@ -634,6 +666,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     </div>
   </details>
   </div>
+
+  <p class="note hidden-note" id="hidden-note"><span id="hidden-txt"></span> <button type="button" class="linkish" id="hidden-toggle"></button></p>
 
   <footer>
     <span>Dati on-chain da Base, OP Mainnet, Ethereum, Arbitrum, Ink, Robinhood Chain e Arc (contratti Aero di Dromos Labs), prezzi DexScreener, quote KyberSwap e Velora. Aggiornamento ogni 15 minuti con GitHub Actions.</span>
@@ -2679,6 +2713,144 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     return share > 0 ? { share: Math.min(share, 1), who, ends } : null;
   }
 
+  // ---------------------------------------------------------------- sections kept out of sight for now: the monitor
+  // still collects everything they show; the line at the bottom brings them back
+  const HIDDEN = [["top10", "Le 10 posizioni più grandi"], ["sim", "Simulazione"], ["waves", "Ondate di cooldown"],
+    ["calendar", "Posizioni grandi in uscita"], ["pools", "Pool"], ["chains", "Chain"], ["alerts", "Avvisi recenti"]];
+  let SHOW_HIDDEN = false;
+  try { SHOW_HIDDEN = localStorage.getItem("radar-show-hidden") === "1"; } catch (e) {}
+  function applyHidden() {
+    for (const [id] of HIDDEN) { const e = document.querySelector(`details[data-fold="${id}"]`); if (e) e.hidden = !SHOW_HIDDEN; }
+    $("rd-loadbar").hidden = !SHOW_HIDDEN;          // the simulation's options belong with the simulation
+    document.querySelectorAll(".grid2").forEach(g => { g.hidden = [...g.children].every(c => c.hidden); });
+    $("hidden-txt").textContent = SHOW_HIDDEN ? "Sezioni nascoste visibili." : `Nascoste per ora, ma il monitor continua a raccoglierne i dati: ${HIDDEN.map(h => h[1]).join(", ")}.`;
+    $("hidden-toggle").textContent = SHOW_HIDDEN ? "Nascondile di nuovo" : "Mostrale";
+  }
+  $("hidden-toggle").addEventListener("click", () => {
+    SHOW_HIDDEN = !SHOW_HIDDEN;
+    try { localStorage.setItem("radar-show-hidden", SHOW_HIDDEN ? "1" : "0"); } catch (e) {}
+    applyHidden();
+    if (SHOW_HIDDEN && DATA) { render(); if (SIM) simRender(); }
+  });
+  applyHidden();
+
+  // ---------------------------------------------------------------- stocks on chain, hour by hour (stocks.json)
+  let STK = null, stkChain = "4663", stkAll = false;
+  try { stkChain = localStorage.getItem("radar-stk-chain") || "4663"; } catch (e) {}
+  const STK_NAMES = { 4663: "Robinhood Chain", 8453: "Base" }, STK_TOP = 15;
+  const usd = x => x == null ? "—" : "$" + fmtN(x);
+  const pctCh = (a, b) => a != null && b != null && b > 0 ? (a - b) / b * 100 : null;
+  const chTxt = v => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmtPct(Math.abs(v));
+  const chEl = (v, tag = "span") => { const e = el(tag, v == null ? null : v > 0 ? "up" : v < 0 ? "down" : null, chTxt(v)); return e; };
+  // the New York stock exchange is open: weekdays 9:30-16:00 in New York
+  const nyFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "numeric", hour12: false });
+  function nyOpen(ts) {
+    const parts = Object.fromEntries(nyFmt.formatToParts(new Date(ts * 1000)).map(x => [x.type, x.value]));
+    const m = (+parts.hour % 24) * 60 + +parts.minute;
+    return !["Sat", "Sun"].includes(parts.weekday) && m >= 570 && m < 960;
+  }
+  // the last two readings of a series: [last, the one before, index of the last]
+  function lastTwo(xs) {
+    let i = xs.length - 1;
+    while (i >= 0 && xs[i] == null) i--;
+    return i < 0 ? [null, null, -1] : [xs[i], i > 0 ? xs[i - 1] : null, i];
+  }
+  function stkBars(vals, hours, w, h, opts = {}) {
+    const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`); svg.setAttribute("preserveAspectRatio", "none");
+    const max = Math.max(1, ...vals.filter(v => v != null)), bw = w / vals.length;
+    if (opts.market && hours) hours.forEach((t, i) => {
+      if (!nyOpen(t + 1800)) return;
+      const r = document.createElementNS(NS, "rect");
+      r.setAttribute("x", i * bw); r.setAttribute("y", 0); r.setAttribute("width", bw + 0.2); r.setAttribute("height", h);
+      r.setAttribute("fill", "var(--chip)"); svg.append(r);
+    });
+    vals.forEach((v, i) => {
+      if (v == null) return;
+      const bh = Math.max(v > 0 ? 1 : 0, v / max * (h - 2)), r = document.createElementNS(NS, "rect");
+      r.setAttribute("x", i * bw + bw * 0.12); r.setAttribute("y", h - bh); r.setAttribute("width", bw * 0.76); r.setAttribute("height", bh);
+      r.setAttribute("fill", i === vals.length - 1 || (opts.lastIdx != null && i === opts.lastIdx) ? "var(--accent)" : "var(--passive)");
+      if (hours && opts.titles) { const t = document.createElementNS(NS, "title"); t.textContent = `${when(hours[i])}: ${usd(v)}`; r.append(t); }
+      svg.append(r);
+    });
+    return svg;
+  }
+  function stocksRender() {
+    const cards = $("stk-chains"), rows = $("stk-rows");
+    cards.replaceChildren(); rows.replaceChildren();
+    if (!STK || !STK.tokens || !STK.tokens.length) {
+      $("stk-sub").textContent = "";
+      cards.append(el("p", "note", "I dati arrivano con la prossima lettura oraria del monitor."));
+      $("stk-more").hidden = true;
+      return;
+    }
+    const H = STK.hours, reads = Object.keys(STK.read || {}).map(Number);
+    $("stk-sub").textContent = reads.length ? `ultima lettura ${when(STK.read[String(Math.max(...reads))])}` : "";
+    for (const cid of ["4663", "8453"]) {
+      const c = STK.chains[cid];
+      if (!c || !c.n) continue;
+      const [v, vp, i] = lastTwo(c.vol), yday = i >= 24 ? c.vol[i - 24] : null, [tx, txp] = lastTwo(c.tx);
+      const card = el("div", "stkc"), h = el("div", "h");
+      h.append(el("b", null, STK_NAMES[cid]), el("span", "d", `${c.n} titoli · ${i >= 0 && nyOpen(H[i] + 1800) ? "borsa di New York aperta" : "borsa di New York chiusa"}`));
+      card.append(h);
+      const big = el("div", "big", `${usd(v)} nell'ultima ora`);
+      card.append(big);
+      const l1 = el("div", "d");
+      l1.append("sull'ora prima ", chEl(pctCh(v, vp)), " · sulla stessa ora di ieri ", chEl(pctCh(v, yday)));
+      const l2 = el("div", "d");
+      const mint = i >= 0 ? c.mint[i] : null;
+      l2.append(`${tx != null ? fmtN(tx) : "—"} operazioni (`, chEl(pctCh(tx, txp)), ") · supply ", mint == null ? "—" : el("span", mint > 0 ? "up" : mint < 0 ? "down" : null, (mint > 0 ? "+" : mint < 0 ? "−" : "") + usd(Math.abs(mint))),
+        mint == null ? "" : mint >= 0 ? " portati sulla chain" : " tolti dalla chain");
+      card.append(l1, l2, stkBars(c.vol, H, 216, 70, { market: true, titles: true, lastIdx: i }));
+      const ax = el("div", "d"); ax.textContent = `volume orario delle ultime ${H.length} ore, fino alle ${H.length ? when(H[H.length - 1]) : ""}`;
+      card.append(ax);
+      card.style.cursor = "pointer";
+      card.addEventListener("click", () => { stkChain = cid; try { localStorage.setItem("radar-stk-chain", cid); } catch (e) {} stocksRender(); });
+      cards.append(card);
+    }
+    document.querySelectorAll("#stk-tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.c === stkChain)));
+    const q = $("stk-q").value.trim().toLowerCase();
+    const list = STK.tokens.filter(t => String(t.c) === stkChain && (!q || t.sym.toLowerCase().includes(q)))
+      .map(t => ({ t, two: lastTwo(t.vol) })).sort((a, b) => (b.two[0] || 0) - (a.two[0] || 0));
+    const shown = stkAll || q ? list : list.slice(0, STK_TOP);
+    for (const { t, two } of shown) {
+      const tr = document.createElement("tr");
+      const [v, vp] = two, px = t.px, [sp, spp] = lastTwo(t.sup);
+      const supUsd = sp != null && spp != null && px ? (sp - spp) * px : null;
+      tr.append(el("td", null, t.sym), el("td", "num", px == null ? "—" : "$" + (px >= 100 ? px.toFixed(2) : px.toPrecision(4)).replace(".", ",")));
+      const c1 = el("td", "num"); c1.append(chEl(t.chg)); tr.append(c1);
+      tr.append(el("td", "num", usd(v)));
+      const c2 = el("td", "num"); c2.append(chEl(pctCh(v, vp))); tr.append(c2);
+      const [tx] = lastTwo(t.tx);
+      tr.append(el("td", "num", tx == null ? "—" : `${fmtN(tx)}` + (t.buys + t.sells > 0 ? ` (${Math.round(t.buys / (t.buys + t.sells) * 100)}% acquisti)` : "")));
+      const c3 = el("td", "num"); c3.append(supUsd == null ? "—" : el("span", supUsd > 0 ? "up" : supUsd < 0 ? "down" : null, (supUsd > 0 ? "+" : supUsd < 0 ? "−" : "") + usd(Math.abs(supUsd)))); tr.append(c3);
+      tr.append(el("td", "num", usd(t.v24)));
+      const c4 = el("td"); c4.append(stkBars(t.vol.slice(-24), H.slice(-24), 72, 18)); tr.append(c4);
+      const yd = t.vol.length > 24 ? t.vol[t.vol.length - 25] : null;
+      tr.title = `${t.sym}: ${usd(v)} nell'ultima ora` + (yd != null ? `, ${usd(yd)} alla stessa ora di ieri` : "") + `; liquidità ${usd(t.liq)}`;
+      rows.append(tr);
+    }
+    if (!list.length) { const tr = document.createElement("tr"), td = el("td", "muted", q ? "Nessun titolo corrisponde." : "Nessun titolo letto su questa rete."); td.colSpan = 9; tr.append(td); rows.append(tr); }
+    const more = $("stk-more");
+    more.hidden = !!q || list.length <= STK_TOP;
+    more.textContent = stkAll ? `Mostra solo i primi ${STK_TOP}` : `Mostra tutti i ${list.length}`;
+  }
+  document.querySelectorAll("#stk-tabs button").forEach(b => b.addEventListener("click", () => {
+    stkChain = b.dataset.c; try { localStorage.setItem("radar-stk-chain", stkChain); } catch (e) {}
+    stocksRender();
+  }));
+  $("stk-more").addEventListener("click", () => { stkAll = !stkAll; stocksRender(); });
+  let stkQt = 0;
+  $("stk-q").addEventListener("input", () => { clearTimeout(stkQt); stkQt = setTimeout(stocksRender, 150); });
+  async function loadStocks() {
+    try {
+      const r = await dataFetch("stocks.json");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      STK = await r.json();
+    } catch (e) { STK = null; }
+    stocksRender();
+  }
+
   async function load() {
     try {
       const sha = await headSha(true);
@@ -2690,6 +2862,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       if (POS && POS.generated < DATA.generated) { POS = null; SHARDS = {}; posLoading = null; }
       render();
       loadSim();
+      loadStocks();
     } catch (e) {
       $("updated").textContent = "Non riesco a leggere i dati: " + e.message + ". Riprovo tra un minuto.";
       setTimeout(load, 60000);
