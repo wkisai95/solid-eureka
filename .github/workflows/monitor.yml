@@ -57,7 +57,11 @@ jobs:
       group: radar-monitor
       cancel-in-progress: false
     steps:
+      # the latest code, not the one of when the run was queued: an automatic cycle waits about 15 minutes, and
+      # otherwise it would publish the page and the state of before a push made in the meantime
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
