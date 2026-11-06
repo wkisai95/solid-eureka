@@ -82,10 +82,11 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
   e per giorno. L'APR è calcolato sul valore degli AERO in stake al prezzo attuale.
   Accanto a ogni APR c'è il multiplo della resa di mercato: quanto ha reso ogni voto allocato della posizione
   rispetto alla media di tutti i voti allocati nella stessa finestra (×1 = come il mercato).
-- **maturato dal cambio di allocazione**: nella scheda di ogni posizione scrivi quanto mostra l'app di Aero e in
-  quante ore (la pagina propone le ore dal cambio di allocazione): l'APR, i dollari al giorno e il multiplo del
-  mercato si calcolano subito, senza aspettare i dati del monitor, e accanto c'è la stima del monitor per lo stesso
-  periodo. Il dato resta solo su questo dispositivo e si cancella da solo quando la posizione rialloca;
+- **maturato dall'ultima allocazione**: nella scheda di ogni posizione scrivi quanto mostra l'app di Aero; il tempo
+  è quello passato dall'ultima allocazione della posizione (l'ora la esporta il monitor) al momento in cui premi
+  Calcola. L'APR, i dollari al giorno e il multiplo del mercato si calcolano subito, senza aspettare i dati del
+  monitor, e accanto c'è quanto stima il monitor dalla stessa allocazione (fino a 4 giorni). Il dato resta solo su
+  questo dispositivo e si cancella da solo quando la posizione rialloca;
 - **in classifica**: dove stanno i tuoi voti tra le posizioni con più di 100k e con più di 10k sAERO allocati
   (Autopilot compreso), per quanto ha reso ogni voto allocato nelle ultime 24 ore e negli ultimi 7 giorni: posto,
   quota delle posizioni che fai meglio, il tuo APR per voto, quello a metà classifica e la soglia del primo 10%. Se

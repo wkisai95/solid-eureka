@@ -340,8 +340,9 @@ def positions_export(state, params, now):
 
     Split by position number (SHARD numbers per file) so the page downloads only the files it needs.
     Returns (index, {shard: {"names": [...], "keys": [...], "p": {id: [[chainId, cooldown end, sAERO, active,
-    moves, [[pool index, sAERO], ...]], ...]}, "r": {id: earnings.summary with pool indexes, plus [last allocation
-    change, USD since then, export time] when that change was within the last day}}}).
+    moves, [[pool index, sAERO], ...], time of its last allocation], ...]}, "r": {id: earnings.summary with pool
+    indexes, plus [last allocation
+    change, USD since then, export time] when that change was in the last 4 days}}}).
     """
     cooldown = params["cooldown"]
     shards = {}
@@ -362,7 +363,8 @@ def positions_export(state, params, now):
         last[tid] = max(last.get(tid, 0), int(t.get("last") or 0))
         sh = shard(tid)
         pools = [[pool_index(sh, g), round(a)] for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])]
-        sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools])
+        sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools,
+                                            int(t.get("last") or 0)])
     book = state.get("earnings") or {}
     keys = E.gauge_keys(book)
     h0 = int(book.get("h0") or now - now % HOUR)
@@ -381,7 +383,7 @@ def positions_export(state, params, now):
         sh = shard(tid)
         r = E.summary(pe, now, keys, h0)
         r[7] = [[pool_index(sh, g), v] for g, v in sorted(r[7].items(), key=lambda kv: -kv[1]) if v >= 0.01]
-        # what it earned since its last allocation change, when that was within the last day: [since, USD, until]
+        # what it earned since its last allocation change, when that was in the last 4 days: [since, USD, until]
         got = E.since(pe, last.get(tid, 0), now, h0)
         if got is not None:
             r.append([last[tid], round(got, 4), now])

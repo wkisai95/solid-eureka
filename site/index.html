@@ -940,44 +940,54 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const price = (DATA && DATA.aero_usd) || 0, box = el("div", "claim");
     let c = CLAIM[id];
     if (c && c.alloc_at !== allocAt) { delete CLAIM[id]; saveClaim(); c = null; }      // the position has moved since
-    const f = el("form"), inp = el("input"), hIn = el("input");
+    const f = el("form"), inp = el("input");
     inp.type = "text"; inp.inputMode = "decimal"; inp.placeholder = "es. 12,40"; inp.setAttribute("aria-label", "Dollari maturati dal cambio di allocazione");
-    hIn.type = "text"; hIn.inputMode = "decimal"; hIn.setAttribute("aria-label", "Ore");
-    const now = Date.now() / 1000, elapsed = allocAt ? now - allocAt : 0;
     const dr = DRAFT[id];
     inp.value = dr ? dr.usd : (c ? String(c.usd).replace(".", ",") : "");
-    hIn.value = dr && dr.h != null ? dr.h : (c ? hrsTxt(c.secs) : (allocAt ? hrsTxt(elapsed) : ""));
     inp.addEventListener("input", () => { DRAFT[id] = { ...(DRAFT[id] || {}), usd: inp.value }; });
-    hIn.addEventListener("input", () => { DRAFT[id] = { usd: inp.value, ...(DRAFT[id] || {}), h: hIn.value }; });
-    for (const x of [inp, hIn]) x.addEventListener("blur", () => setTimeout(() => {
+    // without the time of the last allocation the hours are typed in
+    let hIn = null;
+    if (!allocAt) {
+      hIn = el("input"); hIn.type = "text"; hIn.inputMode = "decimal"; hIn.setAttribute("aria-label", "Ore");
+      hIn.value = dr && dr.h != null ? dr.h : (c ? hrsTxt(c.secs) : "");
+      hIn.addEventListener("input", () => { DRAFT[id] = { usd: inp.value, ...(DRAFT[id] || {}), h: hIn.value }; });
+    }
+    for (const x of [inp, hIn].filter(Boolean)) x.addEventListener("blur", () => setTimeout(() => {
       if (meDeferred && !(document.activeElement && document.activeElement.closest && document.activeElement.closest(".claim"))) { meDeferred = false; meRender(); }
     }, 0));
     const ok = el("button", "ghost", "Calcola"); ok.type = "submit";
-    f.append("Maturato dal cambio di allocazione: $", inp, "in", hIn, "ore", ok);
+    if (allocAt) {
+      const ago = el("span", "num"); ago.dataset.since = allocAt; ago.textContent = durText(Date.now() / 1000 - allocAt);
+      f.append(`Maturato dall'ultima allocazione (${when(allocAt)}, `, ago, " fa): $", inp, ok);
+    } else f.append("Maturato dal cambio di allocazione: $", inp, "in", hIn, "ore", ok);
     box.append(f);
     const out = el("div");
     const show = () => {
       out.replaceChildren();
       const cc = CLAIM[id];
       if (!cc) {
-        out.append(el("div", "d", allocAt ? `Scrivi quanto mostra l'app di Aero per questa posizione: le ore partono dal cambio di allocazione (${when(allocAt)}).`
-          : "Scrivi quanto mostra l'app di Aero e in quante ore l'ha maturato."));
+        out.append(el("div", "d", allocAt ? "Scrivi quanto mostra l'app di Aero per questa posizione: il tempo è quello passato dall'ultima allocazione al momento in cui premi Calcola."
+          : "Non conosco l'ora dell'ultima allocazione di questa posizione: scrivi quanto mostra l'app di Aero e in quante ore l'ha maturato."));
         return;
       }
       const capital = base * price, perSec = cc.usd / cc.secs;
       const a = capital > 0 ? perSec * 365 * 86400 / capital * 100 : null, m = multOf(perSec, alloc, 24);
       out.append(el("div", "res", `APR ${fmtPct(a)} · $${(perSec * 86400).toFixed(2).replace(".", ",")} al giorno` + (m != null ? ` · ${fmtX(m)} il mercato` : "")));
-      out.append(el("div", "d", `Da $${cc.usd.toFixed(2).replace(".", ",")} in ${hrsTxt(cc.secs)} ore, scritti ${when(cc.at)}` +
-        (est != null && cc.secs > 0 && Math.abs(cc.secs - (est[2] - est[0])) < 2 * 3600 ? `; il monitor stima $${est[1].toFixed(2).replace(".", ",")} dallo stesso cambio di allocazione` : "") + "."));
+      const span = cc.alloc_at ? `in ${durText(cc.secs)} (allocazione ${when(cc.alloc_at)}, scritti ${when(cc.at)})` : `in ${hrsTxt(cc.secs)} ore (scritti ${when(cc.at)})`;
+      const same = est && cc.alloc_at && Math.abs(est[0] - cc.alloc_at) < 600;
+      out.append(el("div", "d", `Da $${cc.usd.toFixed(2).replace(".", ",")} maturati ${span}` +
+        (same ? `; il monitor stima $${est[1].toFixed(2).replace(".", ",")} dalla stessa allocazione fino alle ${when(est[2])}` : "") + "."));
       const clr = el("button", "linkish", "Cancella"); clr.type = "button";
       clr.addEventListener("click", () => { delete CLAIM[id]; saveClaim(); inp.value = ""; show(); });
       out.append(clr);
     };
     f.addEventListener("submit", e => {
       e.preventDefault();
-      const usd = numIn(inp.value), h = numIn(hIn.value);
-      if (!(usd >= 0) || !(h > 0)) { out.replaceChildren(el("div", "d", "Servono i dollari e le ore, per esempio 12,40 e 4.")); return; }
-      CLAIM[id] = { usd, secs: Math.round(h * 3600), at: Math.round(Date.now() / 1000), alloc_at: allocAt };
+      const usd = numIn(inp.value), at = Math.round(Date.now() / 1000);
+      const secs = allocAt ? at - allocAt : Math.round(numIn(hIn.value) * 3600);
+      if (!(usd >= 0)) { out.replaceChildren(el("div", "d", "Scrivi i dollari, per esempio 12,40.")); return; }
+      if (!(secs > 0)) { out.replaceChildren(el("div", "d", allocAt ? "L'ultima allocazione risulta nel futuro: aspetta il prossimo aggiornamento." : "Servono anche le ore, per esempio 4.")); return; }
+      CLAIM[id] = { usd, secs, at, alloc_at: allocAt };
       delete DRAFT[id];
       saveClaim(); show();
     });
@@ -1090,7 +1100,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       }
       if (ent.length) {
         // the last allocation change: the latest cooldown start over the chains it allocates on
-        const cdH = (POS && POS.cooldown_h) || 47, allocAt = Math.max(...ent.map(e => e[1])) - cdH * 3600;
+        const cdH = (POS && POS.cooldown_h) || 47;
+        const allocAt = ent.some(e => e[6] > 0) ? Math.max(...ent.map(e => e[6] || 0)) : Math.max(...ent.map(e => e[1])) - cdH * 3600;
         box.append(claimBox(id, allocAt > 0 ? allocAt : 0, base, alloc, r && r[9] ? r[9] : null));
       }
       if (!ent.length) {
@@ -2313,6 +2324,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     });
   }
   setInterval(tickCountdowns, 1000);
+  function durText(s) {
+    s = Math.max(0, Math.round(s / 60));
+    const d = Math.floor(s / 1440), h = Math.floor(s % 1440 / 60), m = s % 60;
+    return d ? `${d} g ${h} h ${String(m).padStart(2, "0")} min` : h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`;
+  }
+  setInterval(() => { const now = Date.now() / 1000; document.querySelectorAll("[data-since]").forEach(e => { e.textContent = durText(now - +e.dataset.since); }); }, 15000);
 
   // ---- the options the simulation follows: sent to the monitor with "Carica queste opzioni nella simulazione"
   function rdOptions() {

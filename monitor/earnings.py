@@ -22,6 +22,7 @@ WINDOWS = (1, 6, 12, 24)
 KEEP_D = 35 * DAY
 BACKFILL = 7 * DAY
 EST_V = 1                   # version of the fee estimate; a new one sets the uncollected estimates up again
+SINCE_MAX = 4 * DAY         # earnings since the last allocation are exported when it is at most this old
 
 
 def _book(state):
@@ -277,8 +278,9 @@ def windows(p, now, h0):
 
 
 def since(p, t0, now, h0):
-    """USD credited to the position since t0, from its hourly buckets; None when t0 is older than they reach."""
-    if not t0 or t0 < h0 - (HOURS - 1) * HOUR or t0 >= now:
+    """USD credited to the position since t0: the hourly buckets for the last day, before that the daily ones spread
+    evenly over their day. None when t0 is more than SINCE_MAX ago."""
+    if not t0 or t0 >= now or t0 < now - SINCE_MAX:
         return None
     usd = 0.0
     for i, v in enumerate(p.get("h") or []):
@@ -286,6 +288,12 @@ def since(p, t0, now, h0):
         lo, hi = max(b, t0), min(b + HOUR, now)
         if hi > lo and v:
             usd += v * (hi - lo) / max(1, min(b + HOUR, now) - b)
+    hs = h0 - (HOURS - 1) * HOUR                      # where the hourly buckets start
+    if t0 < hs:
+        for d, v in (p.get("d") or {}).items():
+            lo, hi = max(int(d), t0), min(int(d) + DAY, hs)
+            if hi > lo and v:
+                usd += v * (hi - lo) / DAY
     return usd
 
 
