@@ -27,6 +27,7 @@ diluisce ogni pool. Tutte le opzioni della vecchia app:
 | Opzione | Cosa fa |
 |---|---|
 | Allocation Power, prezzo AERO | La tua posizione (resta solo sul dispositivo); il prezzo serve solo per l'APR |
+| Calcola sull'APR (48 ore) | La finestra su cui stimare quanto renderà ogni pool: le ultime 48 ore, o le ultime 24, 12, 6 ore o l'ultima ora, con le fee della finestra (volume orario × fee per dollaro scambiato delle 48 ore) portate a 48 ore più gli incentivi programmati. I pool senza volume orario restano sulle 48 ore; con una finestra corta trend e taglio dei picchi sono spenti |
 | Peso del trend fee | Corregge le fee delle ultime 48 ore della loro variazione rispetto alle 48 prima |
 | Concorrenza attesa | Nessun pool rende più del multiplo scelto della media del mercato (o «voti fermi») |
 | Taglia i picchi di volume | Nei pool le cui fee sono salite più del mercato oltre la tolleranza conta le fee delle 48 ore prima, mosse come il mercato; gli incentivi programmati restano |

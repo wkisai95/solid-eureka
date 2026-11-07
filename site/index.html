@@ -431,6 +431,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field" id="rd-mypos-f" hidden><span class="flabel">Posizioni da riallocare</span><div class="mypos" id="rd-mypos"></div><small id="rd-mypos-s"></small></div>
       <div class="field"><label for="rd-ap">Allocation Power</label><input id="rd-ap" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>I tuoi sAERO, dalla card del tuo stake</small></div>
       <div class="field"><label for="rd-price">Prezzo AERO $</label><input id="rd-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="rd-price-s">Solo per l'APR. Vuoto: il prezzo letto dal monitor</small></div>
+      <div class="field"><label for="rd-win">Calcola sull'APR</label><select id="rd-win"><option value="48">delle ultime 48 ore</option><option value="24">delle ultime 24 ore</option><option value="12">delle ultime 12 ore</option><option value="6">delle ultime 6 ore</option><option value="1">dell'ultima ora</option></select><small id="rd-win-s">Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati</small></div>
       <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
       <div class="field"><label for="rd-comp">Concorrenza attesa</label><select id="rd-comp"><option value="0">Nessuna: voti fermi</option><option value="8">Max 8× la media del mercato</option><option value="5">Max 5× la media del mercato</option><option value="3">Max 3× la media del mercato</option><option value="2">Max 2× la media del mercato</option><option value="1.5">Max 1,5× la media del mercato</option></select><small>Gli altri allocatori arrivano dove si guadagna di più</small></div>
       <div class="field"><span class="flabel">Taglia i picchi di volume</span><label class="switch"><input id="rd-spk" type="checkbox" role="switch"><span id="rd-spk-s">Spento</span></label>
@@ -1643,7 +1644,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---------------------------------------------------------------- Radar sAERO: the old app, on the monitor's data
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-  const RD_DEF = { ap: "235000", price: "", trend: "0", comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", exitOff: [], minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
+  const RD_DEF = { ap: "235000", price: "", win: "48", trend: "0", comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", exitOff: [], minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
   let RD = { ...RD_DEF };
   try { RD = { ...RD_DEF, ...(JSON.parse(lsGet("radar-rd") || "null") || {}) }; } catch (e) {}
   let XS = { keys: new Set(), rules: [], chainsOff: [] };
@@ -1682,7 +1683,24 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   const qmatch = (p, q) => { const w = String(q).toLowerCase().split(/\s+/).filter(Boolean); return w.length > 0 && w.every(t => hayOf(p).includes(t)); };
   const ruleFor = p => XS.rules.find(r => qmatch(p, r));
   const chainOff = p => XS.chainsOff.includes(p.chain);
-  const projected = (p, w) => Math.max(0, p.inc + p.fee * (1 + w * Math.max(-100, Math.min(200, p.d || 0)) / 100));
+  // fees of a pool in the last n hours: its hourly volume × its fees per dollar traded in the last 48 hours; null
+  // without hourly volume (fee transfers arrive in batches on some chains, so short windows would be noise)
+  function winFee(p, n) {
+    if (!(p.vh && p.vh.some(v => v) && p.fpv)) return p.fee > 0 ? null : 0;
+    const xs = (n === 1 ? [p.vh.slice(0, 2).find(v => v != null)] : p.vh.slice(0, n)).filter(v => v != null);
+    return xs.length ? xs.reduce((a, b) => a + b, 0) * n / xs.length * p.fpv : null;
+  }
+  const rdWin = () => [1, 6, 12, 24].includes(+RD.win) ? +RD.win : 48;
+  // expected in the next 48 hours: the fees of the chosen window brought to 48 hours (the 48 hours themselves,
+  // moved by the trend weight, when the window is 48 or the pool has no hourly volume) plus the scheduled incentives
+  const projected = (p, w) => {
+    const n = rdWin();
+    if (n < 48) {
+      const f = winFee(p, n);
+      if (f != null) return Math.max(0, p.inc + f * 48 / n);
+    }
+    return Math.max(0, p.inc + p.fee * (1 + w * Math.max(-100, Math.min(200, p.d || 0)) / 100));
+  };
 
   // votes of the positions being reallocated, per pool: when they move, they leave these pools
   function myVotes() {
@@ -1871,12 +1889,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
 
   // the Radar's allocation: 1% slices to the pool that pays most on the next slice, within the options
   function rdAllocate(list) {
-    const ap = Math.max(0, rdNum(RD.ap, 0)), w = (+RD.trend || 0) / 100, cap = +RD.cap || 100, N = +RD.comp || 0, minA = Math.max(0, +RD.minA || 0);
+    const win = rdWin(), ap = Math.max(0, rdNum(RD.ap, 0)), w = win < 48 ? 0 : (+RD.trend || 0) / 100, cap = +RD.cap || 100, N = +RD.comp || 0, minA = Math.max(0, +RD.minA || 0);
     let sR = 0, sA = 0;
     for (const p of list) { sR += projected(p, w); sA += Math.max(0, p.alloc); }
     const avg = sA > 0 ? sR / sA : 0;     // the whole market: the others vote on the pools you leave out too
     let spike = null;
-    if (RD.spk) {
+    if (RD.spk && win === 48) {
       let now = 0, prev = 0; const withD = [];
       for (const p of list) {
         now += p.fee;
@@ -1960,7 +1978,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const total = act.reduce((s, o) => s + earn(o, o.k), 0);
     let top = null, topE = 0;
     for (const o of act) { const e = earn(o, 100); if (e > topE) { topE = e; top = o; } }
-    return { ap, w, act, total, top, topE, earn, avg, N, spike, stab };
+    const short = win < 48 ? list.filter(p => p.on && p.fee > 0 && winFee(p, win) == null).length : 0;     // on the 48 hours
+    return { ap, w, win, short, act, total, top, topE, earn, avg, N, spike, stab };
   }
 
   function toast(text, bad) {
@@ -1977,10 +1996,18 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     pfRender();
     $("rd-when").textContent = "dati del " + when(DATA.generated);
     $("rd-trend-v").textContent = (+RD.trend || 0) + "%";
+    const short = r.win < 48;
+    $("rd-trend").disabled = short; $("rd-spk").disabled = short; $("rd-spkK").disabled = short;
+    $("rd-win-s").textContent = !short ? "Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati"
+      : `Le fee ${r.win === 1 ? "dell'ultima ora" : `delle ultime ${r.win} ore`} portate a 48 ore, più gli incentivi programmati` +
+        (r.short ? `; ${r.short} pool senza volume orario restano sulle 48 ore` : "") +
+        (r.win === 1 ? ". In un'ora basta uno scambio grosso a far sembrare d'oro un pool: guarda gli avvisi di picco" : "");
+    $("rd-k48").nextElementSibling.textContent = short ? `stima prossime 48 ore, ${r.win === 1 ? "dall'ultima ora" : `dalle ultime ${r.win} ore`}` : "stima prossime 48 ore";
     $("rd-price").placeholder = DATA.aero_usd ? DATA.aero_usd.toFixed(3).replace(".", ",") : "es. 0,80";
     const nD = list.filter(p => p.d != null).length;
     const ready = Math.min(...(DATA.chains || []).filter(c => c.fee_from && c.pools).map(c => c.fee_from + 96 * 3600));
-    $("rd-trend-s").textContent = nD ? `Segue la variazione delle fee rispetto alle 48 ore prima (disponibile per ${nD} pool)`
+    $("rd-trend-s").textContent = short ? "Conta solo con le 48 ore: una finestra più corta segue già le fee recenti"
+      : nD ? `Segue la variazione delle fee rispetto alle 48 ore prima (disponibile per ${nD} pool)`
       : `La variazione delle fee arriva con 96 ore di storico${isFinite(ready) ? ", " + when(ready) : ""}: fino ad allora il trend non cambia nulla`;
     rdChains(list);
 
@@ -2084,7 +2111,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     }
     $("rd-spk-s").textContent = RD.spk ? "Acceso" : "Spento";
     const sp = r.spike, si = $("rd-spk-info");
-    if (!sp) si.textContent = "Riporta al livello di prima le fee dei pool saliti più del mercato oltre la tolleranza; gli incentivi programmati restano";
+    if (r.win < 48) si.textContent = "Lavora sulle 48 ore: con una finestra più corta è spento";
+    else if (!sp) si.textContent = "Riporta al livello di prima le fee dei pool saliti più del mercato oltre la tolleranza; gli incentivi programmati restano";
     else if (!sp.n) si.textContent = "Nessuna variazione delle fee ancora: il filtro non ha nulla da confrontare";
     else si.textContent = `Mercato ${sPct(sp.Dm)} · fee tagliate nei pool sopra ${sPct(sp.thr)}: ${sp.ids.size} (incentivi tenuti)`;
     const mk = $("rd-mkt");
@@ -2403,7 +2431,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (e.type === "checkbox") e.checked = !!RD[key]; else e.value = RD[key];
     e.addEventListener(ev || "input", () => { RD[key] = e.type === "checkbox" ? e.checked : e.value; saveRD(); rdSchedule(); });
   };
-  rdBind("rd-ap", "ap"); rdBind("rd-price", "price"); rdBind("rd-trend", "trend"); rdBind("rd-comp", "comp", "change");
+  rdBind("rd-ap", "ap"); rdBind("rd-price", "price"); rdBind("rd-win", "win", "change"); rdBind("rd-trend", "trend"); rdBind("rd-comp", "comp", "change");
   rdBind("rd-spk", "spk", "change"); rdBind("rd-spkK", "spkK"); rdBind("rd-stb", "stb", "change"); rdBind("rd-stbK", "stbK"); rdBind("rd-min", "minA", "change"); rdBind("rd-cap", "cap", "change");
   rdBind("rd-sort", "sortBy", "change");
   $("rd-saved").value = RD.saved || "";
