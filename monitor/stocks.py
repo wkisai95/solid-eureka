@@ -24,7 +24,7 @@ EVERY = 55 * 60             # one reading per hour
 LATE = 80 * 60              # after this long it reads even in a run that already read the other markets
 KEEP_H = 7 * 24
 EXPORT_H = 72               # hours of each chain's totals in the export
-TOKEN_H = 48                # hours of each token's volume
+WINDOWS = (1, 2, 6, 12)     # hours the page can show the trading of
 COINBASE_PREFIX = "0xb2" + "0" * 20
 SEL_SUPPLY = C.sel("totalSupply()")
 
@@ -181,17 +181,28 @@ def refresh(state, cfg, rpc_for, now, log, markets_read=False):
     return bool(row)
 
 
+def _span(xs):
+    """Total of an hourly series over a span; hours without a reading count at the average of the others."""
+    have = [x for x in xs if x is not None]
+    return float(sum(have)) * len(xs) / len(have) if have else None
+
+
 def export(state, now):
     """The page's stocks.json: the last 72 hours of every stock token and of each chain.
 
-    {"generated", "hours": [hour starts, oldest first], "read": {hour: time of the reading},
+    {"generated", "hours": [hour starts, oldest first], "read": {hour: time of the reading}, "end": index in hours
+     of the last reading, "windows": [1, 2, 6, 12],
      "chains": {cid: {"vol": [72], "tx": [72], "mint": [USD minted - burned in the hour], "n": tokens}},
-     "tokens": [{"k", "sym", "c", "vol": [the last 48 hours], "tx": [last 2], "sup": [last 2], "px", "liq", "v24",
-                 "chg", "buys", "sells"}]}: the token's figures are those of its last reading."""
+     "tokens": [{"k", "sym", "c", "vol": [the last 24 hours], "px", "liq", "v24", "chg", "buys", "sells",
+                 "w": {hours: [volume, volume of the hours before, volume of the same hours yesterday, operations,
+                               operations of the hours before, USD of supply brought on chain (minus taken off),
+                               price change %]}}]}
+    The token's px, liq, v24, chg, buys and sells are those of its last reading; the windows end at the last reading."""
     st = book(state)
     h0 = now - now % HOUR
     hours = [h0 - i * HOUR for i in range(EXPORT_H - 1, -1, -1)]
     rows = [st["h"].get(str(h)) or {} for h in hours]
+    end = max((i for i, x in enumerate(rows) if x), default=len(rows) - 1)
     chains = {str(c): {"vol": [], "tx": [], "mint": [], "n": 0} for c in CHAINS}
     tokens = []
     for k, m in sorted((st.get("tok") or {}).items()):
@@ -201,11 +212,30 @@ def export(state, now):
         if not last:
             continue
         chains[cid]["n"] += 1
+        vol = [x[0] if x else None for x in r]
+        tx = [(x[1] + x[2]) if x else None for x in r]
+        px = [x[3] if x else None for x in r]
+        sup = [x[7] if x and len(x) > 7 else None for x in r]
+        win = {}
+        for n in WINDOWS:
+            lo = end - n + 1
+            if lo - n < 0:
+                continue
+            cur, before = _span(vol[lo:end + 1]), _span(vol[lo - n:lo])
+            yday = _span(vol[lo - 24:end - 23]) if lo - 24 >= 0 else None
+            t_cur, t_before = _span(tx[lo:end + 1]), _span(tx[lo - n:lo])
+            # the reading just before the span, or the closest one up to two hours earlier when it is missing
+            before_i = next((j for j in (lo - 1, lo - 2, lo - 3) if j >= 0 and r[j]), None)
+            s_end, p_end = sup[end], px[end]
+            s_start, p_start = (sup[before_i], px[before_i]) if before_i is not None else (None, None)
+            supply = (s_end - s_start) * p_end if None not in (s_end, s_start, p_end) else None
+            change = (p_end / p_start - 1) * 100 if p_end and p_start else (last[6] if n == 1 else None)
+            win[str(n)] = [None if v is None else round(v) for v in (cur, before, yday, t_cur, t_before, supply)] + \
+                          [None if change is None else round(change, 2)]
         tokens.append({"k": k, "sym": m["sym"], "c": int(cid),
-                       "vol": [round(x[0]) if x else None for x in r[-TOKEN_H:]],
-                       "tx": [(x[1] + x[2]) if x else None for x in r[-2:]],
-                       "sup": [float(f"{x[7]:.7g}") if x and len(x) > 7 and x[7] is not None else None for x in r[-2:]],
-                       "px": last[3], "liq": last[4], "v24": last[5], "chg": last[6], "buys": last[1], "sells": last[2]})
+                       "vol": [None if v is None else round(v) for v in vol[-24:]],
+                       "px": last[3], "liq": last[4], "v24": last[5], "chg": last[6], "buys": last[1], "sells": last[2],
+                       "w": win})
     for i, x in enumerate(rows):
         prev = rows[i - 1] if i else {}
         for cid, ch in chains.items():
@@ -218,5 +248,6 @@ def export(state, now):
                 if len(a) > 7 and len(b) > 7 and a[7] is not None and b[7] is not None and b[3]:
                     mint = (mint or 0.0) + (b[7] - a[7]) * b[3]
             ch["mint"].append(round(mint) if mint is not None else None)
-    return {"generated": now, "hours": hours, "read": {h: t for h, t in st.get("t", {}).items() if int(h) >= hours[0]},
+    return {"generated": now, "hours": hours, "end": end, "windows": list(WINDOWS),
+            "read": {h: t for h, t in st.get("t", {}).items() if int(h) >= hours[0]},
             "chains": chains, "tokens": tokens}

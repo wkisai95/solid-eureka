@@ -107,11 +107,12 @@ volume delle 24 ore; dalla chain legge la supply (`totalSupply`), che da un'ora 
 portate sulla chain o tolte. Tiene 7 giorni di storia oraria in `state.json.gz` e scrive `stocks.json` sul ramo
 `data` (72 ore per rete, 48 per titolo).
 
-Nella pagina, sotto il Radar: per ogni rete il volume dell'ultima ora con la variazione sull'ora prima e sulla stessa
-ora di ieri, le operazioni, la supply portata sulla chain o tolta e il grafico delle ultime 72 ore con la fascia della
-borsa di New York aperta; poi la tabella dei titoli della rete scelta (prezzo, prezzo nell'ultima ora, volume e sua
-variazione, operazioni con la quota di acquisti, supply dell'ora, volume 24 ore, barre delle ultime 24 ore), con
-ricerca. In `config.json` `"stocks": {"add": [...], "skip": [...]}` aggiunge o toglie token (chiavi `chain:indirizzo`).
+Nella pagina, sotto il Radar, scegli il periodo (1, 2, 6 o 12 ore): per ogni rete il volume del periodo con la
+variazione sulle ore subito prima e sulle stesse ore di ieri, le operazioni, la supply portata sulla chain o tolta e il
+grafico delle ultime 72 ore con il periodo in evidenza e la fascia della borsa di New York aperta; poi la tabella dei
+titoli della rete scelta per lo stesso periodo (prezzo e sua variazione, volume e sua variazione, operazioni, con la
+quota di acquisti per l'ultima ora, supply, volume 24 ore, barre delle ultime 24 ore), con ricerca. Le ore senza
+lettura contano alla media delle altre del periodo. In `config.json` `"stocks": {"add": [...], "skip": [...]}` aggiunge o toglie token (chiavi `chain:indirizzo`).
 
 ## Simulazione
 
