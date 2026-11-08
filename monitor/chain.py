@@ -13,7 +13,9 @@ FACTORY_REGISTRY = "0x7b2A2c12dC5Ea2a31455952a05031C3E4BB28F3E"   # leaf factory
 BASE_CHAIN = 8453
 START_BLOCK = 52875727          # 2026-10-21 00:00 UTC on Base, before the Aero launch
 DEPLOY_BLOCK = 52688157         # root Voter and LeafVoter deployed on Base (2026-10-16)
-BASE_GENESIS_TS = 1686789347    # Base has fixed 2-second blocks: ts = genesis + 2 * block
+BASE_GENESIS_TS = 1686789347    # Base blocks: every 2 seconds from genesis, every 200 ms since the Denim upgrade
+DENIM_BLOCK = 53556127          # first 200 ms block (Denim, 5 Nov 2026 18:00 UTC)
+DENIM_TS = BASE_GENESIS_TS + 2 * DENIM_BLOCK     # its timestamp, 1793901601
 ZERO = "0x0000000000000000000000000000000000000000"
 
 CHAIN_NAMES = {1: "Ethereum", 10: "OP Mainnet", 8453: "Base", 42161: "Arbitrum",
@@ -31,12 +33,24 @@ def chain_short(cid):
 
 
 def block_ts(block):
-    """Timestamp of a Base block."""
-    return BASE_GENESIS_TS + 2 * int(block)
+    """Timestamp of a Base block. Since Denim five blocks share each second (timestamps are whole seconds)."""
+    b = int(block)
+    if b < DENIM_BLOCK:
+        return BASE_GENESIS_TS + 2 * b
+    return DENIM_TS + (b - DENIM_BLOCK) // 5
 
 
 def ts_block(ts):
-    return max(0, (int(ts) - BASE_GENESIS_TS) // 2)
+    """Last Base block with a timestamp at or before ts."""
+    t = int(ts)
+    if t < DENIM_TS:
+        return max(0, (t - BASE_GENESIS_TS) // 2)
+    return DENIM_BLOCK + (t - DENIM_TS) * 5 + 4
+
+
+def block_time(block):
+    """Seconds between Base blocks at this block."""
+    return 2.0 if int(block) < DENIM_BLOCK else 0.2
 
 
 def topic(sig):

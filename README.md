@@ -7,7 +7,9 @@ Ogni giro:
 
 - legge da ogni chain gli eventi del LeafVoter di Aero (allocazioni delle posizioni sAERO, cooldown, nuovi gauge),
   le fee girate agli allocatori e i programmi di incentivi; le chain si leggono in parallelo e una chain che non
-  risponde non blocca le altre;
+  risponde non blocca le altre. Su Base l'ora di ogni evento viene dal ritmo dei blocchi (uno ogni 2 secondi, uno
+  ogni 200 ms dall'aggiornamento Denim del 5 novembre 2026, blocco 53.556.127), controllato a ogni giro sull'ultimo
+  blocco letto: se non torna più, il monitor prende gli orari dalla chain e lo scrive nel log;
 - legge l'allocazione totale di ogni pool e com'era 1, 6 e 24 ore fa;
 - una volta all'ora chiede a KyberSwap e Velora una quotazione da $1.000 e $10.000 sui pool più allocati e misura
   quanta parte passa dal pool Aero (quota di routing);
@@ -99,9 +101,11 @@ l'allocazione di adesso. I numeri sono una stima dai dati pubblici, non i claim 
 
 ## Stocks onchain
 
-Le azioni tokenizzate su Robinhood Chain (NVDA, TSLA, SPY…: i token dei pool Aero il cui simbolo è un ticker USA) e
+Le azioni tokenizzate su Robinhood Chain (NVDA, TSLA, SPY…: i token dei pool Aero il cui simbolo è un ticker USA,
+tranne U che lì è una stablecoin) e
 su Base (NVDAc, TSLAc…: i token azionari con la «c» finale, 8 decimali e indirizzo che inizia con `0xb2` e venti zeri;
-più i fondi WisdomTree `wt…`). Una volta all'ora il monitor legge per ognuno, da DexScreener, tutti i suoi pool sui DEX
+più i fondi WisdomTree `wt…`). Una volta per ogni ora (al primo giro dell'ora, ad almeno 40 minuti dalla lettura
+prima) il monitor legge per ognuno, da DexScreener, tutti i suoi pool sui DEX
 della rete: volume e operazioni dell'ultima ora (acquisti e vendite), prezzo, variazione del prezzo, liquidità e
 volume delle 24 ore; dalla chain legge la supply (`totalSupply`), che da un'ora all'altra dice quante azioni sono state
 portate sulla chain o tolte. Tiene 7 giorni di storia oraria in `state.json.gz` e scrive `stocks.json` sul ramo

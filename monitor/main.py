@@ -21,6 +21,7 @@ from . import big as B
 from . import chain as C
 from . import market as M
 from . import marketdata as MD
+from . import repair as RP
 from . import report as R
 from . import stocks as S
 from . import tracker as T
@@ -153,6 +154,13 @@ def run(args):
     for cid in chain_ids:
         A.chain_state(state, cid)
         rpc_for(cid)
+    # Base times after the Denim upgrade (200 ms blocks since 5 Nov 2026): put back once, before anything reads them
+    if first_run:
+        state.setdefault("repairs", []).append(RP.DENIM)
+    elif RP.DENIM not in state.setdefault("repairs", []):
+        # if it fails the run stops with the state untouched: the old Base times must not mix with the new ones
+        RP.denim(state, base_rpc, now, log, A.FEE_WINDOW)
+        state["migrated_at"] = now          # what the repair moves is not news: this run's alerts stay quiet
 
     # 1. events of every chain, read in parallel (each worker touches only its own chain state)
     def read_chain(cid):
@@ -190,6 +198,9 @@ def run(args):
         if not res["ok"]:
             status["errors"].append(f"{C.chain_short(cid)}: {res['error']}")
             continue
+        if cs.get("ts_drift"):
+            status["errors"].append(f"{C.chain_short(cid)}: the block clock is off by {cs['ts_drift']['by']:+d} s, "
+                                    f"block times read from the chain")
         if not cs.get("first_ok"):
             cs["first_ok"] = now
             first_read.add(cid)

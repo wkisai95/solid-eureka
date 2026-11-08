@@ -794,7 +794,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // public export what each position number has allocated and earned.
   const SAERO = "0xbf7977e1521e9a3032bf7243ee4712f311f13915";
   const BASE_RPCS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com", "https://base.drpc.org", "https://1rpc.io/base"];
-  const BASE_GENESIS = 1686789347;           // Base has fixed 2-second blocks
+  // Base blocks: every 2 seconds from genesis, every 200 ms since the Denim upgrade (block 53556127, 5 Nov 2026)
+  const BASE_GENESIS = 1686789347, DENIM_BLOCK = 53556127, DENIM_TS = BASE_GENESIS + 2 * DENIM_BLOCK;
+  const baseTime = b => b < DENIM_BLOCK ? BASE_GENESIS + 2 * b : DENIM_TS + Math.floor((b - DENIM_BLOCK) / 5);
   let POS = null, SHARDS = {}, posLoading = null;
   let myIds = [], meAddr = "", ME = null, meErr = null, meLoading = false;
   try { myIds = JSON.parse(localStorage.getItem("radar-ids") || "[]"); } catch (e) { myIds = []; }
@@ -836,7 +838,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     return ids.map((id, i) => {
       const st = res[3 * i], blk = Number(word(res[3 * i + 2], 0));
       return { id, amount: e18(word(st, 0)), end: Number(word(st, 1)), perm: word(st, 2) !== 0n, ap: e18(word(res[3 * i + 1], 0)),
-        since: blk ? BASE_GENESIS + 2 * blk : 0 };
+        since: blk ? baseTime(blk) : 0 };
     }).sort((a, b) => b.ap - a.ap);
   }
 

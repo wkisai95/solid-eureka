@@ -270,10 +270,13 @@ class _Market:
         return out
 
 
-def refresh(state, chains_cfg, now, log, every=55 * 60):
-    """Hourly snapshot of every Aero pool and chain. Returns True when it refreshed."""
+def refresh(state, chains_cfg, now, log, gap=40 * 60):
+    """Hourly snapshot of every Aero pool and chain: one per clock hour, at least `gap` after the previous one (a
+    fixed interval drifted across the runs, leaving some hours with two snapshots and others with none). Returns True
+    when it refreshed."""
     mk = market_state(state)
-    if now - mk.get("at", 0) < every:
+    at = int(mk.get("at", 0))
+    if now - at < gap or now - now % HOUR == at - at % HOUR:
         return False
     t_start = time.time()
     by_chain = {}

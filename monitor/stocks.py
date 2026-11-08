@@ -20,7 +20,7 @@ from .marketdata import DS, LOOKUP_PACE_S, Limited, _get, _num
 
 HOUR = 3600
 CHAINS = {8453: "base", 4663: "robinhood"}
-EVERY = 55 * 60             # one reading per hour
+GAP = 40 * 60               # one reading per clock hour, at least this long after the previous one
 LATE = 80 * 60              # after this long it reads even in a run that already read the other markets
 KEEP_H = 7 * 24
 EXPORT_H = 72               # hours of each chain's totals in the export
@@ -28,7 +28,7 @@ WINDOWS = (1, 2, 6, 12)     # hours the page can show the trading of
 COINBASE_PREFIX = "0xb2" + "0" * 20
 SEL_SUPPLY = C.sel("totalSupply()")
 
-# US stocks and ETFs, as Robinhood Chain names its tokens
+# US stocks and ETFs, as Robinhood Chain names its tokens ("U" is left out: on Robinhood Chain it is a stablecoin)
 TICKERS = set("""
 AAPL ABBV ABNB ACN ADBE ADP AMAT AMC AMD AMGN AMZN ANET APP ARKK ARM ASML AVGO AXP BA BABA BAC BBAI BIDU BLK BMY
 BRK.B BRKB BX C CAT CCJ CEG CHWY CMCSA CMG COIN COP COST CRCL CRM CRWD CSCO CVNA CVS CVX DAL DDOG DE DELL DIA DIS
@@ -36,7 +36,7 @@ DJT DKNG DOCU DUOL EEM EFA ETHA F FCX FDX FIG GD GE GEV GILD GLD GLXY GM GME GOO
 IBM INTC INTU IONQ ISRG IVV IWM JD JNJ JPM KO KRE LCID LIN LLY LMT LOW LRCX LULU MA MARA MCD MDT MELI META MMM MO
 MRK MRVL MS MSFT MSTR MU NBIS NET NFLX NIO NKE NOW NU NVDA NVO OKLO ON ORCL OXY PANW PDD PEP PFE PG PINS PLTR PM
 PYPL QCOM QQQ QS QUBT RBLX RDDT RGTI RIOT RIVN RKLB ROKU SBUX SCHW SGOV SHOP SLV SMCI SMR SNAP SNOW SOFI SONY SOXL
-SOXX SPCX SPOT SPY SQ T TGT TLT TQQQ TSLA TSM TTD TXN U UBER UNH UNP UPS UPST USO V VOO VTI VZ WFC WMT XLE XLF XOM
+SOXX SPCX SPOT SPY SQ T TGT TLT TQQQ TSLA TSM TTD TXN UBER UNH UNP UPS UPST USO V VOO VTI VZ WFC WMT XLE XLF XOM
 XYZ ZM
 """.split())
 
@@ -131,11 +131,12 @@ def _supply(rpc, toks):
 
 
 def refresh(state, cfg, rpc_for, now, log, markets_read=False):
-    """One reading an hour; markets_read: this run already read the other markets from DexScreener, so the reading
-    waits for the next run unless the last one is getting late. Returns True when it read."""
+    """One reading per clock hour (a fixed interval drifted across the runs, leaving some hours with two readings and
+    others with none); markets_read: this run already read the other markets from DexScreener, so the reading waits
+    for the next run unless the last one is getting late. Returns True when it read."""
     st = book(state)
     age = now - int(st.get("at") or 0)
-    if age < EVERY or (markets_read and age < LATE):
+    if str(now - now % HOUR) in st["h"] or age < GAP or (markets_read and age < LATE):
         return False
     t0 = time.time()
     toks = universe(state, cfg)
@@ -236,10 +237,12 @@ def export(state, now):
                        "vol": [None if v is None else round(v) for v in vol[-24:]],
                        "px": last[3], "liq": last[4], "v24": last[5], "chg": last[6], "buys": last[1], "sells": last[2],
                        "w": win})
+    listed = st.get("tok") or {}
     for i, x in enumerate(rows):
         prev = rows[i - 1] if i else {}
         for cid, ch in chains.items():
-            ks = [k for k in x if k.startswith(f"{cid}:")]
+            # only the tokens still on the list: one dropped from it leaves its past readings out of the totals too
+            ks = [k for k in x if k.startswith(f"{cid}:") and k in listed]
             ch["vol"].append(round(sum(x[k][0] for k in ks)) if ks else None)
             ch["tx"].append(sum(x[k][1] + x[k][2] for k in ks) if ks else None)
             mint = None

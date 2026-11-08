@@ -15,6 +15,7 @@ from .rpc import RpcError, TimeBudget
 HOUR = 3600
 FEE_WINDOW = 100 * HOUR   # fees and incentives kept: the last 48 hours and the 48 before, for the change
 FEE_HISTORY = 49 * HOUR
+DRIFT_MAX = 60            # seconds: Base's block clock (chain.block_ts) is set aside when the chain is further off
 VRM_SEL = {k: C.sel(v) for k, v in {
     "gauge": "gauge()",
     "totalSupply": "totalSupply()",
@@ -107,8 +108,10 @@ def add_anchor(cs, block, ts):
 
 
 def ts_fn(cid, cs):
-    """Block number -> timestamp. Base has fixed 2-second blocks; other chains interpolate between anchors."""
-    if int(cid) == C.BASE_CHAIN:
+    """Block number -> timestamp. Base follows its block clock (chain.block_ts) while the chain agrees with it;
+    other chains, and Base once it no longer agrees, interpolate between anchors read from the chain."""
+    base = int(cid) == C.BASE_CHAIN
+    if base and not cs.get("ts_drift"):
         return C.block_ts
     anchors = [tuple(x) for x in cs.get("anchors") or []]
     blocks = [a[0] for a in anchors]
@@ -126,17 +129,45 @@ def ts_fn(cid, cs):
             return int(t + (block - b) * bt)
         (b0, t0), (b1, t1) = anchors[i - 1], anchors[i]
         return int(t0 + (block - b0) * (t1 - t0) / max(1, b1 - b0))
+    if base:
+        ok = int(cs.get("ts_ok") or 0)       # the last block where the clock still matched the chain
+        return lambda block: C.block_ts(block) if block <= ok else f(block)
     return f
+
+
+def _base_clock(rpc, cs, head, now, log):
+    """(clock ok, the head's timestamp read from the chain or None). Base's block clock is checked on the head
+    every run, so a change of block time is caught at once instead of skewing every timestamp after it."""
+    calc = C.block_ts(head)
+    try:
+        real = rpc.block_ts(head)
+    except RpcError as e:
+        log(f"Base: block clock not checked this run ({str(e)[:120]})")
+        return not cs.get("ts_drift"), None
+    if abs(real - calc) <= DRIFT_MAX:
+        cs["ts_ok"] = head
+        if cs.pop("ts_drift", None):
+            log("Base: the block clock matches the chain again")
+        return True, real
+    if not cs.get("ts_drift"):
+        ok = int(cs.get("ts_ok") or 0)
+        if ok:
+            add_anchor(cs, ok, C.block_ts(ok))
+    cs["ts_drift"] = {"at": now, "head": head, "by": int(real - calc)}
+    log(f"Base: block {head} is at {real}, the block clock says {calc} ({real - calc:+d} s): block times read "
+        f"from the chain until the clock is updated")
+    return False, real
 
 
 def chain_head(rpc, cid, cs, lag, now, log):
     """Latest safe block of a chain, its timestamp and the average block time."""
     head = max(0, rpc.block_number() - lag)
-    if int(cid) == C.BASE_CHAIN:
-        cs["bt"] = 2.0
+    clock_ok, real = _base_clock(rpc, cs, head, now, log) if int(cid) == C.BASE_CHAIN else (False, None)
+    if clock_ok:
         ts = C.block_ts(head)
+        cs["bt"] = C.block_time(head)
     else:
-        ts = rpc.block_ts(head)
+        ts = real if real is not None else rpc.block_ts(head)
         add_anchor(cs, head, ts)
         if not cs.get("bt") or now - cs.get("bt_at", 0) > 6 * HOUR:
             back = 20000
@@ -282,8 +313,8 @@ def fetch_reward_events(rpc, cid, cs, head, log, deadline, now):
     prev = cs.get("vrm_block") or 0
     if not prev:
         head_ts = cs.get("head_ts") or now
-        if cid == C.BASE_CHAIN:
-            target = max(C.START_BLOCK, head - FEE_HISTORY // 2)
+        if cid == C.BASE_CHAIN and not cs.get("ts_drift"):
+            target = max(C.START_BLOCK, C.ts_block(head_ts - FEE_HISTORY))
         else:
             target = rpc.block_at_ts(now - FEE_HISTORY, head, head_ts, bt)
             add_anchor(cs, target, rpc.block_ts(target))
