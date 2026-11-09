@@ -276,7 +276,7 @@ def export(state, names, now):
         started.setdefault(p["g"], set()).add(c - c % DAY)
     for k, p in sorted(P.items(), key=lambda kv: -state["ap"].get(kv[0], 0)):
         days = p["d"]
-        name, chain, fpv = names.get(k) or (None, None, None)
+        name, chain = (names.get(k) or (None, None, None))[:2]
         if not name:
             continue
         wd, n = _weekdays(days)
@@ -287,7 +287,8 @@ def export(state, names, now):
         fees = t["f"].get(k) or {}
         # dollars of fees per dollar traded on the days both are known: what a day of volume is worth
         both = [(fees[d], days[d][0]) for d in fees if d in days and days[d][0] > 0]
-        rate = sum(f for f, _ in both) / sum(v for _, v in both) if both else fpv
+        # (the report's own rate is on another source's volume: not mixed with these candles)
+        rate = sum(f for f, _ in both) / sum(v for _, v in both) if both else None
         ev = []
         for d, x in sorted(spikes[k].items(), key=lambda kv: -int(kv[0]))[:6]:
             kind = "mercato" if d in events else "pool"
