@@ -265,6 +265,10 @@ def run(args):
             status["errors"].append("fees backfill: " + traceback.format_exc()[-200:])
             log(f"fees backfill failed: {traceback.format_exc()[-600:]}")
         state["migrated_at"] = now      # the pools' fees change measure: this run's alerts stay quiet
+    # the hours of the last 48 not measured yet (a chain whose old state reached less far back): estimated from
+    # the measured fees per dollar traded, instead of the transfers that carried days of fees at once
+    for cid, (lo, th) in A.estimate_unmeasured(state, now).items():
+        log(f"{C.chain_short(int(cid))}: fees before {(now - th) / 3600:.0f} hours ago estimated from the measured ones")
 
     # hourly market snapshot (pool volumes, pair volume on every DEX, Aero share per chain), kept as history
     if not args.no_market:

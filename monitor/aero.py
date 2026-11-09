@@ -854,16 +854,73 @@ def incentive_usd(state, prices, key, start, end):
 
 
 def fee_hours(state, key):
-    """{hour: USD} the pool's voters earned in fees: measured on the gauge from the chain's acc_from on, the fee
-    transfers before it (they stood for the fees until the gauges were measured)."""
-    t = int(((state.get("chains") or {}).get(str(chain_of(key))) or {}).get("acc_from") or 0)
+    """{hour: USD} the pool's voters earned in fees: measured on the gauge from the chain's acc_from on. Before it,
+    within the last 48 hours, the estimate of estimate_unmeasured once the chain has been measured long enough; the
+    fee transfers otherwise (they stood for the fees until the gauges were measured)."""
+    cid = str(chain_of(key))
+    t = int(((state.get("chains") or {}).get(cid) or {}).get("acc_from") or 0)
     acc = (state.get("acc") or {}).get(key) or {}
     if not t:
         return {int(h): v for h, v in (state["fees"].get(key) or {}).items()}
-    out = {int(h): v for h, v in (state["fees"].get(key) or {}).items() if int(h) < t}
+    rng = (state.get("acc_est_range") or {}).get(cid)
+    out = {}
+    for h, v in (state["fees"].get(key) or {}).items():
+        h = int(h)
+        if h < t and not (rng and rng[0] <= h < rng[1]):
+            out[h] = v
+    if rng:
+        for h, v in ((state.get("acc_est") or {}).get(key) or {}).items():
+            out[int(h)] = out.get(int(h), 0.0) + v
     for h, v in acc.items():
         out[int(h)] = out.get(int(h), 0.0) + v
     return out
+
+
+EST_MIN_H = 6       # hours a chain must have been measured before they stand for its hours before
+
+
+def _hour_volume(vser, h):
+    """Volume traded in the hour starting at h: the snapshot taken in the next hour covers it best."""
+    snap = vser.get(str(h + HOUR)) or vser.get(str(h))
+    return float((snap or [0])[0] or 0) if snap else None
+
+
+def estimate_unmeasured(state, now):
+    """Fees of the hours of the last 48 before a chain's gauges were first measured, from what was measured since:
+    each hour's volume times the fees per dollar traded measured, or the measured hourly average for a pool without
+    hourly volume. They stand for the fee transfers of those hours, which on a quiet pool carry days of fees in one
+    hour. Done each run while the last 48 hours are not all measured and the chain has EST_MIN_H measured."""
+    pools = ((state.get("market") or {}).get("hist") or {}).get("pools") or {}
+    est, ranges = {}, {}
+    lo = now - 49 * HOUR
+    lo -= lo % HOUR
+    for cid, cs in state["chains"].items():
+        t = int(cs.get("acc_from") or 0)
+        th = t - t % HOUR
+        if not t or th <= lo or now - t < EST_MIN_H * HOUR:
+            continue
+        ranges[cid] = [lo, th]
+        keys = {k for k in state.get("acc") or {} if chain_of(k) == int(cid)} | \
+               {k for k in state["fees"] if chain_of(k) == int(cid)}
+        full = range(th, now - now % HOUR, HOUR)          # the measured hours already complete
+        for key in keys:
+            acc = (state.get("acc") or {}).get(key) or {}
+            mf = sum(acc.get(str(h), 0.0) for h in full)
+            if mf <= 0:
+                continue
+            vser = pools.get(key) or {}
+            mv = sum(_hour_volume(vser, h) or 0.0 for h in full) if vser else 0.0
+            n = max(1, len(full))
+            out = {}
+            for h in range(lo, th, HOUR):
+                v = _hour_volume(vser, h) if vser and mv > 0 else None
+                usd = v * mf / mv if v is not None else mf / n
+                if usd > 0:
+                    out[str(h)] = round(usd, 6)
+            if out:
+                est[key] = out
+    state["acc_est"], state["acc_est_range"] = est, ranges
+    return ranges
 
 
 def fees_usd(state, key, start, end):
