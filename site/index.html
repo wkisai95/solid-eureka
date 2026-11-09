@@ -449,7 +449,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field" id="rd-mypos-f" hidden><span class="flabel">Posizioni da riallocare</span><div class="mypos" id="rd-mypos"></div><small id="rd-mypos-s"></small></div>
       <div class="field"><label for="rd-ap">Allocation Power</label><input id="rd-ap" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>I tuoi sAERO, dalla card del tuo stake</small></div>
       <div class="field"><label for="rd-price">Prezzo AERO $</label><input id="rd-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="rd-price-s">Solo per l'APR. Vuoto: il prezzo letto dal monitor</small></div>
-      <div class="field"><label for="rd-win">Calcola sull'APR</label><select id="rd-win"><option value="48">delle ultime 48 ore</option><option value="24">delle ultime 24 ore</option><option value="12">delle ultime 12 ore</option><option value="6">delle ultime 6 ore</option><option value="1">dell'ultima ora</option></select><small id="rd-win-s">Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati</small></div>
+      <div class="field"><label for="rd-win">Calcola sull'APR</label><select id="rd-win"><option value="pred">Previsione più affidabile (backtest)</option><option value="48">delle ultime 48 ore</option><option value="24">delle ultime 24 ore</option><option value="12">delle ultime 12 ore</option><option value="6">delle ultime 6 ore</option><option value="1">dell'ultima ora</option></select><small id="rd-win-s">Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati</small></div>
       <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
       <div class="field"><span class="flabel">Correggi per il giorno della settimana</span><label class="switch"><input id="rd-sea" type="checkbox" role="switch"><span id="rd-sea-s">Spento</span></label>
         <small id="rd-sea-info">Porta le fee della finestra scelta ai giorni delle prossime 48 ore, con le tendenze di ogni pool (sotto, «Tendenze fee»)</small></div>
@@ -552,6 +552,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     <p class="note">Come si muovono le fee di ogni pool nei giorni della settimana e cosa le ha fatte saltare. Le fee seguono il volume: qui c'è il volume orario di ogni pool delle ultime sei settimane (GeckoTerminal), con i giorni eccezionali contati a parte perché un evento non passi per un'abitudine. Giorni in UTC. 1,0× è il giorno medio del pool.</p>
     <div class="trd-top">
       <div class="stkc"><div class="h"><b>Mercato Aero per giorno</b><span class="d" id="trd-m-n"></span></div><div class="wdbars" id="trd-m-wd"></div><div class="wdlab" id="trd-m-lab"></div><div class="d" id="trd-m-txt"></div></div>
+      <div class="stkc"><div class="h"><b>Quale previsione sbaglia meno</b><span class="d" id="trd-f-n"></span></div><div class="trd-ev" id="trd-f"></div></div>
       <div class="stkc"><div class="h"><b>Eventi di mercato</b><span class="d">giorni in cui si sono mossi molti pool insieme</span></div><div class="trd-ev" id="trd-m-ev"></div></div>
     </div>
     <div class="stk-bar">
@@ -1734,7 +1735,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const part = DATA && DATA.generated ? (DATA.generated % 3600) / 3600 : 0;
     return fh.slice(0, n + 1).reduce((a, b) => a + b, 0) * n / (n + part);
   }
-  const rdWin = () => [1, 6, 12, 24].includes(+RD.win) ? +RD.win : 48;
+  // 0 stands for the backtested forecast (trends.json says which one won); it falls back to the 48 hours pool by pool
+  const rdWin = () => RD.win === "pred" ? 0 : [1, 6, 12, 24].includes(+RD.win) ? +RD.win : 48;
   // tendencies by day of the week (trends.json): average of a pool's 28 six-hour blocks between two times
   let TRD = null, TRD_BY = {};
   function blockAvg(b, t0, t1) {
@@ -1759,7 +1761,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // moved by the trend weight, when the window is 48 or the pool has no hourly fees), corrected for the days of
   // the week when asked, plus the scheduled incentives
   const projected = (p, w) => {
-    const n = rdWin(), sx = RD.sea ? seasonX(p.key, n) : 1;
+    const n = rdWin(), sx = RD.sea && n ? seasonX(p.key, n) : 1;
+    if (!n) return Math.max(0, p.inc + (p.pred != null ? p.pred : p.fee));
     if (n < 48) {
       const f = winFee(p, n);
       if (f != null) return Math.max(0, p.inc + f * 48 / n * sx);
@@ -1813,7 +1816,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           fee: p.fees48h || 0, inc: p.inc_next48h || 0, incPast: p.inc48h || 0, rew: p.rev48h || 0,
           d: p.dfee != null ? p.dfee : null, prev: p.fees_prev48h != null ? p.fees_prev48h : null,
           alloc: p.ap || 0, dh: { 1: p.d1h, 6: p.d6h, 24: p.d24h, 48: p.d48h }, spark: p.spark, fh: p.fh || [], inc24: p.inc24h || 0,
-          vh: p.vh || null, fpv: p.fpv || 0, mine: mine[p.key] || 0 };
+          vh: p.vh || null, fpv: p.fpv || 0, mine: mine[p.key] || 0,
+          pred: p.pred48 != null ? p.pred48 : null, perr: p.pred_err || null };
         q.on = !(XS.keys.has(q.key) || ruleFor(q) || chainOff(q));
         return q;
       });
@@ -2063,11 +2067,15 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     $("rd-trend-v").textContent = (+RD.trend || 0) + "%";
     const short = r.win < 48;
     $("rd-trend").disabled = short; $("rd-spk").disabled = short; $("rd-spkK").disabled = short;
-    $("rd-win-s").textContent = !short ? "Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati"
+    const nPred = list.filter(p => p.pred != null).length, bestF = TRD && (TRD.forecasts || []).find(f => f.k === TRD.best);
+    $("rd-sea").disabled = !r.win;
+    $("rd-win-s").textContent = !r.win ? (nPred ? `La previsione che nel backtest ha sbagliato meno${bestF ? ` (${bestF.name}, errore tipico ${Math.round((bestF.err - 1) * 100)}%)` : ""}, fatta sulle fee misurate ora per ora di ${nPred} pool, più gli incentivi programmati. Gli altri pool restano sulle ultime 48 ore`
+        : "Il backtest non è ancora pronto: per ora valgono le ultime 48 ore, più gli incentivi programmati")
+      : !short ? "Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati"
       : `Le fee ${r.win === 1 ? "dell'ultima ora" : `delle ultime ${r.win} ore`} portate a 48 ore, più gli incentivi programmati` +
         (r.short ? `; ${r.short} pool senza volume orario restano sulle 48 ore` : "") +
         (r.win === 1 ? ". In un'ora basta uno scambio grosso a far sembrare d'oro un pool: guarda gli avvisi di picco" : "");
-    $("rd-k48").nextElementSibling.textContent = short ? `stima prossime 48 ore, ${r.win === 1 ? "dall'ultima ora" : `dalle ultime ${r.win} ore`}` : "stima prossime 48 ore";
+    $("rd-k48").nextElementSibling.textContent = !r.win ? "previsione prossime 48 ore" : short ? `stima prossime 48 ore, ${r.win === 1 ? "dall'ultima ora" : `dalle ultime ${r.win} ore`}` : "stima prossime 48 ore";
     $("rd-price").placeholder = DATA.aero_usd ? DATA.aero_usd.toFixed(3).replace(".", ",") : "es. 0,80";
     const nD = list.filter(p => p.d != null).length;
     const ready = Math.min(...(DATA.chains || []).filter(c => c.fee_from && c.pools).map(c => c.fee_from + 96 * 3600));
@@ -2126,7 +2134,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           `: se esce, ${exitGain(Math.min(apx.share, 0.99))}.`));
       }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
-      { const sx = seasonX(o.p.key, rdWin());
+      if (!rdWin() && o.p.pred != null) {
+        const e = o.p.perr;
+        left.append(el("div", "apx", `🎯 Previsione delle fee: ${r$(o.p.pred)} nelle prossime 48 ore (ultime 48: ${r$(o.p.fee)})` +
+          (e ? `. Nel backtest su questo pool ha sbagliato di solito di ${Math.round((e - 1) * 100)}%` + (e >= 1.6 ? ": pool poco prevedibile" : "") : "")));
+      }
+      { const sx = rdWin() ? seasonX(o.p.key, rdWin()) : 1;
         if (Math.abs(sx - 1) >= 0.1) left.append(el("div", "apx", `📅 Per i giorni della settimana, nelle prossime 48 ore le sue fee sono di solito ${String(sx.toFixed(2)).replace(".", ",")}× quelle della finestra` + (RD.sea ? " (già contato)" : " (non contato: accendi «Correggi per il giorno della settimana»)"))); }
       left.append(bar);
       // leave this pool out, like unticking it in the table; it comes back from the chips of excluded pools
@@ -2977,6 +2990,19 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
   function trendsRender() {
     const rows = $("trd-rows"), m = TRD && TRD.market;
+    { const box = $("trd-f"), fs = (TRD && TRD.forecasts) || [];
+      box.replaceChildren();
+      $("trd-f-n").textContent = fs.length ? `${fmtN(fs[0].n)} prove sulla storia dei pool` : "";
+      if (!fs.length) box.append(el("div", "", "Il backtest parte quando la storia dei pool è stata letta."));
+      const base = fs.find(f => f.k === "48h"), pct = f => Math.round((f.err - 1) * 100) + "%";
+      const show = fs.slice(0, 4);
+      if (base && !show.includes(base)) show.push(base);
+      for (const f of show) {
+        const d = el("div"); d.append(el("b", "", f.name[0].toUpperCase() + f.name.slice(1)), ` · errore tipico ${pct(f)}` + (f.k === TRD.best ? " · usata dal radar" : "") + (f.k === "48h" ? " · il metodo di prima" : ""));
+        box.append(d);
+      }
+      if (fs.length) box.append(el("div", "", "Ogni previsione delle 48 ore successive è rifatta in ogni punto della storia con i soli dati di allora e confrontata con quello che è successo."));
+    }
     rows.replaceChildren(); $("trd-m-wd").replaceChildren(); $("trd-m-lab").replaceChildren(); $("trd-m-ev").replaceChildren();
     if (!TRD || !TRD.pools || !TRD.pools.length || !m) {
       $("trd-sub").textContent = TRD && TRD.tracked ? `raccolta in corso: ${TRD.have || 0} pool su ${TRD.tracked}` : "";

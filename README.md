@@ -124,6 +124,14 @@ in dollari. Dieci pool a ogni giro (limite dell'API gratuita), ognuno riletto du
 - **Radar, «Correggi per il giorno della settimana»** (spento di default): porta le fee della finestra scelta ai
   giorni delle prossime 48 ore (tra 0,6× e 1,6×), per i pool con almeno 14 giorni di storia.
 
+- **Backtest delle previsioni**: sulla storia oraria di ogni pool il monitor rifà, ogni sei ore, undici previsioni
+  delle 48 ore successive (ultime 6, 12, 24, 48, 96 ore, mediana di quattro giorni, medie pesate, combinazioni),
+  ognuna anche corretta per il giorno della settimana con le sole fasce note fino a quel momento, e misura di quanto
+  sbagliano (errore tipico: media di |ln(previsto/reale)|). Nel radar, «Previsione più affidabile (backtest)» usa
+  quella che sbaglia meno, applicata alle fee misurate ora per ora e ripulita dal suo scarto medio; per ogni pool
+  suggerito mostra di quanto ha sbagliato su quel pool. Una rete misurata da meno di quattro giorni usa la migliore
+  tra le previsioni che leggono solo 48 ore.
+
 Con cinque o sei campioni per giorno della settimana sono tendenze, non certezze: accanto a ogni giorno c'è il
 numero di settimane viste.
 

@@ -14,6 +14,7 @@ What comes out (trends.json):
   market moved that day (many pools at once, with ETH's and BTC's move) or only this pool, and whether an incentive
   program started on it.
 """
+import math
 import statistics
 import urllib.error
 
@@ -119,7 +120,7 @@ def refresh(state, now, log):
         p = P.get(k) or {}
         if p.get("miss"):
             return now - p.get("tried", 0) > RETRY_MISSING
-        return now - p.get("at", 0) > EVERY
+        return now - p.get("at", 0) > EVERY or "bt" not in p
 
     queue = sorted((k for k in targets if due(k)), key=lambda k: (P.get(k) or {}).get("at", 0))[:PER_RUN]
     done = missing = 0
@@ -152,7 +153,8 @@ def refresh(state, now, log):
             missing += 1
             continue
         old = {d: v for d, v in (p.get("d") or {}).items() if d not in days and int(d) >= now - KEEP_DAYS * DAY}
-        P[k] = {"at": now, "tried": now, "d": {**old, **days}, "b": _blocks(days, hours)}
+        P[k] = {"at": now, "tried": now, "d": {**old, **days}, "b": _blocks(days, hours),
+                "bt": backtest(days, hours)}
         done += 1
     _fee_days(state, t, now)
     if queue:
@@ -179,6 +181,153 @@ def _fee_days(state, t, now):
         if not t["f"][k]:
             del t["f"][k]
     t["fd"] = day
+
+
+# ---------------------------------------------------------------- which forecast of the next 48 hours is right
+
+BT_LOOK, BT_AHEAD, BT_WARM, BT_STEP = 96, 48, 168, 6      # hours
+
+
+def _w(n):
+    return lambda x: sum(x[-n:]) * BT_AHEAD / n
+
+
+def _med4(x):
+    return statistics.median(sum(x[i:i + 24]) for i in range(0, 96, 24)) * 2
+
+
+def _ewma(half):
+    def f(x):
+        tot = wsum = 0.0
+        for age, v in enumerate(reversed(x)):
+            w = 0.5 ** (age / half)
+            tot += v * w
+            wsum += w
+        return tot / wsum * BT_AHEAD
+    return f
+
+
+def _gm(*fs):
+    def f(x):
+        vals = [g(x) for g in fs]
+        if min(vals) <= 0:
+            return sum(vals) / len(vals)
+        prod = 1.0
+        for v in vals:
+            prod *= v
+        return prod ** (1 / len(vals))
+    return f
+
+
+# name: (hours of history it reads, forecast of the next 48 hours from the last 96 hourly values, oldest first)
+PREDICTORS = {
+    "48h": (48, _w(48)), "24h": (24, _w(24)), "12h": (12, _w(12)), "6h": (6, _w(6)), "96h": (96, _w(96)),
+    "mediana": (96, _med4),                       # twice the median of the last four days: deaf to one spike
+    "ewma24": (96, _ewma(24)), "ewma12": (72, _ewma(12)),
+    "48h+mediana": (96, _gm(_w(48), _med4)), "24h+96h": (96, _gm(_w(24), _w(96))),
+    "24h+48h+96h": (96, _gm(_w(24), _w(48), _w(96))),
+}
+LABELS = {"48h": "ultime 48 ore", "24h": "ultime 24 ore", "12h": "ultime 12 ore", "6h": "ultime 6 ore",
+          "96h": "ultimi 4 giorni", "mediana": "mediana di 4 giorni", "ewma24": "media pesata (metà peso a 24 ore)",
+          "ewma12": "media pesata (metà peso a 12 ore)", "48h+mediana": "48 ore e mediana insieme",
+          "24h+96h": "24 ore e 4 giorni insieme", "24h+48h+96h": "24, 48 ore e 4 giorni insieme"}
+
+
+def _block_of(ts):
+    return ((ts // DAY + 3) % 7) * 4 + (ts % DAY) // (6 * HOUR)
+
+
+def _season(blocks, t, look):
+    """Typical level of the 48 hours after t against the `look` hours before it, from 28 weekly blocks; 1 if
+    unknown; kept between 0.6 and 1.6."""
+    def avg(a, b):
+        vals = [blocks[_block_of(h)] for h in range(a, b, HOUR)]
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+    nxt, past = avg(t, t + BT_AHEAD * HOUR), avg(t - look * HOUR, t)
+    if not nxt or not past or nxt <= 0 or past <= 0:
+        return 1.0
+    return max(0.6, min(1.6, nxt / past))
+
+
+def backtest(days, hours):
+    """Walks through the pool's hourly history: at each step every forecast of the next 48 hours is made with what
+    was known then (the weekly blocks too, from the hours before) and compared with what happened. Returns
+    {name: [sum of |ln(forecast / real)|, sum of ln(forecast / real), samples]}; "+g" names are corrected for the
+    day of the week."""
+    if not days:
+        return {}
+    start = min(int(d) for d in days)
+    end = max(int(d) for d in days) + DAY
+    x = [float(hours.get(t, 0.0)) for t in range(start, end, HOUR)]
+    out = {}
+    for i in range(max(BT_LOOK, BT_WARM), len(x) - BT_AHEAD + 1, BT_STEP):
+        real = sum(x[i:i + BT_AHEAD])
+        past = x[i - BT_LOOK:i]
+        if real <= 0 or sum(past) <= 0:
+            continue
+        t = start + i * HOUR
+        tot, n = [0.0] * 28, [0] * 28
+        for j in range(i):
+            b = _block_of(start + j * HOUR)
+            tot[b] += x[j]
+            n[b] += 1
+        blocks = [tot[b] / n[b] if n[b] else None for b in range(28)]
+        for name, (look, f) in PREDICTORS.items():
+            pred = f(past)
+            for nm, v in ((name, pred), (name + "+g", pred * _season(blocks, t, look))):
+                if v <= 0:
+                    continue
+                e = math.log(v / real)
+                o = out.setdefault(nm, [0.0, 0.0, 0])
+                o[0] += abs(e)
+                o[1] += e
+                o[2] += 1
+    return {k: [round(v[0], 4), round(v[1], 4), v[2]] for k, v in out.items()}
+
+
+def scores(state):
+    """{name: (typical error as a factor, bias as a factor, samples)} over every pool's backtest."""
+    tot = {}
+    for p in book(state)["p"].values():
+        for nm, v in (p.get("bt") or {}).items():
+            o = tot.setdefault(nm, [0.0, 0.0, 0])
+            o[0] += v[0]
+            o[1] += v[1]
+            o[2] += v[2]
+    return {nm: (math.exp(v[0] / v[2]), math.exp(v[1] / v[2]), v[2]) for nm, v in tot.items() if v[2] >= 200}
+
+
+def best(state, max_look=96):
+    """Name of the forecast with the smallest typical error among those reading at most max_look hours."""
+    sc = {nm: v for nm, v in scores(state).items() if PREDICTORS[nm.replace("+g", "")][0] <= max_look}
+    return min(sc, key=lambda nm: sc[nm][0]) if sc else None
+
+
+def forecast(state, key, now):
+    """(fees expected in the next 48 hours in USD, name of the forecast used, the pool's own typical error with it
+    as a factor or None), or None while there is no backtest. Made on the fees measured hour by hour; a chain
+    measured for less than four days uses the best forecast that reads only 48 hours."""
+    cs = state["chains"].get(str(A.chain_of(key))) or {}
+    h0 = now - now % HOUR
+    measured = int(cs.get("acc_backfill") and cs.get("acc_from") or 0)
+    look = 96 if measured and measured <= h0 - 96 * HOUR else 48
+    name = best(state, look)
+    if not name or not measured or measured > h0 - 48 * HOUR:
+        return None
+    base = name.replace("+g", "")
+    fh = A.fee_hours(state, key)
+    x = [fh.get(h, 0.0) for h in range(h0 - 96 * HOUR, h0, HOUR)]
+    if look < 96:
+        x = [0.0] * 48 + x[48:]
+    usd = PREDICTORS[base][1](x)
+    p = book(state)["p"].get(key) or {}
+    if name.endswith("+g") and p.get("b"):
+        usd *= _season(p["b"], h0, PREDICTORS[base][0])
+    sc = scores(state)[name]
+    usd /= sc[1]                                  # the forecast's own average bias, taken out
+    own = (p.get("bt") or {}).get(name)
+    return usd, name, (math.exp(own[0] / own[2]) if own and own[2] >= 10 else None)
 
 
 def _weekdays(days):
@@ -238,6 +387,11 @@ def export(state, names, now):
     P = {k: p for k, p in t["p"].items() if p.get("d") and k in state["ap"]}
     out = {"generated": now, "pools": [], "market": None, "min_days": MIN_DAYS,
            "tracked": len(_targets(state)), "have": len(P)}
+    sc = scores(state)
+    out["forecasts"] = [{"k": nm, "name": LABELS.get(nm.replace("+g", ""), nm) + (", corretta per il giorno della settimana" if nm.endswith("+g") else ""),
+                         "err": round(v[0], 3), "bias": round(v[1], 3), "n": v[2]}
+                        for nm, v in sorted(sc.items(), key=lambda kv: kv[1][0])]
+    out["best"] = best(state)
     if not P:
         return out
     spikes = {k: _spikes(p["d"]) for k, p in P.items()}
