@@ -25,6 +25,7 @@ from . import repair as RP
 from . import report as R
 from . import stocks as S
 from . import tracker as T
+from . import trends as TR
 from .rpc import Rpc
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -407,6 +408,13 @@ def run(args):
         save_json(pos_dir / f"{k}.json", shard)
     save_json(out / "positions.json", pos_index)
     save_json(out / "tracker.json", tracker_report)
+    try:
+        # fee tendencies by weekday and catalyst days, from each pool's hourly candles
+        TR.refresh(state, now, log)
+        names = {p["key"]: (p["name"], p["chain"], p.get("fpv")) for p in public_report.get("pools") or []}
+        save_json(out / "trends.json", TR.export(state, names, now))
+    except Exception:
+        log(f"trends failed: {traceback.format_exc()[-400:]}")
     try:
         save_json(out / "stocks.json", S.export(state, now))
     except Exception:

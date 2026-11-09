@@ -113,6 +113,24 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .down { color: var(--bad, #c0392b); }
 .stk-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin-top: 4px; }
 .stk-bar input[type=search] { flex: 1 1 180px; max-width: 280px; }
+.trd-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.trd-ev { display: grid; gap: 6px; font: 13px/1.45 var(--f-num); }
+.trd-ev b { font-weight: 600; }
+.wdbars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; align-items: end; height: 64px; }
+.wdbars span { background: var(--passive); border-radius: 2px 2px 0 0; min-height: 2px; position: relative; }
+.wdbars span.today { background: var(--accent); }
+.wdbars span.na { background: none; border-bottom: 1px dashed var(--line); }
+.wdlab { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; font: 11px/1.4 var(--f-num); color: var(--ink-2); text-align: center; }
+.wdlab b { color: var(--ink); }
+table.trd td, table.trd th { white-space: nowrap; text-align: left; }
+table.trd th { cursor: default; }
+table.trd td.num, table.trd th.num { text-align: right; }
+table.trd td.num { font-family: var(--f-num); }
+table.trd .wdbars { width: 84px; height: 20px; gap: 2px; }
+table.trd tr.open td { border-bottom: 0; }
+table.trd td.det { white-space: normal; font: 12.5px/1.5 var(--f-num); color: var(--ink-2); padding-top: 0; }
+table.trd tbody tr.trow { cursor: pointer; }
+.up { color: var(--good); } .down { color: var(--warn); }
 table.stk td, table.stk th { white-space: nowrap; }
 table.stk td.num { font-family: var(--f-num); }
 table.stk svg { width: 72px; height: 18px; display: block; }
@@ -433,6 +451,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field"><label for="rd-price">Prezzo AERO $</label><input id="rd-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="rd-price-s">Solo per l'APR. Vuoto: il prezzo letto dal monitor</small></div>
       <div class="field"><label for="rd-win">Calcola sull'APR</label><select id="rd-win"><option value="48">delle ultime 48 ore</option><option value="24">delle ultime 24 ore</option><option value="12">delle ultime 12 ore</option><option value="6">delle ultime 6 ore</option><option value="1">dell'ultima ora</option></select><small id="rd-win-s">Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati</small></div>
       <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
+      <div class="field"><span class="flabel">Correggi per il giorno della settimana</span><label class="switch"><input id="rd-sea" type="checkbox" role="switch"><span id="rd-sea-s">Spento</span></label>
+        <small id="rd-sea-info">Porta le fee della finestra scelta ai giorni delle prossime 48 ore, con le tendenze di ogni pool (sotto, «Tendenze fee»)</small></div>
       <div class="field"><label for="rd-comp">Concorrenza attesa</label><select id="rd-comp"><option value="0">Nessuna: voti fermi</option><option value="8">Max 8× la media del mercato</option><option value="5">Max 5× la media del mercato</option><option value="3">Max 3× la media del mercato</option><option value="2">Max 2× la media del mercato</option><option value="1.5">Max 1,5× la media del mercato</option></select><small>Gli altri allocatori arrivano dove si guadagna di più</small></div>
       <div class="field"><span class="flabel">Taglia i picchi di volume</span><label class="switch"><input id="rd-spk" type="checkbox" role="switch"><span id="rd-spk-s">Spento</span></label>
         <div class="inline"><small>Tolleranza</small><input id="rd-spkK" class="short" type="text" inputmode="decimal" autocomplete="off" aria-label="Tolleranza in percento del Δ mercato"><small>% del Δ mercato</small></div>
@@ -526,6 +546,24 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       </div>
     </details>
   </section>
+
+  <details class="panel fold" data-fold="trends" open id="trends">
+    <summary class="panel-head"><h2>Tendenze fee</h2><span class="sub" id="trd-sub"></span></summary>
+    <p class="note">Come si muovono le fee di ogni pool nei giorni della settimana e cosa le ha fatte saltare. Le fee seguono il volume: qui c'è il volume orario di ogni pool delle ultime sei settimane (GeckoTerminal), con i giorni eccezionali contati a parte perché un evento non passi per un'abitudine. Giorni in UTC. 1,0× è il giorno medio del pool.</p>
+    <div class="trd-top">
+      <div class="stkc"><div class="h"><b>Mercato Aero per giorno</b><span class="d" id="trd-m-n"></span></div><div class="wdbars" id="trd-m-wd"></div><div class="wdlab" id="trd-m-lab"></div><div class="d" id="trd-m-txt"></div></div>
+      <div class="stkc"><div class="h"><b>Eventi di mercato</b><span class="d">giorni in cui si sono mossi molti pool insieme</span></div><div class="trd-ev" id="trd-m-ev"></div></div>
+    </div>
+    <div class="stk-bar">
+      <div class="seg" id="trd-sort" role="group" aria-label="Ordina"><button type="button" data-s="ap" aria-pressed="true">Più votati</button><button type="button" data-s="next" aria-pressed="false">Meglio nelle prossime 48 ore</button><button type="button" data-s="swing" aria-pressed="false">Più legati al giorno</button></div>
+      <input id="trd-q" type="search" placeholder="Cerca un pool" autocomplete="off" spellcheck="false" aria-label="Cerca un pool">
+    </div>
+    <div class="tbl"><table class="trd">
+      <thead><tr><th>Pool</th><th>Lun → Dom</th><th>Giorno migliore</th><th>Giorno peggiore</th><th class="num">Prossime 48 ore</th><th class="num">Giorno tipico</th><th>Ultimo evento</th></tr></thead>
+      <tbody id="trd-rows"></tbody>
+    </table></div>
+    <button type="button" class="linkish" id="trd-more" hidden></button>
+  </details>
 
   <details class="panel fold" data-fold="stocks" open id="stocks">
     <summary class="panel-head"><h2>Stocks onchain</h2><span class="sub" id="stk-sub"></span></summary>
@@ -1649,7 +1687,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---------------------------------------------------------------- Radar sAERO: the old app, on the monitor's data
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-  const RD_DEF = { ap: "235000", price: "", win: "48", trend: "0", comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", exitOff: [], minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
+  const RD_DEF = { ap: "235000", price: "", win: "48", trend: "0", sea: false, comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", exitOff: [], minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
   let RD = { ...RD_DEF };
   try { RD = { ...RD_DEF, ...(JSON.parse(lsGet("radar-rd") || "null") || {}) }; } catch (e) {}
   let XS = { keys: new Set(), rules: [], chainsOff: [] };
@@ -1688,23 +1726,45 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   const qmatch = (p, q) => { const w = String(q).toLowerCase().split(/\s+/).filter(Boolean); return w.length > 0 && w.every(t => hayOf(p).includes(t)); };
   const ruleFor = p => XS.rules.find(r => qmatch(p, r));
   const chainOff = p => XS.chainsOff.includes(p.chain);
-  // fees of a pool in the last n hours: its hourly volume × its fees per dollar traded in the last 48 hours; null
-  // without hourly volume (fee transfers arrive in batches on some chains, so short windows would be noise)
+  // fees of a pool in the last n hours (n up to 24): the fees measured on its gauge hour by hour (fh, newest first,
+  // the first is the hour in progress); null when the pool has no hourly fees
   function winFee(p, n) {
-    if (!(p.vh && p.vh.some(v => v) && p.fpv)) return p.fee > 0 ? null : 0;
-    const xs = (n === 1 ? [p.vh.slice(0, 2).find(v => v != null)] : p.vh.slice(0, n)).filter(v => v != null);
-    return xs.length ? xs.reduce((a, b) => a + b, 0) * n / xs.length * p.fpv : null;
+    const fh = p.fh || [];
+    if (fh.length < n + 1) return p.fee > 0 ? null : 0;
+    const part = DATA && DATA.generated ? (DATA.generated % 3600) / 3600 : 0;
+    return fh.slice(0, n + 1).reduce((a, b) => a + b, 0) * n / (n + part);
   }
   const rdWin = () => [1, 6, 12, 24].includes(+RD.win) ? +RD.win : 48;
+  // tendencies by day of the week (trends.json): average of a pool's 28 six-hour blocks between two times
+  let TRD = null, TRD_BY = {};
+  function blockAvg(b, t0, t1) {
+    let tot = 0, w = 0;
+    for (let t = t0; t < t1;) {
+      const i = Math.floor((t - 345600) / 21600), nx = Math.min(t1, 345600 + (i + 1) * 21600);   // 5 Jan 1970: a Monday
+      const v = b[((i % 28) + 28) % 28];
+      if (v != null) { tot += v * (nx - t); w += nx - t; }
+      t = nx;
+    }
+    return w > 0 ? tot / w : null;
+  }
+  // how the next 47 hours of a pool compare with the last n, by its weekly habits; 1 when unknown
+  function seasonX(key, n) {
+    const t = TRD_BY[key];
+    if (!t || !DATA) return 1;
+    const now = DATA.generated, nxt = blockAvg(t.b, now, now + 47 * 3600), past = blockAvg(t.b, now - n * 3600, now);
+    if (!(nxt > 0) || !(past > 0)) return 1;
+    return Math.max(0.6, Math.min(1.6, nxt / past));
+  }
   // expected in the next 48 hours: the fees of the chosen window brought to 48 hours (the 48 hours themselves,
-  // moved by the trend weight, when the window is 48 or the pool has no hourly volume) plus the scheduled incentives
+  // moved by the trend weight, when the window is 48 or the pool has no hourly fees), corrected for the days of
+  // the week when asked, plus the scheduled incentives
   const projected = (p, w) => {
-    const n = rdWin();
+    const n = rdWin(), sx = RD.sea ? seasonX(p.key, n) : 1;
     if (n < 48) {
       const f = winFee(p, n);
-      if (f != null) return Math.max(0, p.inc + f * 48 / n);
+      if (f != null) return Math.max(0, p.inc + f * 48 / n * sx);
     }
-    return Math.max(0, p.inc + p.fee * (1 + w * Math.max(-100, Math.min(200, p.d || 0)) / 100));
+    return Math.max(0, p.inc + p.fee * sx * (1 + w * Math.max(-100, Math.min(200, p.d || 0)) / 100));
   };
 
   // votes of the positions being reallocated, per pool: when they move, they leave these pools
@@ -2066,6 +2126,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           `: se esce, ${exitGain(Math.min(apx.share, 0.99))}.`));
       }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
+      { const sx = seasonX(o.p.key, rdWin());
+        if (Math.abs(sx - 1) >= 0.1) left.append(el("div", "apx", `📅 Per i giorni della settimana, nelle prossime 48 ore le sue fee sono di solito ${String(sx.toFixed(2)).replace(".", ",")}× quelle della finestra` + (RD.sea ? " (già contato)" : " (non contato: accendi «Correggi per il giorno della settimana»)"))); }
       left.append(bar);
       // leave this pool out, like unticking it in the table; it comes back from the chips of excluded pools
       const xb = el("button", "x", "✕");
@@ -2115,6 +2177,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       }
     }
     $("rd-spk-s").textContent = RD.spk ? "Acceso" : "Spento";
+    $("rd-sea-s").textContent = RD.sea ? "Acceso" : "Spento";
+    { const nT = Object.keys(TRD_BY).length;
+      $("rd-sea-info").textContent = !nT ? "Le tendenze dei pool non sono ancora state raccolte"
+        : RD.sea ? `Fee della finestra portate ai giorni delle prossime 48 ore, per i ${nT} pool con almeno ${(TRD && TRD.min_days) || 14} giorni di storia (tra 0,6× e 1,6×)`
+        : "Porta le fee della finestra scelta ai giorni delle prossime 48 ore, con le tendenze di ogni pool (sotto, «Tendenze fee»)"; }
     const sp = r.spike, si = $("rd-spk-info");
     if (r.win < 48) si.textContent = "Lavora sulle 48 ore: con una finestra più corta è spento";
     else if (!sp) si.textContent = "Riporta al livello di prima le fee dei pool saliti più del mercato oltre la tolleranza; gli incentivi programmati restano";
@@ -2437,7 +2504,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     e.addEventListener(ev || "input", () => { RD[key] = e.type === "checkbox" ? e.checked : e.value; saveRD(); rdSchedule(); });
   };
   rdBind("rd-ap", "ap"); rdBind("rd-price", "price"); rdBind("rd-win", "win", "change"); rdBind("rd-trend", "trend"); rdBind("rd-comp", "comp", "change");
-  rdBind("rd-spk", "spk", "change"); rdBind("rd-spkK", "spkK"); rdBind("rd-stb", "stb", "change"); rdBind("rd-stbK", "stbK"); rdBind("rd-min", "minA", "change"); rdBind("rd-cap", "cap", "change");
+  rdBind("rd-sea", "sea", "change"); rdBind("rd-spk", "spk", "change"); rdBind("rd-spkK", "spkK"); rdBind("rd-stb", "stb", "change"); rdBind("rd-stbK", "stbK"); rdBind("rd-min", "minA", "change"); rdBind("rd-cap", "cap", "change");
   rdBind("rd-sort", "sortBy", "change");
   $("rd-saved").value = RD.saved || "";
   $("rd-saved").addEventListener("input", () => { RD.saved = $("rd-saved").value; saveRD(); rdCooldown(); });
@@ -2885,6 +2952,101 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   $("stk-more").addEventListener("click", () => { stkAll = !stkAll; stocksRender(); });
   let stkQt = 0;
   $("stk-q").addEventListener("input", () => { clearTimeout(stkQt); stkQt = setTimeout(stocksRender, 150); });
+  // ---------------------------------------------------------------- fee tendencies (trends.json)
+  const WD = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"], WDL = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
+  let trdSort = "ap", trdAll = false, trdOpen = null;
+  const TRD_TOP = 25, x2t = v => v == null ? "—" : String(v.toFixed(2)).replace(".", ",") + "×";
+  const dayTxt = d => new Date(d * 1000).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  function wdBars(wd, today) {
+    const box = el("div", "wdbars"), max = Math.max(0.01, ...wd.filter(v => v != null));
+    wd.forEach((v, i) => {
+      const b = el("span", v == null ? "na" : i === today ? "today" : "");
+      if (v != null) { b.style.height = Math.max(4, v / max * 100) + "%"; b.title = `${WDL[i]}: ${x2t(v)}`; }
+      box.append(b);
+    });
+    return box;
+  }
+  const pctTxt = v => v == null ? "" : (v > 0 ? "+" : v < 0 ? "−" : "") + String(Math.abs(v).toFixed(1)).replace(".", ",") + "%";
+  function evText(e) {
+    // [day, times the median, price change %, range %, kind, incentives]
+    const parts = [`${dayTxt(e[0])}: ${String(e[1].toFixed(1)).replace(".", ",")}× il volume solito`];
+    if (Math.abs(e[2]) >= 1) parts.push(`prezzo ${pctTxt(e[2])}`); else if (e[3] >= 3) parts.push(`prezzo mosso del ${String(e[3].toFixed(1)).replace(".", ",")}% nel giorno`);
+    parts.push(e[4] === "mercato" ? "con tutto il mercato" : "solo questo pool");
+    if (e[5]) parts.push("incentivi partiti in quei giorni");
+    return parts.join(" · ");
+  }
+  function trendsRender() {
+    const rows = $("trd-rows"), m = TRD && TRD.market;
+    rows.replaceChildren(); $("trd-m-wd").replaceChildren(); $("trd-m-lab").replaceChildren(); $("trd-m-ev").replaceChildren();
+    if (!TRD || !TRD.pools || !TRD.pools.length || !m) {
+      $("trd-sub").textContent = TRD && TRD.tracked ? `raccolta in corso: ${TRD.have || 0} pool su ${TRD.tracked}` : "";
+      $("trd-m-txt").textContent = "La storia dei pool viene letta un po' a ogni giro: le prime tendenze arrivano in qualche ora.";
+      $("trd-more").hidden = true;
+      return;
+    }
+    const now = TRD.generated, today = (Math.floor(now / 86400) + 3) % 7;
+    $("trd-sub").textContent = `${TRD.have} pool su ${TRD.tracked} · dal ${dayTxt(m.from)} al ${dayTxt(m.to)}`;
+    $("trd-m-wd").replaceWith(Object.assign(wdBars(m.wd, today), { id: "trd-m-wd" }));
+    WD.forEach((d, i) => { const c = el(i === today ? "b" : "span", "", `${d} ${m.wd[i] == null ? "—" : String(m.wd[i].toFixed(2)).replace(".", ",")}`); $("trd-m-lab").append(c); });
+    $("trd-m-n").textContent = `${Math.min(...m.n)}–${Math.max(...m.n)} settimane per giorno`;
+    const known = m.wd.map((v, i) => [v, i]).filter(x => x[0] != null).sort((a, b) => b[0] - a[0]);
+    const mx = blockAvg(m.b, now, now + 47 * 3600);
+    $("trd-m-txt").textContent = known.length ? `Di solito il giorno più forte è ${WDL[known[0][1]]} (${x2t(known[0][0])}), il più debole ${WDL[known[known.length - 1][1]]} (${x2t(known[known.length - 1][0])}). ` +
+      (mx ? `Le prossime 48 ore valgono di solito ${x2t(mx)} la media.` : "") : "";
+    if (!m.events.length) $("trd-m-ev").append(el("div", "", "Nessun giorno fuori dal normale nel periodo."));
+    for (const e of m.events.slice(0, 6)) {
+      const d = el("div"), b = el("b", "", dayTxt(e.day));
+      const mv = [e.eth != null ? `ETH ${pctTxt(e.eth)}` : "", e.btc != null ? `BTC ${pctTxt(e.btc)}` : ""].filter(Boolean).join(", ");
+      d.append(b, ` · volume ${x2t(e.x)} il solito · ${Math.round(e.share * 100)}% dei pool in picco${mv ? " · " + mv : ""}`);
+      $("trd-m-ev").append(d);
+    }
+    const q = $("trd-q").value.trim().toLowerCase();
+    const list = TRD.pools.filter(p => p.n >= TRD.min_days && (!q || `${p.name} ${p.chain}`.toLowerCase().includes(q))).map(p => {
+      const wd = p.wd.map((v, i) => [v, i]).filter(x => x[0] != null).sort((a, b) => b[0] - a[0]);
+      return { p, wd, next: blockAvg(p.b, now, now + 47 * 3600), swing: wd.length ? wd[0][0] - wd[wd.length - 1][0] : 0 };
+    });
+    list.sort((a, b) => trdSort === "next" ? (b.next || 0) - (a.next || 0) : trdSort === "swing" ? b.swing - a.swing : b.p.ap - a.p.ap);
+    document.querySelectorAll("#trd-sort button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.s === trdSort)));
+    const shown = trdAll || q ? list : list.slice(0, TRD_TOP);
+    for (const o of shown) {
+      const p = o.p, tr = el("tr", "trow" + (trdOpen === p.k ? " open" : ""));
+      const c0 = el("td"); c0.append(el("b", "", p.name), el("span", "sub", ` ${p.chain}`)); tr.append(c0);
+      const c1 = el("td"); c1.append(wdBars(p.wd, today)); tr.append(c1);
+      tr.append(el("td", "", o.wd.length ? `${WDL[o.wd[0][1]]} ${x2t(o.wd[0][0])}` : "—"));
+      tr.append(el("td", "", o.wd.length ? `${WDL[o.wd[o.wd.length - 1][1]]} ${x2t(o.wd[o.wd.length - 1][0])}` : "—"));
+      const c4 = el("td", "num " + (o.next >= 1.1 ? "up" : o.next <= 0.9 ? "down" : ""), x2t(o.next)); tr.append(c4);
+      tr.append(el("td", "num", p.fee != null ? `${usd(p.fee)} di fee` : `${usd(p.vol)} di volume`));
+      tr.append(el("td", "", p.ev.length ? `${dayTxt(p.ev[0][0])} · ${String(p.ev[0][1].toFixed(1)).replace(".", ",")}×` + (p.ev[0][4] === "mercato" ? "" : " · solo lui") : "—"));
+      tr.addEventListener("click", () => { trdOpen = trdOpen === p.k ? null : p.k; trendsRender(); });
+      rows.append(tr);
+      if (trdOpen === p.k) {
+        const dr = el("tr"), td = el("td", "det"); td.colSpan = 7;
+        td.append(el("div", "", `${p.n} giorni di storia. Per giorno: ` + WD.map((d, i) => `${d} ${p.wd[i] == null ? "—" : x2t(p.wd[i])} (${p.wn[i]})`).join(" · ") + "."));
+        const blk = ["notte 00–06", "mattina 06–12", "pomeriggio 12–18", "sera 18–24"], bs = p.b.map((v, i) => [v, i]).filter(x => x[0] != null).sort((a, b) => b[0] - a[0]);
+        if (bs.length) td.append(el("div", "", `Fascia più forte (UTC): ${WDL[Math.floor(bs[0][1] / 4)]} ${blk[bs[0][1] % 4]}, ${x2t(bs[0][0])}; più debole: ${WDL[Math.floor(bs[bs.length - 1][1] / 4)]} ${blk[bs[bs.length - 1][1] % 4]}, ${x2t(bs[bs.length - 1][0])}.`));
+        if (p.ev.length) { td.append(el("div", "", "Giorni fuori dal normale:")); for (const e of p.ev) td.append(el("div", "", "· " + evText(e))); }
+        else td.append(el("div", "", "Nessun giorno fuori dal normale nel periodo."));
+        dr.append(td); rows.append(dr);
+      }
+    }
+    const more = $("trd-more");
+    more.hidden = !!q || list.length <= TRD_TOP;
+    more.textContent = trdAll ? `Mostra solo i primi ${TRD_TOP}` : `Mostra tutti i ${list.length}`;
+  }
+  document.querySelectorAll("#trd-sort button").forEach(b => b.addEventListener("click", () => { trdSort = b.dataset.s; trendsRender(); }));
+  $("trd-more").addEventListener("click", () => { trdAll = !trdAll; trendsRender(); });
+  { let t = 0; $("trd-q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(trendsRender, 150); }); }
+  async function loadTrends() {
+    try {
+      const r = await dataFetch("trends.json");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      TRD = await r.json();
+    } catch (e) { TRD = null; }
+    TRD_BY = {};
+    if (TRD && TRD.pools) for (const p of TRD.pools) if (p.n >= (TRD.min_days || 14) && p.b && p.b.some(v => v != null)) TRD_BY[p.k] = p;
+    trendsRender();
+    if (typeof rdSchedule === "function") rdSchedule();
+  }
   async function loadStocks() {
     try {
       const r = await dataFetch("stocks.json");
@@ -2906,6 +3068,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       render();
       loadSim();
       loadStocks();
+      loadTrends();
     } catch (e) {
       $("updated").textContent = "Non riesco a leggere i dati: " + e.message + ". Riprovo tra un minuto.";
       setTimeout(load, 60000);

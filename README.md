@@ -29,7 +29,8 @@ diluisce ogni pool. Tutte le opzioni della vecchia app:
 | Opzione | Cosa fa |
 |---|---|
 | Allocation Power, prezzo AERO | La tua posizione (resta solo sul dispositivo); il prezzo serve solo per l'APR |
-| Calcola sull'APR (48 ore) | La finestra su cui stimare quanto renderà ogni pool: le ultime 48 ore, o le ultime 24, 12, 6 ore o l'ultima ora, con le fee della finestra (volume orario × fee per dollaro scambiato delle 48 ore) portate a 48 ore più gli incentivi programmati. I pool senza volume orario restano sulle 48 ore; con una finestra corta trend e taglio dei picchi sono spenti |
+| Calcola sull'APR (48 ore) | La finestra su cui stimare quanto renderà ogni pool: le ultime 48 ore, o le ultime 24, 12, 6 ore o l'ultima ora, con le fee misurate sul gauge in quelle ore portate a 48 ore più gli incentivi programmati; con una finestra corta trend e taglio dei picchi sono spenti |
+| Correggi per il giorno della settimana | Porta le fee della finestra ai giorni delle prossime 48 ore con le tendenze di ogni pool (vedi «Tendenze fee»), tra 0,6× e 1,6×; spento di default |
 | Peso del trend fee | Corregge le fee delle ultime 48 ore della loro variazione rispetto alle 48 prima |
 | Concorrenza attesa | Nessun pool rende più del multiplo scelto della media del mercato (o «voti fermi») |
 | Taglia i picchi di volume | Nei pool le cui fee sono salite più del mercato oltre la tolleranza conta le fee delle 48 ore prima, mosse come il mercato; gli incentivi programmati restano |
@@ -105,6 +106,26 @@ giorni, gonfiando o azzerando le 48 ore e la stima. Al passaggio il monitor ha l
 a ogni ora delle 48 ore prima, dove gli endpoint conservano lo stato vecchio, e ha rifatto con le fee misurate le
 ultime 24 ore orarie delle posizioni che non hanno cambiato allocazione; dove lo stato vecchio non c'è, le ore prima
 del passaggio restano sui trasferimenti finché escono dalle 48 ore e la variazione delle fee riparte da zero.
+
+## Tendenze fee
+
+Per ogni pool con almeno 50.000 voti (i 160 più votati) il monitor legge da GeckoTerminal le candele orarie delle
+ultime sei settimane circa: volume e prezzo. Le fee seguono il volume, quindi la forma settimanale del volume è
+quella delle fee; le fee misurate sul gauge vengono tenute giorno per giorno e dicono quanto vale un giorno tipico
+in dollari. Dieci pool a ogni giro (limite dell'API gratuita), ognuno riletto due volte al giorno.
+
+- **Per giorno della settimana** (UTC): il giorno tipico di ogni giorno rispetto al giorno medio del pool (1,0×).
+  I giorni eccezionali contano al massimo 3 volte la mediana, così un evento non passa per un'abitudine.
+- **Fasce di sei ore**: 28 blocchi della settimana, dai soli giorni normali. Con questi la pagina confronta le
+  prossime 48 ore con le ore su cui è misurato un APR.
+- **Eventi (catalyst)**: i giorni con almeno 2,5 volte il volume mediano del pool, con il movimento del prezzo, se
+  si è mosso tutto il mercato (almeno un quarto dei pool in picco, o volume totale 1,6 volte il solito; con le
+  variazioni di ETH e BTC) o solo quel pool, e se in quei giorni è partito un programma di incentivi.
+- **Radar, «Correggi per il giorno della settimana»** (spento di default): porta le fee della finestra scelta ai
+  giorni delle prossime 48 ore (tra 0,6× e 1,6×), per i pool con almeno 14 giorni di storia.
+
+Con cinque o sei campioni per giorno della settimana sono tendenze, non certezze: accanto a ogni giorno c'è il
+numero di settimane viste.
 
 ## Stocks onchain
 
