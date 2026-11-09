@@ -401,7 +401,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <input type="text" id="me-addr" autocomplete="off" spellcheck="false" placeholder="Il tuo indirizzo 0x…" aria-label="Indirizzo del wallet">
       <button type="submit">Mostra</button>
     </form>
-    <p class="note">L'indirizzo resta solo su questo dispositivo: la pagina legge da Base quali sAERO possiede e prende dal monitor quanto ha incassato ognuno. Gli incassi sono fee e incentivi dei pool, divisi in base alla quota di ogni posizione nel pool. Come fa il contratto di Aero, le fee vanno a chi è allocato mentre maturano: dove arrivano al contratto a blocchi ogni qualche ora (Robinhood, per esempio) il monitor le stima dal volume orario del pool e il blocco aggiunge solo quello che la stima non aveva contato.</p>
+    <p class="note">L'indirizzo resta solo su questo dispositivo: la pagina legge da Base quali sAERO possiede e prende dal monitor quanto ha incassato ognuno. Gli incassi sono fee e incentivi dei pool, divisi in base alla quota di ogni posizione nel pool. Come fa il contratto di Aero, le fee vanno a chi è allocato mentre maturano: il monitor le misura sul gauge a ogni giro (fee in sospeso più quelle raccolte), anche dove il claim arriva una volta ogni qualche giorno.</p>
     <div class="stats" id="me-stats"></div>
     <div class="merank" id="me-rank"></div>
     <div class="chartbox"><div class="chart" id="me-chart"></div></div>
@@ -2036,11 +2036,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const rc = recent(o.p), x = o.k * r.ap / 100, pr = rdPrice();
       const mine = n => { const v = rc.rev(n, false); return v != null ? v / n * 8760 / ((o.A0 + x) * pr) * 100 : null; };
       if (pr > 0 && rc.src) {
-        const note = rc.src === "trasferimenti" ? (r.stab ? " (volume orario non disponibile: stabilità non verificabile)" : " (dalle fee arrivate: volume orario non disponibile)") : "";
+        const note = rc.src === "trasferimenti" ? (r.stab ? " (volume orario non disponibile: stabilità non verificabile)" : " (dalle fee maturate ora per ora: volume orario non disponibile)") : "";
         const line = el("div", "sb", "APR " + RD_SHOW.map(n => `${n}h ${fmtPct(mine(n))}`).join(" · ") + note);
         line.title = "APR con la tua quota nel pool, con i voti che ha adesso. " + (rc.src === "volume"
           ? "Fee stimate dal volume di ogni ora per le fee per dollaro scambiato delle ultime 48 ore, più gli incentivi."
-          : "Fee arrivate al contratto in quelle ore: su alcune reti arrivano a blocchi una o due volte al giorno.");
+          : "Fee maturate in quelle ore, misurate sul gauge (fee in sospeso più quelle raccolte), più gli incentivi.");
         left.append(line);
         // votes that left in the last 6 hours make the same rewards go further: the 6-hour APR above already counts
         // the pool as it is now, while each vote really earned less, because there were more of them

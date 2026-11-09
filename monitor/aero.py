@@ -233,6 +233,8 @@ def apply_events(state, cid, events, cooldown):
         elif k == "fees":
             state["fees_pending"].append([ev["ts"], cid, ev["gauge"], ev["token"], str(ev["amount"]),
                                           ev["emitter"]])
+            state.setdefault("collected", []).append([cid, ev["gauge"], ev["token"], str(ev["amount"]),
+                                                      ev["emitter"]])
         elif k == "incentive":
             state["incentives_pending"].append({"chain": cid, "vrm": ev["emitter"], "pid": ev["program"],
                                                 "tok": ev["token"], "amt": str(ev["amount"]), "start": ev["start"],
@@ -571,17 +573,20 @@ def settle_rewards(state, prices, now, log):
             keep.append(entry)
             continue
         fresh.append((ts, key, usd))
-        hour = str(ts - ts % HOUR)
-        bucket = state["fees"].setdefault(key, {})
-        bucket[hour] = round(bucket.get(hour, 0) + usd, 4)
+        if not (state["chains"].get(str(int(cid))) or {}).get("acc_from"):
+            # before the gauges' pending fees were measured, the transfers stood for the fees
+            hour = str(ts - ts % HOUR)
+            bucket = state["fees"].setdefault(key, {})
+            bucket[hour] = round(bucket.get(hour, 0) + usd, 4)
         priced += 1
     state["fees_pending"] = keep[-40000:]
     cutoff = now - FEE_WINDOW
-    for key in list(state["fees"]):
-        # hours over the limit were priced with a broken price before the checks existed
-        state["fees"][key] = {h: v for h, v in state["fees"][key].items() if int(h) >= cutoff and v <= MAX_HOUR_USD}
-        if not state["fees"][key]:
-            del state["fees"][key]
+    for book in (state["fees"], state.setdefault("acc", {})):
+        for key in list(book):
+            # hours over the limit were priced with a broken price before the checks existed
+            book[key] = {h: v for h, v in book[key].items() if int(h) >= cutoff and v <= MAX_HOUR_USD}
+            if not book[key]:
+                del book[key]
     new_inc, waiting = [], []
     for p in state["incentives_pending"]:
         cid = int(p.get("chain", C.BASE_CHAIN))
@@ -598,6 +603,237 @@ def settle_rewards(state, prices, now, log):
     log(f"rewards: priced {priced} fee transfers, {len(state['fees_pending'])} waiting for a price or a gauge, "
         f"rejected {rejected}; {len(state['incentives'])} incentive programs tracked")
     return new_inc, fresh
+
+
+MAX_RUN_USD = 1_000_000      # fees one gauge can earn between two runs: more means a broken price, held back
+
+
+def chain_gauges(state, cid):
+    """Addresses of the known gauges of a chain."""
+    return sorted(k.split(":", 1)[1] for k, g in state["gauges"].items()
+                  if chain_of(k) == int(cid) and g.get("ok", True))
+
+
+def read_pending(rpc, cid, cs, state, now, log):
+    """Reads what every gauge of the chain has pending for its voters (chain.read_pending_fees), for
+    settle_accrual. Only this chain's state is written: chains are read in parallel."""
+    gauges = chain_gauges(state, cid)
+    if not gauges:
+        return
+    v = C.read_pending_fees(rpc, gauges)
+    cs["pend_now"] = {"t": int(now), "v": {g: [a, b] for g, (a, b) in v.items()}}
+    if len(v) < len(gauges):
+        log(f"{C.chain_short(cid)}: pending fees read for {len(v)} of {len(gauges)} gauges")
+
+
+def _spread(bucket, t0, t1, usd):
+    """Adds usd to the hour buckets between t0 and t1, in proportion to the time in each hour."""
+    t0, t1 = int(t0), int(t1)
+    if t1 <= t0:
+        h = str(t1 - t1 % HOUR)
+        bucket[h] = round(bucket.get(h, 0.0) + usd, 6)
+        return
+    t = t0
+    while t < t1:
+        h = t - t % HOUR
+        nxt = min(t1, h + HOUR)
+        bucket[str(h)] = round(bucket.get(str(h), 0.0) + usd * (nxt - t) / (t1 - t0), 6)
+        t = nxt
+
+
+def _accrued(state, prices, cid, key, prev, now_p, collected):
+    """(USD earned, raw amounts carried) from a gauge's pending fees before and now, the raw amounts collected in
+    between and the carry: a negative remainder (a collection whose event comes next run) or an amount without a
+    price waits for the next run."""
+    g = state["gauges"].get(key) or {}
+    usd, carry = 0.0, []
+    for i, tok in enumerate((g.get("t0"), g.get("t1"))):
+        d = int(now_p[i]) - int(prev["p"][i]) + int(prev["c"][i]) + int(collected.get((tok or "").lower(), 0))
+        tk = tkey(cid, tok) if tok else None
+        price = prices.get(tk) if tk else None
+        if d <= 0 or price is None:
+            carry.append(d)
+            continue
+        dec = (state["erc20"].get(tk) or {}).get("dec", 18)
+        usd += d / 10 ** dec * price
+        carry.append(0)
+    return usd, carry
+
+
+def settle_accrual(state, prices, now, log):
+    """The fees each gauge earned for its voters since the last run: pending now, minus pending then, plus what
+    was collected in between (the FeesCollected events of this run). Writes them to the hour buckets of
+    state["acc"] and returns [(time, gauge, USD)] for this run (what the earnings and the simulation credit).
+
+    A gauge read for the first time starts its count; one not read this run keeps its collected amounts in its carry."""
+    pend = state.setdefault("pend", {})
+    acc = state.setdefault("acc", {})
+    vrm_map = state.get("vrm_map") or {}
+    collected = {}
+    for cid, gauge, tok, amount, emitter in state.pop("collected", []):
+        key = gkey(cid, gauge)
+        if vrm_map.get(f"{int(cid)}:{emitter}") == key:
+            c = collected.setdefault(key, {})
+            c[tok.lower()] = c.get(tok.lower(), 0) + int(amount)
+    fresh, held, started = [], 0, 0
+    for cid, cs in state["chains"].items():
+        read = cs.pop("pend_now", None)
+        if not read:
+            continue
+        t = int(read["t"])
+        cs.setdefault("acc_from", t)
+        for addr, now_p in read["v"].items():
+            key = gkey(cid, addr)
+            prev = pend.get(key)
+            col = collected.pop(key, {})
+            if not prev:
+                pend[key] = {"p": [str(x) for x in now_p], "c": ["0", "0"], "t": t}
+                started += 1
+                continue
+            usd, carry = _accrued(state, prices, cid, key, prev, now_p, col)
+            if usd > MAX_RUN_USD:
+                log(f"rewards: {usd:,.0f} USD of fees on {key} in one run held back (a broken price?)")
+                g = state["gauges"].get(key) or {}
+                carry = [int(now_p[i]) - int(prev["p"][i]) + int(prev["c"][i]) +
+                         int(col.get((tok or "").lower(), 0)) for i, tok in enumerate((g.get("t0"), g.get("t1")))]
+                usd, held = 0.0, held + 1
+            pend[key] = {"p": [str(x) for x in now_p], "c": [str(x) for x in carry], "t": t}
+            if usd > 0:
+                _spread(acc.setdefault(key, {}), int(prev["t"]), t, usd)
+                fresh.append((t, key, usd))
+    # gauges not read this run: what was collected waits in their carry
+    for key, col in collected.items():
+        prev = pend.get(key)
+        g = state["gauges"].get(key) or {}
+        if prev:
+            prev["c"] = [str(int(prev["c"][i]) + int(col.get((tok or "").lower(), 0)))
+                         for i, tok in enumerate((g.get("t0"), g.get("t1")))]
+    log(f"rewards: fees earned measured on {len(fresh)} gauges, {sum(u for _, _, u in fresh):,.0f} USD"
+        + (f", {started} gauges counted from now" if started else "") + (f", {held} held back" if held else ""))
+    return fresh
+
+
+def _block_at(cid, cs, t):
+    """Block of a chain at time t: Base's clock, the anchors read from the chain elsewhere."""
+    if int(cid) == C.BASE_CHAIN and not cs.get("ts_drift"):
+        return C.ts_block(t)
+    anchors = sorted(tuple(x) for x in cs.get("anchors") or [])
+    if len(anchors) < 2:
+        return None
+    times = [a[1] for a in anchors]
+    i = bisect.bisect_left(times, t)
+    if i == 0 or i == len(anchors):
+        return None
+    (b0, t0), (b1, t1) = anchors[i - 1], anchors[i]
+    return int(b0 + (t - t0) * (b1 - b0) / max(1, t1 - t0))
+
+
+BACKFILL_H = 48
+
+
+def backfill_accrual(state, make_rpc, prices, now, log, budget=180):
+    """Once, when the gauges are first measured: their pending fees at every hour of the last 48, read from
+    endpoints that keep old state, give the fees each pool earned hour by hour (pending at the end of the hour,
+    minus at its start, plus the transfers of the hour), so the 48-hour figures are measured at once instead of in
+    two days. A chain whose endpoints keep no old state keeps its transfers for those hours.
+
+    make_rpc(chain): a fresh client, so the old-state errors do not count against the run's own endpoints."""
+    from concurrent.futures import ThreadPoolExecutor
+    deadline = time.time() + budget
+    h_now = now - now % HOUR
+    marks = [h_now - i * HOUR for i in range(BACKFILL_H, 0, -1)] + [h_now]
+
+    def one(cid):
+        cs = state["chains"][str(cid)]
+        if cs.get("acc_backfill") or int(cs.get("acc_from") or 0) != now:
+            return cid, None, "not needed"
+        gauges = [k.split(":", 1)[1] for k, v in state.get("pend", {}).items()
+                  if chain_of(k) == int(cid) and int(v.get("t") or 0) == now]
+        if not gauges:
+            return cid, None, "no gauges"
+        rpc = make_rpc(cid)
+        reads = {}
+        # newest first: an endpoint that keeps only some old state still gives the hours it has
+        for t in reversed(marks):
+            if t >= now or time.time() > deadline:
+                continue
+            b = _block_at(cid, cs, t)
+            if b is None:
+                break
+            try:
+                rpc.eth_call(gauges[0], C.S["pendingFees"], hex(b))    # one call first: fails fast without old state
+                v = C.read_pending_fees(rpc, gauges, block=b)
+            except Exception as e:
+                if not reads:
+                    return cid, None, f"no old state ({str(e)[:100]})"
+                break
+            if len(v) < len(gauges) // 2:
+                break
+            reads[t] = v
+        return cid, reads, f"{len(reads)} of {len(marks)} hours read"
+
+    ids = [int(c) for c in state["chains"]]
+    with ThreadPoolExecutor(max_workers=max(1, len(ids))) as ex:
+        results = list(ex.map(one, ids))
+    acc = state.setdefault("acc", {})
+    for cid, reads, why in results:
+        cs = state["chains"][str(cid)]
+        if not reads:
+            if why != "not needed":
+                log(f"{C.chain_short(cid)}: fees of the last {BACKFILL_H} hours not measured ({why}): transfers kept")
+            continue
+        filled, total = 0, 0.0
+        for key, end in state["pend"].items():
+            if chain_of(key) != cid or int(end.get("t") or 0) != now:
+                continue
+            addr = key.split(":", 1)[1]
+            g = state["gauges"].get(key) or {}
+            toks = [tkey(cid, t) if t else None for t in (g.get("t0"), g.get("t1"))]
+            px = [prices.get(t) if t else None for t in toks]
+            dec = [(state["erc20"].get(t) or {}).get("dec", 18) if t else 18 for t in toks]
+            transfers = {int(h): v for h, v in (state["fees"].get(key) or {}).items()}
+            series = [(t, reads[t].get(addr)) for t in sorted(reads)]
+            series.append((now, [int(x) for x in end["p"]]))
+            bucket, carry = {}, 0.0
+            for (t0, p0), (t1, p1) in zip(series, series[1:]):
+                # the transfers of the segment's hours: a collection empties the gauge's pending fees
+                moved = sum(transfers.get(h, 0.0) for h in range(t0, t1, HOUR))
+                if p0 is None or p1 is None:
+                    usd = moved
+                else:
+                    usd = moved + carry + sum((int(p1[i]) - int(p0[i])) / 10 ** dec[i] * px[i]
+                                              for i in range(2) if px[i] is not None)
+                    carry = min(0.0, usd)        # pending fell more than the hour's transfers show: next hour
+                    usd = max(0.0, usd)
+                if usd > 0:
+                    _spread(bucket, t0, t1, usd)
+            # the hours the series covers are measured, the transfers of the older ones stay in the old book
+            if bucket:
+                acc[key] = {h: round(v, 6) for h, v in bucket.items() if v > 0}
+                filled += 1
+                total += sum(bucket.values())
+        cs["acc_from"] = min(reads)
+        cs["acc_backfill"] = now
+        log(f"{C.chain_short(cid)}: fees of the last {BACKFILL_H} hours measured on {filled} gauges from their "
+            f"pending fees ({why}), {total:,.0f} USD")
+    return [cid for cid, reads, _ in results if reads]
+
+
+def accrual_tokens(state):
+    """Tokens to price for settle_accrual: those of the gauges whose pending fees moved or that collected fees."""
+    want = set()
+    pend = state.get("pend") or {}
+    for cid, cs in state["chains"].items():
+        for addr, now_p in ((cs.get("pend_now") or {}).get("v") or {}).items():
+            key = gkey(cid, addr)
+            prev = pend.get(key)
+            if prev and [str(x) for x in now_p] == prev["p"] and prev["c"] == ["0", "0"]:
+                continue
+            g = state["gauges"].get(key) or {}
+            want |= {tkey(cid, t) for t in (g.get("t0"), g.get("t1")) if t}
+    for cid, gauge, tok, _, _ in state.get("collected") or []:
+        want.add(tkey(cid, tok))
+    return want
 
 
 def incentive_usd(state, prices, key, start, end):
@@ -617,8 +853,21 @@ def incentive_usd(state, prices, key, start, end):
     return total
 
 
+def fee_hours(state, key):
+    """{hour: USD} the pool's voters earned in fees: measured on the gauge from the chain's acc_from on, the fee
+    transfers before it (they stood for the fees until the gauges were measured)."""
+    t = int(((state.get("chains") or {}).get(str(chain_of(key))) or {}).get("acc_from") or 0)
+    acc = (state.get("acc") or {}).get(key) or {}
+    if not t:
+        return {int(h): v for h, v in (state["fees"].get(key) or {}).items()}
+    out = {int(h): v for h, v in (state["fees"].get(key) or {}).items() if int(h) < t}
+    for h, v in acc.items():
+        out[int(h)] = out.get(int(h), 0.0) + v
+    return out
+
+
 def fees_usd(state, key, start, end):
-    return sum(v for h, v in (state["fees"].get(key) or {}).items() if start <= int(h) < end)
+    return sum(v for h, v in fee_hours(state, key).items() if start <= h < end)
 
 
 def fee_change(state, key, now):
@@ -630,7 +879,8 @@ def fee_change(state, key, now):
     cs = (state.get("chains") or {}).get(str(chain_of(key))) or {}
     if not cs.get("fee_from"):
         return None, None
-    start = max(int(cs["fee_from"]), int(state.get("fee_complete_from") or 0))
+    # measured fees are compared with measured fees only: transfers came in lumps on quiet pools
+    start = max(int(cs["fee_from"]), int(state.get("fee_complete_from") or 0), int(cs.get("acc_from") or 0))
     if now - start < 96 * HOUR - 1800:
         return None, None
     prev = fees_usd(state, key, now - 96 * HOUR, now - 48 * HOUR)

@@ -125,9 +125,9 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
              "kind": m.get("kind", "?"), "pool": m.get("pool"), "ap": round(ap)}
         # hourly fees of the last day (index 0: the current hour) and the incentives streamed in it: the page's APR
         # over 6, 12, 18 and 24 hours and its warning when the fees come from a few hours
-        hourly = state["fees"].get(key) or {}
+        hourly = A.fee_hours(state, key)
         h0 = now - now % HOUR
-        fh = [round(hourly.get(str(h0 - i * HOUR), 0.0), 2) for i in range(25)]
+        fh = [round(hourly.get(h0 - i * HOUR, 0.0), 2) for i in range(25)]
         while fh and not fh[-1]:
             fh.pop()
         if fh:
@@ -193,7 +193,7 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             r["spark"] = [round(v) if v else 0 for v in spark]
         rows.append(r)
     # pools that earned revenue but have no allocation at all (the first allocator takes everything)
-    for key in set(state["fees"]) | {p["g"] for p in state["incentives"].values()}:
+    for key in set(state["fees"]) | set(state.get("acc") or {}) | {p["g"] for p in state["incentives"].values()}:
         if key in state["ap"]:
             continue
         m, r, fees48, inc48, inc_next = pool_row(key, 0)

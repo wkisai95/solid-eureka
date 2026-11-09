@@ -154,6 +154,7 @@ S = {k: sel(v) for k, v in {
     "isActivated": "isActivated(address)",
     "emissionCap": "emissionCap(address)",
     "tokenStates": "tokenStates(uint256)",
+    "pendingFees": "pendingFees()",
     "reduction": "accumulatedCooldownReduction(uint256)",
     "allocatedGauges": "allocatedGauges(uint256)",
     "allocations": "allocations(uint256,address)",
@@ -241,6 +242,18 @@ def read_token_states(rpc, token_ids):
         if st is not None:
             out[str(tid)] = {"last": int(st[1]), "budget": st[3] / 1e18,
                              "red": int(red) if red is not None else 0}
+    return out
+
+
+def read_pending_fees(rpc, gauges, block="latest"):
+    """{gauge: (token0, token1)}: the fees each gauge has accrued for its voters and not handed over yet (raw
+    amounts). The rewards manager credits exactly these to the votes; FeesCollected only moves them, on a claim."""
+    res = rpc.multicall([(g, S["pendingFees"]) for g in gauges], block=block)
+    out = {}
+    for g, r in zip(gauges, res):
+        v = _dec(["uint256", "uint256"], *r)
+        if v is not None:
+            out[g] = (int(v[0]), int(v[1]))
     return out
 
 

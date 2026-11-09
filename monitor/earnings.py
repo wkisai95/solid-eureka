@@ -6,14 +6,12 @@ they allocate on. Nothing here knows who owns a position: the page finds the vie
 and reads their numbers from the public export.
 
 Fees. Aero's rewards manager credits a pool's fees to the votes allocated while they accrue: every allocation change
-in the pool first credits what accrued until then, at the votes of that moment. The fees themselves reach the
-contract (FeesCollected) only when someone collects them, every few hours on some chains. So where the pool's hourly
-volume is known, its fees are estimated as they accrue (volume x the pool's fees per dollar traded over the last 48
-hours) and the transfers only add what the estimate missed; elsewhere the transfers are credited as they arrive.
-Incentives stream by their schedule.
+in the pool first credits what the gauge has pending until then, at the votes of that moment. The fees reach the
+rewards manager (FeesCollected) only when someone claims, which on a quiet pool can be days later and all at once.
+So the fees are measured on the gauge every run (aero.settle_accrual: pending now, minus pending at the last run,
+plus what was collected in between) and credited for the run they accrued in. Incentives stream by their schedule.
 """
 from . import aero as A
-from . import marketdata as MD
 
 HOUR = 3600
 DAY = 86400
@@ -21,7 +19,6 @@ HOURS = 25                  # hourly buckets for the last day: windows of 1, 6, 
 WINDOWS = (1, 6, 12, 24)
 KEEP_D = 35 * DAY
 BACKFILL = 7 * DAY
-EST_V = 1                   # version of the fee estimate; a new one sets the uncollected estimates up again
 SINCE_MAX = 4 * DAY         # earnings since the last allocation are exported when it is at most this old
 
 
@@ -105,7 +102,7 @@ def _backfill(state, prices, pe, now, log, hours_only=False):
     for g, members in gauges.items():
         cs = (state["chains"].get(str(A.chain_of(g))) or {})
         lo = max(start, int(cs.get("fee_from") or now))
-        hours = {int(h): v for h, v in (state["fees"].get(g) or {}).items() if lo <= int(h) < now}
+        hours = {h: v for h, v in A.fee_hours(state, g).items() if lo <= h < now}
         inc_hours = range(lo - lo % HOUR, now, HOUR) if any(p["g"] == g for p in state["incentives"].values()) else ()
         for h in sorted(set(hours) | set(inc_hours)):
             usd = hours.get(h, 0.0) + (A.incentive_usd(state, prices, g, h, min(now, h + HOUR)) if inc_hours else 0.0)
@@ -125,56 +122,13 @@ def _backfill(state, prices, pe, now, log, hours_only=False):
         f"({credited} pool-hours)")
 
 
-def _vol_between(vser, start, end):
-    """Volume traded between start and end, from the hourly snapshots: the one taken in an hour is the volume of the
-    60 minutes before it, so an hour is best covered by the next hour's snapshot, then by its own, then by the last
-    one before it."""
-    tot, t = 0.0, start
-    known = sorted(int(h) for h in vser)
-    while t < end:
-        h = t - t % HOUR
-        nxt = min(end, h + HOUR)
-        snap = vser.get(str(h + HOUR)) or vser.get(str(h))
-        if snap is None:
-            prev = [x for x in known if x <= h]
-            snap = vser.get(str(prev[-1])) if prev and h - prev[-1] <= 3 * HOUR else None
-        tot += float((snap or [0])[0] or 0) * (nxt - t) / HOUR
-        t = nxt
-    return tot
-
-
-def _fee_rate(state, g, now):
-    """(fees per dollar traded over the last 48 hours, the pool's volume snapshots, fees of the last 48 hours)."""
-    vser = (MD.market_state(state)["hist"]["pools"]).get(g) or {}
-    if not vser:
-        return 0.0, {}, 0.0
-    _, v48 = MD.hourly_volume(state, g, now)
-    f48 = A.fees_usd(state, g, now - 48 * HOUR, now + HOUR)
-    return (min(0.01, f48 / v48) if v48 and f48 > 0 else 0.0), vser, f48
-
-
-def interval_revenue(state, prices, fresh_fees, start, end, pe):
-    """{gauge: USD credited to its allocators between start and end}; pe["est"] keeps, per gauge, the fees estimated
-    and credited that no transfer has brought yet."""
-    est_left = pe.setdefault("est", {})
-    got = {}
+def interval_revenue(state, prices, fresh_fees, start, end):
+    """{gauge: USD earned by its allocators between start and end}: the fees measured on the gauge in this run
+    (aero.settle_accrual) and the incentives streamed."""
+    rev = {}
     for ts, k, usd in fresh_fees:
         if start - 2 * HOUR < ts <= end:
-            got[k] = got.get(k, 0.0) + usd
-    rev = {}
-    for g in set(_by_gauge(state)) | set(got):
-        fpv, vser, f48 = _fee_rate(state, g, end)
-        est = _vol_between(vser, start, end) * fpv if fpv > 0 else 0.0
-        left = est_left.get(g, 0.0) + est
-        arrived = got.get(g, 0.0)
-        extra = max(0.0, arrived - left)          # what the estimate missed: credited now
-        left = min(max(0.0, left - arrived), max(f48, 1.0))
-        if left > 0.005:
-            est_left[g] = round(left, 4)
-        else:
-            est_left.pop(g, None)
-        if est + extra > 0:
-            rev[g] = est + extra
+            rev[k] = rev.get(k, 0.0) + usd
     for k in {p["g"] for p in state["incentives"].values()}:
         r = A.incentive_usd(state, prices, k, start, end)
         if r > 0:
@@ -182,41 +136,8 @@ def interval_revenue(state, prices, fresh_fees, start, end, pe):
     return rev
 
 
-def _setup_estimates(state, pe, now, log):
-    """Once: the fees that accrued since each pool's last transfer, estimated hour by hour from its volume and
-    credited to the positions allocated in it for the hours they were there; they are what the next transfer
-    brings, so they are kept as already credited."""
-    gauges = _by_gauge(state)
-    est_left, credited = pe.setdefault("est", {}), 0.0
-    for g, members in gauges.items():
-        fpv, vser, f48 = _fee_rate(state, g, now)
-        if fpv <= 0:
-            continue
-        hours = [int(h) for h, v in (state["fees"].get(g) or {}).items() if v > 0 and int(h) >= now - 48 * HOUR]
-        if not hours:
-            continue
-        t0 = max(hours) + HOUR // 2                 # the last transfer, within its hour
-        left = 0.0
-        t = t0
-        while t < now:
-            nxt = min(now, t - t % HOUR + HOUR)
-            usd = _vol_between(vser, t, nxt) * fpv
-            left += usd
-            tot = _total(state, g, members, t - t % HOUR)
-            if usd > 0 and tot > 0:
-                for tid, a, last in members:
-                    if last <= t:
-                        _credit(pe, tid, g, usd * a / tot, t, t)
-                        credited += usd * a / tot
-            t = nxt
-        if left > 0.005:
-            est_left[g] = round(min(left, max(f48, 1.0)), 4)
-    pe["est_v"] = EST_V
-    log(f"earnings: fees accrued since the last transfer estimated in {len(est_left)} pools, ${credited:,.2f} credited")
-
-
 def accrue(state, prices, fresh_fees, now, log):
-    """fresh_fees: [(time, gauge, USD)] fee transfers priced in this run (aero.settle_rewards)."""
+    """fresh_fees: [(time, gauge, USD)] fees measured on the gauges in this run (aero.settle_accrual)."""
     pe = _book(state)
     last = int(pe.get("last") or 0)
     pe["last"] = now
@@ -235,9 +156,9 @@ def accrue(state, prices, fresh_fees, now, log):
         pe["hourly"] = True
     if now <= last:
         return pe
-    if pe.get("est_v") != EST_V:
-        _setup_estimates(state, pe, last, log)
-    revenue = interval_revenue(state, prices, fresh_fees, last, now, pe)
+    pe.pop("est", None)             # estimates of the fees between two claims: the gauges are measured now
+    pe.pop("est_v", None)
+    revenue = interval_revenue(state, prices, fresh_fees, last, now)
     gauges = _by_gauge(state)
     for g, usd in revenue.items():
         members = gauges.get(g)
@@ -253,6 +174,90 @@ def accrue(state, prices, fresh_fees, now, log):
         if not p["d"]:
             del pe["p"][tid]
     return pe
+
+
+def rebuild_hours(state, prices, now, log):
+    """Once, when the fees of the last two days have been measured on the gauges (aero.backfill_accrual): the
+    hourly buckets of the last day are credited again from them, replacing what the old estimate gave, for every
+    position and hour whose allocation is known (from the first full hour after its latest allocation change, on
+    chains measured that far back). Total, days and pools move by the same difference."""
+    pe = _book(state)
+    h0 = int(pe.get("h0") or 0)
+    if not h0:
+        return
+    gauges = _by_gauge(state)
+    alloc, last_of = {}, {}
+    for cid, cs in state["chains"].items():
+        for tid, t in (cs.get("tokens") or {}).items():
+            last_of[tid] = max(last_of.get(tid, 0), int(t.get("last") or 0))
+            for g, a in (t.get("a") or {}).items():
+                if a > 0:
+                    alloc.setdefault(tid, {})[g] = float(a)
+    measured_from = {cid: int(cs.get("acc_from") or now) for cid, cs in state["chains"].items()}
+    fees, inc = {}, {}
+
+    def earned(g, h):
+        if g not in fees:
+            fees[g] = A.fee_hours(state, g)
+        if (g, h) not in inc:
+            inc[(g, h)] = A.incentive_usd(state, prices, g, h, min(now, h + HOUR))
+        return fees[g].get(h, 0.0) + inc[(g, h)]
+
+    gi = pe.setdefault("_gi", {k: i for i, k in enumerate(pe["gi"])})
+    changed, moved = 0, 0.0
+    for tid, al in alloc.items():
+        last = last_of.get(tid, 0)
+        measured = max(measured_from[str(A.chain_of(g))] for g in al)
+        p = pe["p"].get(tid)
+        for i in range(HOURS):
+            h = h0 - i * HOUR
+            if h < measured or h + HOUR <= last:
+                break
+            end = min(now, h + HOUR)
+            # in the hour of its latest allocation the position held the new one only from then on: before it, as
+            # much as it earned in the hour before
+            part = 1.0
+            before = 0.0
+            if last > h:
+                part = max(0.0, (end - last) / max(1, end - h))
+                hh = (p or {}).get("h") or []
+                before = (hh[i + 1] if len(hh) > i + 1 else 0.0) * (last - h) / HOUR
+            per = {}
+            for g, a in al.items():
+                tot = _total(state, g, gauges.get(g) or [], h)
+                if tot > 0:
+                    per[g] = earned(g, h) * a / tot * part
+            new = sum(per.values()) + before
+            if p is None:
+                for g, usd in per.items():
+                    _credit(pe, tid, g, usd, h, h)
+                p = pe["p"].get(tid)
+                changed += 1 if p else 0
+                moved += new
+                continue
+            hh = p.setdefault("h", [])
+            if len(hh) <= i:
+                hh.extend([0.0] * (i + 1 - len(hh)))
+            diff = new - hh[i]
+            if abs(diff) < 1e-6:
+                continue
+            hh[i] = round(new, 5)
+            p["t"] = round(max(0.0, p["t"] + diff), 5)
+            d = str(h - h % DAY)
+            p["d"][d] = round(max(0.0, p["d"].get(d, 0.0) + diff), 5)
+            weights = per if new > 0 else {g: a for g, a in al.items()}
+            wsum = sum(weights.values()) or 1.0
+            for g, w in weights.items():
+                if g not in gi:
+                    gi[g] = len(pe["gi"])
+                    pe["gi"].append(g)
+                k = str(gi[g])
+                p["g"][k] = round(max(0.0, p["g"].get(k, 0.0) + diff * w / wsum), 5)
+            changed += 1
+            moved += diff
+    pe.pop("_gi", None)
+    log(f"earnings: last day credited again from the measured fees, {changed} position-hours changed, "
+        f"{moved:+,.0f} USD in all")
 
 
 def windows(p, now, h0):

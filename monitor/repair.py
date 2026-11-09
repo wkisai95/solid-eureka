@@ -42,6 +42,22 @@ def real_hour(h):
     return m - m % HOUR
 
 
+def _vol_between(vser, start, end):
+    """Volume traded between start and end, from the hourly snapshots (as the fee estimate of the time read it)."""
+    tot, t = 0.0, start
+    known = sorted(int(h) for h in vser)
+    while t < end:
+        h = t - t % HOUR
+        nxt = min(end, h + HOUR)
+        snap = vser.get(str(h + HOUR)) or vser.get(str(h))
+        if snap is None:
+            prev = [x for x in known if x <= h]
+            snap = vser.get(str(prev[-1])) if prev and h - prev[-1] <= 3 * HOUR else None
+        tot += float((snap or [0])[0] or 0) * (nxt - t) / HOUR
+        t = nxt
+    return tot
+
+
 def _v48(vser, t):
     """Volume of the 48 hours before t, as marketdata.hourly_volume read it at t."""
     keys = [int(h) for h in vser if int(h) <= t]
@@ -83,7 +99,7 @@ def replay(old, new, vser, start, end, kept_from, left0):
     out, left, t = [], left0, start
     while t < end:
         b = min(end, t - t % HOUR + HOUR)
-        vol = E._vol_between(vser, t, b) if vser else 0.0
+        vol = _vol_between(vser, t, b) if vser else 0.0
         v48 = _v48(vser, b) if vser else 0.0
         f_new, f_old = _f48(s_new, b, kept_from, rate), _f48(s_old, b, kept_from, rate)
         est_new = vol * min(0.01, f_new / v48) if v48 > 0 and f_new > 0 else 0.0

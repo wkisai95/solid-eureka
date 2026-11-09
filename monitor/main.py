@@ -182,6 +182,12 @@ def run(args):
             events += A.fetch_reward_events(rpc, cid, cs, head, log, deadline=read_deadline, now=now)
         except Exception as e:
             log(f"{C.chain_short(cid)}: fee read failed: {type(e).__name__}: {str(e)[:300]}")
+        try:
+            # what each gauge has pending for its voters: with the transfers, the fees they earned (settle_accrual)
+            A.read_pending(rpc, cid, cs, state, now, log)
+        except Exception as e:
+            cs.pop("pend_now", None)
+            log(f"{C.chain_short(cid)}: pending fees not read: {type(e).__name__}: {str(e)[:200]}")
         return {"ok": True, "events": events, "head": head}
 
     with ThreadPoolExecutor(max_workers=len(chain_ids)) as ex:
@@ -240,10 +246,25 @@ def run(args):
     targets = routing_targets(state, cfg, chains_cfg)
     for k, cid, pool, t0, t1 in targets:
         want |= {A.tkey(cid, t0), A.tkey(cid, t1)}
+    want |= A.accrual_tokens(state)
     prices = M.fetch_prices(want, state["prices"], now, log, chains_cfg, state["erc20"],
                             state.setdefault("dex_slugs", {}))
-    new_inc, fresh_fees = A.settle_rewards(state, prices, now, log)
+    new_inc, _ = A.settle_rewards(state, prices, now, log)
     new_inc = list(dict.fromkeys(new_inc + new_programs))
+    # the fees each pool earned in this run, measured on its gauge (the transfers only move them, on a claim)
+    fresh_fees = A.settle_accrual(state, prices, now, log)
+    measured_back = []
+    if any(int(cs.get("acc_from") or 0) == now and not cs.get("acc_backfill") for cs in state["chains"].values()):
+        # the gauges are measured for the first time: their last two days too, where old state can be read
+        def old_state_rpc(cid):
+            ccfg = chains_cfg[str(cid)]
+            return Rpc(ccfg["rpc"], name=C.chain_short(cid) + " (old state)", log=log, pace=float(ccfg.get("pace_s", 0)))
+        try:
+            measured_back = A.backfill_accrual(state, old_state_rpc, prices, now, log)
+        except Exception:
+            status["errors"].append("fees backfill: " + traceback.format_exc()[-200:])
+            log(f"fees backfill failed: {traceback.format_exc()[-600:]}")
+        state["migrated_at"] = now      # the pools' fees change measure: this run's alerts stay quiet
 
     # hourly market snapshot (pool volumes, pair volume on every DEX, Aero share per chain), kept as history
     if not args.no_market:
@@ -291,6 +312,8 @@ def run(args):
     # what every real position earns, for the page's "I tuoi sAERO"
     try:
         E.accrue(state, prices, fresh_fees, now, log)
+        if measured_back:
+            E.rebuild_hours(state, prices, now, log)
     except Exception:
         status["errors"].append("earnings: " + traceback.format_exc()[-200:])
         log(f"earnings failed: {traceback.format_exc()[-600:]}")

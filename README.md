@@ -77,10 +77,10 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
 - **cooldown** di ogni rete;
 - **APR reale**: a ogni giro il monitor divide le fee e gli incentivi di ogni pool tra tutte le posizioni
   allocate, in proporzione alla loro quota. Il contratto di Aero accredita le fee ai voti allocati mentre maturano
-  (ogni cambio di allocazione nel pool accredita prima quanto è maturato fino a lì), ma le fee arrivano al contratto
-  solo quando qualcuno le raccoglie, su alcune reti ogni qualche ora: dove il volume orario del pool è noto il monitor
-  le stima mentre maturano (volume × fee per dollaro scambiato nelle ultime 48 ore) e i trasferimenti aggiungono solo
-  quello che la stima non aveva contato. Da qui gli incassi dell'ultima ora, delle ultime 6, 12 e 24 ore
+  (ogni cambio di allocazione nel pool accredita prima quanto il gauge ha in sospeso fino a lì), ma le fee passano al
+  contratto (FeesCollected) solo quando qualcuno fa claim: su un pool tranquillo anche giorni dopo, tutte insieme.
+  Per questo il monitor le misura sul gauge a ogni giro: le fee in sospeso adesso (`pendingFees()`), meno quelle del
+  giro prima, più quelle raccolte nel frattempo. Da qui gli incassi dell'ultima ora, delle ultime 6, 12 e 24 ore
   (secchi orari), degli ultimi 7 giorni, per pool
   e per giorno. L'APR è calcolato sul valore degli AERO in stake al prezzo attuale.
   Accanto a ogni APR c'è il multiplo della resa di mercato: quanto ha reso ogni voto allocato della posizione
@@ -98,6 +98,13 @@ possiede (numero, AERO in stake, scadenza o perpetuo, Allocation Power, da quand
 
 Il primo giro ricostruisce gli ultimi 7 giorni dalle fee già raccolte, solo per le ore in cui ogni posizione aveva già
 l'allocazione di adesso. I numeri sono una stima dai dati pubblici, non i claim effettivi del contratto.
+
+Fino al 9 novembre 2026 le fee venivano dai trasferimenti (FeesCollected) e, dove c'era il volume orario, da una
+stima volume × fee per dollaro scambiato: sui pool dove si fa claim di rado un solo trasferimento portava fee di
+giorni, gonfiando o azzerando le 48 ore e la stima. Al passaggio il monitor ha letto le fee in sospeso di ogni gauge
+a ogni ora delle 48 ore prima, dove gli endpoint conservano lo stato vecchio, e ha rifatto con le fee misurate le
+ultime 24 ore orarie delle posizioni che non hanno cambiato allocazione; dove lo stato vecchio non c'è, le ore prima
+del passaggio restano sui trasferimenti finché escono dalle 48 ore e la variazione delle fee riparte da zero.
 
 ## Stocks onchain
 

@@ -224,7 +224,7 @@ def _inputs(state, prices, now, cooldown):
     """Per pool, once per run: fees of 48 and 12 hours, incentives over the next cooldown, fee change."""
     tag = (id(state), now, cooldown)
     if _INPUTS.get("tag") != tag:
-        keys = set(state["fees"]) | {p["g"] for p in state["incentives"].values()}
+        keys = set(state["fees"]) | set(state.get("acc") or {}) | {p["g"] for p in state["incentives"].values()}
         rows = {}
         for k in keys:
             rows[k] = (A.fees_usd(state, k, now - 48 * HOUR, now + HOUR),
