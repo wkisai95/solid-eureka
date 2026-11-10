@@ -378,6 +378,27 @@ def _record_market(tr, state, rev, now):
             del tr["pool_daily"][k]
 
 
+def pool_history(tr, now):
+    """What every pool paid and the votes it had, hour by hour for the last HIST_HOURS: the page works out from it
+    what an allocation saved on the device ("Monitora questa allocazione") really earned.
+    {t0: first hour, n: hours, p: {gauge: [first hour index, [USD per hour...], [votes per hour...]]}}."""
+    h1 = now - now % HOUR
+    t0 = h1 - (HIST_HOURS - 1) * HOUR
+    out = {}
+    for k, h in tr["pool_hist"].items():
+        rev, ap, last_ap = [], [], 0
+        for i in range(HIST_HOURS):
+            v = h.get(str(t0 + i * HOUR))
+            if v:
+                last_ap = v[1]
+            rev.append(round(v[0], 2) if v else 0)
+            ap.append(last_ap)
+        if sum(rev) >= 1:
+            first = next(i for i, x in enumerate(rev) if x)
+            out[k] = [first, rev[first:], ap[first:]]
+    return {"generated": now, "t0": t0, "n": HIST_HOURS, "p": out}
+
+
 def repair_broken_prices(tr, now, log, limit=1e7):
     """Removes what fees priced with a broken price left in the simulation (30 Oct 2026: WBTC/USDT on Ethereum).
 

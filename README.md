@@ -132,6 +132,19 @@ in dollari. Dieci pool a ogni giro (limite dell'API gratuita), ognuno riletto du
   suggerito mostra di quanto ha sbagliato su quel pool. Una rete misurata da meno di quattro giorni usa la migliore
   tra le previsioni che leggono solo 48 ore.
 
+- **Verifica dal vivo**: ogni sei ore il monitor salva tutte le previsioni di ogni pool e 48 ore dopo le confronta
+  con le fee misurate. Queste verifiche contano il triplo dei campioni del backtest nella scelta del metodo, e
+  danno a ogni pool il suo scarto (quanto la previsione tende a stare sopra o sotto), tolto dalla previsione man
+  mano che le verifiche crescono. Tiene anche quanto si sono mossi i voti del pool in quelle 48 ore.
+
+## Allocazioni monitorate
+
+Nel radar, «Monitora questa allocazione» salva sul dispositivo l'allocazione suggerita in quel momento (pool, voti,
+incasso previsto). In fondo alla pagina, per ognuna: quanto avrebbe reso davvero, pool per pool, contro la
+previsione, mentre le 48 ore passano e alla fine. Il conto usa `poolhist.json`: fee e incentivi pagati da ogni pool e
+voti presenti, ora per ora per 8 giorni, con i tuoi voti aggiunti a quelli del pool. Il risultato delle 48 ore resta
+salvato con l'allocazione. Niente lascia il dispositivo.
+
 Con cinque o sei campioni per giorno della settimana sono tendenze, non certezze: accanto a ogni giorno c'è il
 numero di settimane viste.
 

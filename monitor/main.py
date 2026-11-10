@@ -399,12 +399,16 @@ def run(args):
     public_report["personal_alerts"] = bool(cfg["my_positions"]) and bool(N.topic_of(cfg))
     try:
         # fees expected in the next 48 hours by the forecast that the backtest finds most accurate (trends.py)
+        TR.verify(state, now, log)
+        sc = TR.scores(state)
         for p in public_report.get("pools") or []:
-            f = TR.forecast(state, p["key"], now) if p.get("key") else None
+            f = TR.forecast(state, p["key"], now, sc) if p.get("key") else None
             if f:
                 p["pred48"], p["pred_by"] = round(f[0], 2), f[1]
                 if f[2]:
                     p["pred_err"] = round(f[2], 3)
+                if f[3]:
+                    p["ap_drift"] = round(f[3], 3)     # how its votes moved in the 48 hours after past forecasts
     except Exception:
         log(f"forecast failed: {traceback.format_exc()[-400:]}")
     save_json(out / "latest.json", public_report)
@@ -418,6 +422,7 @@ def run(args):
         save_json(pos_dir / f"{k}.json", shard)
     save_json(out / "positions.json", pos_index)
     save_json(out / "tracker.json", tracker_report)
+    save_json(out / "poolhist.json", T.pool_history(tr, now))
     try:
         # fee tendencies by weekday and catalyst days, from each pool's hourly candles
         TR.refresh(state, now, log)

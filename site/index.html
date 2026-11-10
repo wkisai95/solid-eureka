@@ -131,6 +131,14 @@ table.trd tr.open td { border-bottom: 0; }
 table.trd td.det { white-space: normal; font: 12.5px/1.5 var(--f-num); color: var(--ink-2); padding-top: 0; }
 table.trd tbody tr.trow { cursor: pointer; }
 .up { color: var(--good); } .down { color: var(--warn); }
+.wt { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 10px; }
+.wt-h { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
+.wt-h .d { font: 12.5px/1.4 var(--f-num); color: var(--ink-2); }
+.wt-verdict { font: 13.5px/1.5 var(--f-num); margin: 8px 0; }
+table.wtt td, table.wtt th { text-align: right; white-space: nowrap; }
+table.wtt td:first-child, table.wtt th:first-child { text-align: left; }
+table.wtt th { cursor: default; }
+table.wtt td { font-family: var(--f-num); }
 table.stk td, table.stk th { white-space: nowrap; }
 table.stk td.num { font-family: var(--f-num); }
 table.stk svg { width: 72px; height: 18px; display: block; }
@@ -484,7 +492,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         </div>
         <div class="strips" id="rd-strips"></div>
         <div class="exits" id="rd-exits"></div>
-        <div class="controls"><button type="button" id="rd-use">Usa questa allocazione</button><button type="button" class="ghost" id="rd-copy">Copia pesi</button><a href="https://app.aero.xyz" target="_blank" rel="noopener">Apri Aero ↗</a></div>
+        <div class="controls"><button type="button" id="rd-use">Usa questa allocazione</button><button type="button" class="ghost" id="rd-watch">Monitora questa allocazione</button><button type="button" class="ghost" id="rd-copy">Copia pesi</button><a href="https://app.aero.xyz" target="_blank" rel="noopener">Apri Aero ↗</a></div>
         <div class="toast" id="rd-toast" role="status"></div>
         <details class="sub-fold apfold" data-fold="autopilot" open>
           <summary><span class="fold-t">Voti dell'Autopilot</span><span class="sub" id="autopilot-sum"></span></summary>
@@ -709,6 +717,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     </div>
   </details>
   </div>
+
+  <details class="panel fold" data-fold="watch" open id="watch">
+    <summary class="panel-head"><h2>Allocazioni monitorate</h2><span class="sub" id="wt-sub"></span></summary>
+    <p class="note">Le allocazioni che hai salvato dal radar con «Monitora questa allocazione», e come sarebbe andata davvero votandole: le fee e gli incentivi che ogni pool ha pagato da allora, divisi con i voti che c'erano ora per ora più i tuoi. Restano solo su questo dispositivo.</p>
+    <div id="wt-list"></div>
+  </details>
 
   <p class="note hidden-note" id="hidden-note"><span id="hidden-txt"></span> <button type="button" class="linkish" id="hidden-toggle"></button></p>
 
@@ -3001,6 +3015,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         const d = el("div"); d.append(el("b", "", f.name[0].toUpperCase() + f.name.slice(1)), ` · errore tipico ${pct(f)}` + (f.k === TRD.best ? " · usata dal radar" : "") + (f.k === "48h" ? " · il metodo di prima" : ""));
         box.append(d);
       }
+      const lv = TRD && TRD.live, le = lv && lv.err && TRD.best && lv.err[TRD.best];
+      if (lv && (lv.waiting || le)) box.append(el("div", "", le ? `Dal vivo: le previsioni del monitor confrontate dopo 48 ore con le fee misurate hanno sbagliato di solito del ${Math.round((le - 1) * 100)}% (${fmtN(lv.checks)} verifiche); contano il triplo nel scegliere il metodo e correggono lo scarto di ogni pool.`
+        : `Dal vivo: ${lv.waiting} serie di previsioni del monitor aspettano le 48 ore per essere confrontate con le fee misurate.`));
       if (fs.length) box.append(el("div", "", "Ogni previsione delle 48 ore successive è rifatta in ogni punto della storia con i soli dati di allora e confrontata con quello che è successo."));
     }
     rows.replaceChildren(); $("trd-m-wd").replaceChildren(); $("trd-m-lab").replaceChildren(); $("trd-m-ev").replaceChildren();
@@ -3062,6 +3079,91 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   document.querySelectorAll("#trd-sort button").forEach(b => b.addEventListener("click", () => { trdSort = b.dataset.s; trendsRender(); }));
   $("trd-more").addEventListener("click", () => { trdAll = !trdAll; trendsRender(); });
   { let t = 0; $("trd-q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(trendsRender, 150); }); }
+  // ---------------------------------------------------------------- monitored allocations (on this device)
+  let WATCH = [], PH = null;
+  try { WATCH = JSON.parse(localStorage.getItem("radar-watch") || "[]") || []; } catch (e) { WATCH = []; }
+  const watchSave = () => { try { localStorage.setItem("radar-watch", JSON.stringify(WATCH.slice(0, 30))); } catch (e) {} };
+  $("rd-watch").addEventListener("click", () => {
+    const r = rdLast && rdLast.r, used = r ? r.act.filter(o => o.k > 0) : [];
+    if (!r || !used.length || !(r.ap > 0)) { toast("Non c'è un'allocazione da monitorare: inserisci la tua Allocation Power.", true); return; }
+    const sel = $("rd-win");
+    WATCH.unshift({ id: Date.now(), t: DATA.generated, ap: r.ap, price: DATA.aero_usd || 0, total: r.total,
+      how: sel.options[sel.selectedIndex].text + (RD.sea && r.win ? ", corretta per il giorno" : ""),
+      rows: used.map(o => ({ k: o.p.key, name: o.p.name, chain: o.p.chain, v: r.ap * o.k / 100, e: r.earn(o, o.k) })) });
+    watchSave(); watchRender();
+    toast("Allocazione salvata: la trovi in fondo, in «Allocazioni monitorate». I primi risultati arrivano al prossimo aggiornamento.");
+  });
+  // what v votes in a pool earned between t0 and t1, from the pool's hourly history; null when it is not covered
+  function watchEarned(k, v, t0, t1) {
+    const h = PH && PH.p[k];
+    if (!PH || t0 < PH.t0) return null;
+    if (!h) return 0;
+    let tot = 0;
+    for (let i = Math.floor((t0 - PH.t0) / 3600); i < PH.n; i++) {
+      const hs = PH.t0 + i * 3600, j = i - h[0];
+      if (hs >= t1) break;
+      if (j < 0 || j >= h[1].length || !h[1][j]) continue;
+      const he = Math.min(hs + 3600, PH.generated), span = Math.max(1, he - hs);
+      const part = Math.max(0, Math.min(he, t1) - Math.max(hs, t0)) / span;
+      tot += h[1][j] * part * v / ((h[2][j] || 0) + v);
+    }
+    return tot;
+  }
+  function watchRender() {
+    const box = $("wt-list");
+    box.replaceChildren();
+    $("wt-sub").textContent = WATCH.length ? `${WATCH.length} salvat${WATCH.length === 1 ? "a" : "e"}` : "";
+    if (!WATCH.length) { box.append(el("p", "note", "Ancora nessuna. Nel radar, sotto l'allocazione suggerita, premi «Monitora questa allocazione»: da quel momento qui vedi quanto avrebbe reso davvero, pool per pool, accanto a quanto prevedeva il radar.")); return; }
+    const now = PH ? PH.generated : (DATA ? DATA.generated : 0), W = 48 * 3600;
+    let dirty = false;
+    for (const w of WATCH) {
+      const card = el("div", "wt"), head = el("div", "wt-h"), end = w.t + W, t1 = Math.min(now, end), hrs = Math.max(0, (t1 - w.t) / 3600);
+      const hl = el("div"); hl.append(el("b", "", "Salvata " + when(w.t)), el("span", "d", ` · ${fmtN(w.ap)} voti su ${w.rows.length} pool · ${w.how || ""}`));
+      const rm = el("button", "linkish", "Rimuovi"); rm.type = "button";
+      rm.addEventListener("click", () => { WATCH = WATCH.filter(x => x.id !== w.id); watchSave(); watchRender(); });
+      head.append(hl, rm); card.append(head);
+      // the 48 hours the forecast was for; once they are complete the result is kept with the allocation
+      let per = w.done ? w.done.per : w.rows.map(r => watchEarned(r.k, r.v, w.t, end));
+      const covered = per.every(x => x != null), complete = now >= end;
+      if (!w.done && covered && complete) { w.done = { per, at: now }; dirty = true; }
+      const real = covered ? per.reduce((a, b) => a + b, 0) : null, pace = w.total * hrs / 48;
+      const aprOf = usd48 => w.price > 0 && w.ap > 0 ? usd48 / (w.ap * w.price) * 182.5 * 100 : NaN;
+      const v = el("div", "wt-verdict");
+      if (!covered) v.textContent = "La storia oraria dei pool non arriva più fino a questa allocazione (si tengono 8 giorni): il risultato non è stato salvato in tempo.";
+      else if (hrs < 0.5) v.textContent = `Il radar prevedeva ${r$(w.total)} in 48 ore (APR ${fmtPct(aprOf(w.total))}). I primi risultati arrivano con i prossimi aggiornamenti.`;
+      else {
+        const diff = pace > 0 ? (real / pace - 1) * 100 : 0, cls = diff >= 0 ? "up" : "down";
+        v.append(complete || w.done ? "Nelle 48 ore avrebbe reso " : `In ${String(hrs.toFixed(1)).replace(".", ",")} ore avrebbe reso `, el("b", "", r$(real)),
+          ` (APR ${fmtPct(aprOf(real * 48 / Math.max(hrs, 0.01)))}). Il radar prevedeva ${r$(w.total)} in 48 ore (APR ${fmtPct(aprOf(w.total))})` + (complete || w.done ? ": " : `, cioè ${r$(pace)} fin qui: `),
+          el("b", cls, (diff >= 0 ? "+" : "−") + fmtPct(Math.abs(diff)).replace("+", "")), diff >= 0 ? " sopra la previsione." : " sotto la previsione.");
+      }
+      card.append(v);
+      if (covered && hrs >= 0.5) {
+        const tbl = el("table", "wtt"), th = el("tr");
+        for (const c of ["Pool", "Voti", "Previsto" + (complete || w.done ? " 48 ore" : " fin qui"), "Reale", "Differenza"]) th.append(el("th", "", c));
+        const thead = el("thead"); thead.append(th); const tb = el("tbody"); tbl.append(thead, tb);
+        w.rows.map((r, i) => ({ r, got: per[i], exp: r.e * hrs / 48 })).sort((a, b) => b.exp - a.exp).forEach(o => {
+          const tr = el("tr"), c0 = el("td"); c0.append(el("b", "", o.r.name), el("span", "sub", " " + o.r.chain));
+          const d = o.exp > 0 ? (o.got / o.exp - 1) * 100 : 0;
+          tr.append(c0, el("td", "", fmtN(o.r.v)), el("td", "", r$(o.exp)), el("td", "", r$(o.got)), el("td", d >= 0 ? "up" : "down", (d >= 0 ? "+" : "−") + fmtPct(Math.abs(d)).replace("+", "")));
+          tb.append(tr);
+        });
+        const wrap = el("div", "tbl"); wrap.append(tbl); card.append(wrap);
+        if (!(complete || w.done)) card.append(el("div", "d", `Mancano ${String(((end - now) / 3600).toFixed(0))} ore alla fine delle 48 ore della previsione.`));
+      }
+      box.append(card);
+    }
+    if (dirty) watchSave();
+  }
+  async function loadWatch() {
+    if (WATCH.length || !PH) {
+      try {
+        const r = await dataFetch("poolhist.json");
+        if (r.ok) PH = await r.json();
+      } catch (e) {}
+    }
+    watchRender();
+  }
   async function loadTrends() {
     try {
       const r = await dataFetch("trends.json");
@@ -3095,6 +3197,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       loadSim();
       loadStocks();
       loadTrends();
+      loadWatch();
     } catch (e) {
       $("updated").textContent = "Non riesco a leggere i dati: " + e.message + ". Riprovo tra un minuto.";
       setTimeout(load, 60000);

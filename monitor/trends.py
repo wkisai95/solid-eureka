@@ -286,16 +286,113 @@ def backtest(days, hours):
     return {k: [round(v[0], 4), round(v[1], 4), v[2]] for k, v in out.items()}
 
 
-def scores(state):
-    """{name: (typical error as a factor, bias as a factor, samples)} over every pool's backtest."""
+NAMES = [n + g for n in PREDICTORS for g in ("", "+g")]
+LIVE_EVERY = 6 * HOUR       # the monitor's own forecasts are saved this often and checked 48 hours later
+LIVE_WEIGHT = 3             # a check on the fees really measured counts as this many backtest samples
+LIVE_MIN_USD = 5            # pools that earned less in the 48 hours are not scored: the ratio would be noise
+SHRINK = 20                 # a pool's own bias counts fully only after many more checks than this
+
+
+def _all_forecasts(state, key, h0, look):
+    """Every forecast of the fees of the 48 hours after h0, in NAMES order (None for those that read more than
+    `look` hours), from the fees measured hour by hour."""
+    fh = A.fee_hours(state, key)
+    x = [fh.get(h, 0.0) for h in range(h0 - 96 * HOUR, h0, HOUR)]
+    blocks = (book(state)["p"].get(key) or {}).get("b")
+    out = []
+    for name, (lk, f) in PREDICTORS.items():
+        if lk > look or sum(x[-lk:]) <= 0:
+            out += [None, None]
+            continue
+        v = f(x if look >= 96 else [0.0] * 48 + x[48:])
+        out += [round(v, 4), round(v * (_season(blocks, h0, lk) if blocks else 1.0), 4)]
+    return out
+
+
+def _measured_look(state, key, h0):
+    """Hours of measured fees behind h0 that the forecasts of this pool may read: 96, 48 or 0."""
+    cs = state["chains"].get(str(A.chain_of(key))) or {}
+    since = int(cs.get("acc_backfill") and cs.get("acc_from") or 0)
+    if not since or since > h0 - 48 * HOUR:
+        return 0
+    return 96 if since <= h0 - 96 * HOUR else 48
+
+
+def verify(state, now, log):
+    """The live check that refines the choice: every six hours every forecast of every pool is saved, and 48 hours
+    later compared with the fees really measured. The errors add to the backtest's (scores) and give each pool
+    its own bias (forecast). Also keeps how much the votes of each pool moved in those 48 hours."""
+    t = book(state)
+    lv = t.setdefault("lv", {"snaps": [], "s": {}, "n": 0})
+    h0 = now - now % HOUR
+    done = 0
+    for snap in [s for s in lv["snaps"] if s["t"] + BT_AHEAD * HOUR <= h0]:
+        lv["snaps"].remove(snap)
+        for key, (ap0, vals) in snap["f"].items():
+            real = A.fees_usd(state, key, snap["t"], snap["t"] + BT_AHEAD * HOUR)
+            if real < LIVE_MIN_USD:
+                continue
+            book_k = lv["s"].setdefault(key, {})
+            for nm, v in zip(NAMES, vals):
+                if v is None or v <= 0:
+                    continue
+                e = math.log(v / real)
+                o = book_k.setdefault(nm, [0.0, 0.0, 0])
+                o[0], o[1], o[2] = round(o[0] + abs(e), 4), round(o[1] + e, 4), o[2] + 1
+            ap1 = float(state["ap"].get(key, 0.0))
+            if ap0 > 0 and ap1 > 0:
+                d = book_k.setdefault("_ap", [0.0, 0])
+                d[0], d[1] = round(d[0] + math.log(ap1 / ap0), 4), d[1] + 1
+            done += 1
+        lv["n"] = lv.get("n", 0) + 1
+    if h0 % LIVE_EVERY == 0 and not any(s["t"] == h0 for s in lv["snaps"]):
+        f = {}
+        for key, ap in state["ap"].items():
+            look = _measured_look(state, key, h0)
+            if ap < 1000 or not look:
+                continue
+            vals = _all_forecasts(state, key, h0, look)
+            if any(v for v in vals):
+                f[key] = [round(ap), vals]
+        if f:
+            lv["snaps"].append({"t": h0, "f": f})
+    for key in [k for k in lv["s"] if k not in state["ap"]]:
+        del lv["s"][key]
+    if done:
+        log(f"trends: {done} forecasts of 48 hours ago checked against the measured fees")
+
+
+def _pool_scores(state, key):
+    """{name: [sum |error|, sum error, samples]} of one pool: its backtest plus its live checks, weighted."""
+    t = book(state)
+    out = {nm: list(v) for nm, v in ((t["p"].get(key) or {}).get("bt") or {}).items()}
+    for nm, v in ((t.get("lv") or {}).get("s") or {}).get(key, {}).items():
+        if nm.startswith("_"):
+            continue
+        o = out.setdefault(nm, [0.0, 0.0, 0])
+        o[0] += v[0] * LIVE_WEIGHT
+        o[1] += v[1] * LIVE_WEIGHT
+        o[2] += v[2] * LIVE_WEIGHT
+    return out
+
+
+def scores(state, live_only=False):
+    """{name: (typical error as a factor, bias as a factor, samples)}: every pool's backtest plus the live checks
+    of the monitor's own forecasts (each worth LIVE_WEIGHT samples); live_only: the live checks alone."""
+    t = book(state)
     tot = {}
-    for p in book(state)["p"].values():
-        for nm, v in (p.get("bt") or {}).items():
+    if live_only:
+        rows = [{nm: v for nm, v in s.items() if not nm.startswith("_")} for s in (t.get("lv") or {}).get("s", {}).values()]
+    else:
+        rows = [_pool_scores(state, k) for k in set(t["p"]) | set((t.get("lv") or {}).get("s", {}))]
+    for r in rows:
+        for nm, v in r.items():
             o = tot.setdefault(nm, [0.0, 0.0, 0])
             o[0] += v[0]
             o[1] += v[1]
             o[2] += v[2]
-    return {nm: (math.exp(v[0] / v[2]), math.exp(v[1] / v[2]), v[2]) for nm, v in tot.items() if v[2] >= 200}
+    need = 50 if live_only else 200
+    return {nm: (math.exp(v[0] / v[2]), math.exp(v[1] / v[2]), v[2]) for nm, v in tot.items() if v[2] >= need}
 
 
 def best(state, max_look=96):
@@ -304,30 +401,31 @@ def best(state, max_look=96):
     return min(sc, key=lambda nm: sc[nm][0]) if sc else None
 
 
-def forecast(state, key, now):
+def forecast(state, key, now, sc=None):
     """(fees expected in the next 48 hours in USD, name of the forecast used, the pool's own typical error with it
-    as a factor or None), or None while there is no backtest. Made on the fees measured hour by hour; a chain
-    measured for less than four days uses the best forecast that reads only 48 hours."""
-    cs = state["chains"].get(str(A.chain_of(key))) or {}
+    as a factor or None, expected change of the pool's votes in 48 hours as a factor or None), or None while there
+    is no backtest. Made on the fees measured hour by hour; a chain measured for less than four days uses the best
+    forecast that reads only 48 hours. The forecast's average bias is taken out: the pool's own, as far as its
+    checks allow (shrunk toward everyone's)."""
     h0 = now - now % HOUR
-    measured = int(cs.get("acc_backfill") and cs.get("acc_from") or 0)
-    look = 96 if measured and measured <= h0 - 96 * HOUR else 48
-    name = best(state, look)
-    if not name or not measured or measured > h0 - 48 * HOUR:
+    look = _measured_look(state, key, h0)
+    sc = sc if sc is not None else scores(state)
+    cands = {nm: v for nm, v in sc.items() if PREDICTORS[nm.replace("+g", "")][0] <= look}
+    if not cands:
         return None
-    base = name.replace("+g", "")
-    fh = A.fee_hours(state, key)
-    x = [fh.get(h, 0.0) for h in range(h0 - 96 * HOUR, h0, HOUR)]
-    if look < 96:
-        x = [0.0] * 48 + x[48:]
-    usd = PREDICTORS[base][1](x)
-    p = book(state)["p"].get(key) or {}
-    if name.endswith("+g") and p.get("b"):
-        usd *= _season(p["b"], h0, PREDICTORS[base][0])
-    sc = scores(state)[name]
-    usd /= sc[1]                                  # the forecast's own average bias, taken out
-    own = (p.get("bt") or {}).get(name)
-    return usd, name, (math.exp(own[0] / own[2]) if own and own[2] >= 10 else None)
+    name = min(cands, key=lambda nm: cands[nm][0])
+    usd = _all_forecasts(state, key, h0, look)[NAMES.index(name)]
+    if usd is None:
+        return None
+    own = _pool_scores(state, key).get(name)
+    bias = math.log(sc[name][1])
+    if own and own[2] > 0:
+        w = own[2] / (own[2] + SHRINK)
+        bias = (1 - w) * bias + w * max(-0.35, min(0.35, own[1] / own[2]))
+    usd /= math.exp(bias)
+    d = (((book(state).get("lv") or {}).get("s") or {}).get(key) or {}).get("_ap")
+    drift = math.exp(d[0] / d[1] * d[1] / (d[1] + 4)) if d and d[1] else None
+    return usd, name, (math.exp(own[0] / own[2]) if own and own[2] >= 10 else None), drift
 
 
 def _weekdays(days):
@@ -392,6 +490,11 @@ def export(state, names, now):
                          "err": round(v[0], 3), "bias": round(v[1], 3), "n": v[2]}
                         for nm, v in sorted(sc.items(), key=lambda kv: kv[1][0])]
     out["best"] = best(state)
+    lv = book(state).get("lv") or {}
+    live = scores(state, live_only=True)
+    out["live"] = {"checks": sum(v.get(out["best"], [0, 0, 0])[2] for v in (lv.get("s") or {}).values()) if out["best"] else 0,
+                   "waiting": len(lv.get("snaps") or []),
+                   "err": {nm: round(v[0], 3) for nm, v in live.items()}}
     if not P:
         return out
     spikes = {k: _spikes(p["d"]) for k, p in P.items()}
