@@ -136,15 +136,17 @@ mostra ancora le ore morte di prima e nessun altro lo vede. `monitor/bootstrap.p
 La sezione «Pool da avviare» della pagina porta tutto in dollari al giorno per i tuoi voti (l'Allocation Power del
 radar) e per la liquidità che metteresti (un campo, salvato sul dispositivo):
 
-- **Fee**: volume della coppia altrove × la quota di liquidità che il pool avrebbe con la tua × la fee del pool; a
-  te la parte dei tuoi voti. Dove la coppia non scambia altrove vale la metà di quello che darebbero, alla stessa
-  quota di liquidità, le altre coppie del token più raro.
+- **Fee**: quello che il pool scambia già, più il volume della coppia altrove × la quota che la tua liquidità
+  avrebbe sulla coppia, il tutto × la fee del pool; a te la parte dei tuoi voti. Dove la coppia non scambia altrove
+  vale la metà di quello che darebbero, alla stessa quota di liquidità, le altre coppie del token più raro. Se il
+  pool ha già almeno 2.000 $ di liquidità, la tua non conta più di quanto rende oggi ogni dollaro già dentro
+  (volume su liquidità): vale la stima più bassa.
 - **Emissioni**: il minore tra quello che chiamano i voti e il cap ricalcolato sulle fee stimate, per la tua parte
   della liquidità del pool. Se il cap di oggi è più alto di così la riga lo segnala («cap ancora alto»).
 - **Confronto**: l'allocazione del radar per gli stessi voti, che non chiede capitale.
 
-Sono stime grezze: assumono che il volume si divida come la liquidità, a parità di fee e di range, e che tutta la
-liquidità del pool sia in stake. Per misura, a ogni giro il monitor calcola come va davvero ai pool Aero piccoli che
+Sono stime grezze: assumono che la tua liquidità prenda volume quanto la sua quota sulla coppia, a parità di fee e
+di range, che quella già nel pool continui a scambiare come oggi, e che tutta sia in stake. Per misura, a ogni giro il monitor calcola come va davvero ai pool Aero piccoli che
 già scambiano (la loro quota di volume divisa per la loro quota di liquidità: mediana e quartili) e la pagina lo
 scrive sotto l'elenco. Serve capitale tuo, con il rischio di impermanent loss; il gas non è contato. Dal contratto
 del gauge: le emissioni maturano solo sulla liquidità in stake e dentro il range (quelle maturate mentre nessuna

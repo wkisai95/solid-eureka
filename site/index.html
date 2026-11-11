@@ -3175,7 +3175,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // what starting one pool could bring, for the votes of the radar and the liquidity typed here: the pool takes the
   // share of the pair's trading that its liquidity is of the pair's (yours added), fees at the pool's own fee;
   // emissions are what the votes bring, up to the gauge's cap, for your share of the pool's liquidity
-  const BS_TOK = 0.5;
+  const BS_TOK = 0.5, BS_OWN_LIQ = 2000;
   function bootEpv() {
     const e = BOOT && BOOT.epv;
     if (typeof e === "number") return e;
@@ -3185,16 +3185,21 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   function bsCalc(c) {
     const V = Math.max(0, rdNum(RD.ap, 0)), L = bsLiq, px = rdPrice() || BOOT.aero_usd || 0;
     const fee = c.fee != null ? c.fee : 0.003;
-    const share = (c.liq + L) / Math.max(1, c.pl + c.al + c.liq + L), volPair = (c.pv + c.av + c.vol) * share;
+    // your liquidity takes its share of what the pair trades elsewhere; the liquidity already there keeps trading as it does today
+    const all = c.pl + c.al + c.liq + L, share = L / Math.max(1, all), volPair = (c.pv + c.av) * share;
     // a pair that trades nowhere else: half of what its rarer token's other pairs would give at the same share of liquidity
-    const tokShare = c.tv > 0 && c.tl != null ? (c.liq + L) / Math.max(1, c.tl + c.pl + c.al + c.liq + L) : 0, volTok = (c.tv || 0) * tokShare * BS_TOK;
-    const byTok = volTok > volPair, vol = Math.max(volPair, volTok), fees = vol * fee;
+    const tokShare = c.tv > 0 && c.tl != null ? L / Math.max(1, c.tl + all) : 0, volTok = (c.tv || 0) * tokShare * BS_TOK;
+    const byTok = volTok > volPair, volShare = Math.max(volPair, volTok);
+    // ... and no more than a dollar already in the pool trades today, where the pool has enough liquidity to tell
+    const turn = c.liq >= BS_OWN_LIQ && c.vol > 0 ? c.vol / c.liq : null, volOwn = turn != null ? turn * L : Infinity;
+    const byOwn = volOwn < volShare, volNew = Math.min(volOwn, volShare), vol = (c.vol || 0) + volNew, fees = vol * fee;
     const mine = V > 0 ? V / (c.ap + V) : 1, lp = L / (c.liq + L), epv = c.epv || bootEpv();
     const rate = (c.ap + V) * epv;
     // the cap follows the pool's fees: where it goes once it is worked out again on the fees expected here, never under the minimum
     const capFees = BOOT.cap_k && px > 0 ? Math.max(BOOT.min_cap || 0, BOOT.cap_k * fees / px) : c.cap != null ? c.cap : Infinity;
     const em = Math.min(rate, capFees) * lp * px, emNow = c.cap != null ? Math.min(rate, c.cap) * lp * px : null;
-    return { V, L, px, fee, share, tokShare, byTok, vol, fees, mine, lp, rate, capFees, feeMe: fees * mine, em, emNow, tot: fees * mine + em, high: emNow != null && emNow > em * 1.5 + 5 };
+    const emAlone = Math.min(c.ap * epv, capFees) * lp * px;       // what the votes already there would bring to your liquidity
+    return { V, L, px, fee, share, tokShare, byTok, byOwn, turn, volShare, volOwn, volNew, vol, fees, mine, epv, lp, rate, capFees, feeMe: fees * mine, em, emNow, emAlone, tot: fees * mine + em, high: emNow != null && emNow > em * 1.5 + 5 };
   }
   function bootRender() {
     const head = $("bs-head"), rows = $("bs-rows"), more = $("bs-more");
@@ -3237,14 +3242,20 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           const feeNote = c.fee == null ? "fee del pool non letta: contata allo 0,30%" : feeTxt(c.fee);
           line(c.pn > 0 || c.av > 0 ? `Altrove sulla rete la coppia scambia ${usd(c.pv)} al giorno su ${c.pn} pool` + (c.dex ? ` (il maggiore su ${c.dex})` : "") + `, con ${usd(c.pl)} di liquidità` + (c.av > 0 ? `; altri ${usd(c.av)} passano da altri pool Aero della stessa coppia (liquidità ${usd(c.al)}).` : ".")
             : "Altrove sulla rete questa coppia non scambia.");
-          if (e.byTok) line(`Il token più raro della coppia però scambia ${usd(c.tv)} al giorno in altre coppie, con ${usd(c.tl)} di liquidità. Con ${usd(e.L)} il pool avrebbe ${ilPct(e.tokShare)} di quella liquidità: contando la metà di quanto farebbe a parità, sono circa ${usd(e.vol)} di volume al giorno, cioè ${r$(e.fees)} di fee (${feeNote}).` +
-            (Array.isArray(BOOT.k_tok) ? ` Per misura, su ${BOOT.k_tok[3]} pool Aero piccoli che sono soli sulla loro coppia: di solito fanno ${kNum(BOOT.k_tok[1])} volte la loro quota, uno su quattro meno di ${kNum(BOOT.k_tok[0])}.` : ""));
-          else line(`Con ${usd(e.L)} il pool avrebbe ${ilPct(e.share)} della liquidità della coppia sulla rete: a parità di fee e di range sono circa ${usd(e.vol)} di volume al giorno, cioè ${r$(e.fees)} di fee (${feeNote}).`);
+          const own = c.vol > 0 ? `, che con ${usd(c.vol)} che il pool scambia già fanno ${usd(e.vol)}` : "";
+          const turnTxt = e.turn != null ? String(e.turn.toFixed(e.turn >= 10 ? 0 : 1)).replace(".", ",") : "";
+          const shareTxt = e.byTok
+            ? `Il token più raro della coppia però scambia ${usd(c.tv)} al giorno in altre coppie, con ${usd(c.tl)} di liquidità. La tua liquidità (${usd(e.L)}) sarebbe ${ilPct(e.tokShare)} di quella: contando la metà di quanto farebbe a parità, prenderebbe circa ${usd(e.volShare)} di volume al giorno`
+            : `La tua liquidità (${usd(e.L)}) sarebbe ${ilPct(e.share)} di quella della coppia sulla rete: a parità di fee e di range prenderebbe circa ${usd(e.volShare)} di volume al giorno`;
+          if (e.byOwn) line(`${shareTxt}. Ma oggi ogni dollaro già nel pool ne scambia ${turnTxt} al giorno (${usd(c.vol)} su ${usd(c.liq)} di liquidità): alla stessa resa la tua porterebbe ${usd(e.volNew)}, e vale la stima più bassa. Con quello che il pool scambia già fanno ${usd(e.vol)}: ${r$(e.fees)} di fee (${feeNote}).`);
+          else line(`${shareTxt}${own}: ${r$(e.fees)} di fee (${feeNote}).` + (e.turn != null ? ` La resa di oggi del pool (${turnTxt} dollari scambiati al giorno per dollaro di liquidità) darebbe di più: vale la stima più bassa.` : ""));
+          if (e.byTok && Array.isArray(BOOT.k_tok)) line(`Per misura, su ${BOOT.k_tok[3]} pool Aero piccoli che sono soli sulla loro coppia: di solito fanno ${kNum(BOOT.k_tok[1])} volte la loro quota del volume del token, uno su quattro meno di ${kNum(BOOT.k_tok[0])}.`);
           line(`Voti: ${fmtN(c.ap)} oggi` + (c.top != null && c.ap > 0 ? `, il primo votante ha ${ilPct(c.top)}` : "") + (e.V > 0 ? `. Con i tuoi ${fmtN(e.V)} avresti ${ilPct(e.mine)} delle fee: ${r$(e.feeMe)} al giorno.` : ". Scrivi la tua Allocation Power nel radar per vedere la tua parte."));
           line(`Emissioni: con questi voti il gauge chiamerebbe ${aeroN(e.rate)} AERO al giorno` +
             (BOOT.cap_k && e.capFees !== Infinity ? `, ma solo fino al cap, che segue le fee del pool: con le fee stimate qui sarebbe ${aeroN(e.capFees)} AERO` : "") +
             `. A te, che avresti ${ilPct(e.lp)} della liquidità del pool, ${r$(e.em)} al giorno.` +
-            (c.cap == null ? "" : e.high ? ` Oggi però il cap è ancora ${aeroN(c.cap)} AERO: finché non viene ricalcolato sulle fee, le emissioni a te sarebbero ${r$(e.emNow)} al giorno.` : ` Oggi il cap è ${aeroN(c.cap)} AERO.`));
+            (c.cap == null ? "" : e.high ? ` Oggi però il cap è ancora ${aeroN(c.cap)} AERO: finché non viene ricalcolato sulle fee, le emissioni a te sarebbero ${r$(e.emNow)} al giorno.` : ` Oggi il cap è ${aeroN(c.cap)} AERO.`) +
+            (e.V > 0 && e.emAlone > 0.2 * e.em && e.emAlone >= 1 ? ` I voti che il pool ha già chiamano ${aeroN(c.ap * e.epv)} AERO: anche senza i tuoi, alla tua liquidità andrebbero ${r$(e.emAlone)} al giorno.` : ""));
           if (g) line(`Qualcuno l'ha già messo in moto: nelle ultime 24 ore ha fatto ${r$(g.f24)} di fee contro ${r$(g.fb)} delle 24 prima (è anche tra gli «Appena partiti»).`);
           if (radarDay) line(`Per confronto, gli stessi voti nell'allocazione del radar: ${r$(radarDay)} al giorno, senza mettere liquidità.`);
           if (c.tv && !e.byTok) line(`Il token più raro della coppia scambia altri ${usd(c.tv)} al giorno in altre coppie della rete.`);
@@ -3256,7 +3267,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       }
       const kp = Array.isArray(BOOT.k_pair) ? BOOT.k_pair : null;
       const kTxt = kp ? ` Per misura, su ${kp[3]} pool Aero piccoli che già scambiano: il volume è di solito ${kNum(kp[1])} volte la loro quota di liquidità, in un caso su quattro meno di ${kNum(kp[0])}.` : "";
-      $("bs-foot").textContent = `«Al giorno» è quello che andrebbe a te a regime: le fee del pool per la tua parte di voti più le emissioni per la tua parte di liquidità, con il cap del gauge ricalcolato sulle fee stimate. In verde quando supera l'allocazione del radar con gli stessi voti. Stime grezze: assumono che il volume della coppia si divida come la liquidità, a parità di fee e di range, e che tutta la liquidità del pool sia in stake.${kTxt} Serve capitale tuo (con il rischio di impermanent loss), il gas non è contato, e le emissioni maturano solo sulla liquidità in stake e dentro il range: se il prezzo esce dal tuo range non prendi né fee né emissioni.` +
+      $("bs-foot").textContent = `«Al giorno» è quello che andrebbe a te a regime: le fee del pool per la tua parte di voti più le emissioni per la tua parte di liquidità, con il cap del gauge ricalcolato sulle fee stimate. In verde quando supera l'allocazione del radar con gli stessi voti. Stime grezze: assumono che la tua liquidità prenda volume quanto la sua quota sulla coppia, a parità di fee e di range, ma non più di quanto rende oggi ogni dollaro già nel pool (dove ce ne sono almeno 2.000); che la liquidità già nel pool continui a scambiare come oggi, e che tutta sia in stake.${kTxt} Serve capitale tuo (con il rischio di impermanent loss), il gas non è contato, e le emissioni maturano solo sulla liquidità in stake e dentro il range: se il prezzo esce dal tuo range non prendi né fee né emissioni.` +
         (BOOT.read ? ` Coppie lette per ${BOOT.read.fresh} token su ${BOOT.read.tokens}: gli altri arrivano nei prossimi giri.` : "");
     } else {
       ["Pool", "APR di oggi", "A 48 ore", "Con i tuoi voti", "Fee 24 ore (prima)", "Voti", "Primo votante"].forEach((t, i) => th(t, i > 0));

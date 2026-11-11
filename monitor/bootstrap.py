@@ -21,9 +21,10 @@ What the monitor adds for it:
   the window on which the caps of the earning gauges agree best with their fees, among the gauges that earn).
 
 The page turns these into dollars for your votes and the liquidity you would add. Estimates, not promises: they
-assume the pair's volume spreads like its liquidity (and, where the pair trades nowhere else, that half of the
-rarer token's trading in its other pairs does). How the small Aero pools that are alive compare with that
-assumption is measured every run and exported with the lists (_share_stats).
+assume your liquidity takes its share of what the pair trades elsewhere (and, where the pair trades nowhere else,
+half its share of the rarer token's trading in its other pairs) while the liquidity already in the pool keeps
+trading as it does today. How the small Aero pools that are alive compare with that assumption is measured every
+run and exported with the lists (_share_stats).
 """
 import statistics
 import time
