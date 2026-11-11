@@ -107,6 +107,51 @@ a ogni ora delle 48 ore prima, dove gli endpoint conservano lo stato vecchio, e 
 ultime 24 ore orarie delle posizioni che non hanno cambiato allocazione; dove lo stato vecchio non c'è, le ore prima
 del passaggio restano sui trasferimenti finché escono dalle 48 ore e la variazione delle fee riparte da zero.
 
+## Pool da avviare
+
+Il gioco: un gauge quasi senza voti e senza liquidità, su una coppia che altrove scambia molto. Lo voti (le fee degli
+allocatori sono tutte tue) e ci metti tu un po' di liquidità in stake per far partire gli swap; le emissioni che i
+tuoi voti portano al pool tornano a te, che sei quasi l'unico a fornire liquidità. Per un giorno o due l'APR a 48 ore
+mostra ancora le ore morte di prima e nessun altro lo vede. `monitor/bootstrap.py` cerca due cose e le scrive in
+`bootstrap.json`:
+
+- **Da avviare**: gauge votabili con meno di 250.000 voti e meno di 100.000 $ di liquidità la cui coppia scambia
+  altrove sulla rete almeno 25.000 $ al giorno, o il cui token più raro ne scambia almeno 150.000 in altre coppie.
+  Lo scambio altrove viene dall'elenco DexScreener di tutti i pool di un token (fino a 30), letto a rotazione per i
+  token di questi gauge: 60 a giro, ognuno riletto ogni sei ore, saltando il giro che legge lo snapshot orario del
+  mercato. Dove un token non è ancora stato letto vale lo snapshot orario. Gli altri pool Aero della stessa coppia
+  sono contati a parte. Un pool che DexScreener non elenca conta come vuoto solo se non ha fee misurate da due
+  giorni e il suo cap è al minimo.
+- **Appena partiti**: gauge con meno di 3 milioni di voti le cui fee misurate nelle ultime 24 ore sono almeno 10 $
+  e almeno quattro volte quelle delle 24 ore prima. Con la quota del primo votante (chi l'ha avviato), come si sono
+  mossi voti e liquidità, l'APR a ritmo di oggi contro quello a 48 ore, e un avviso quando nelle ultime 6 ore non è
+  entrato quasi niente.
+- **Emissioni**: ogni evento di allocazione porta le emissioni per voto al secondo (oggi circa 0,0011 AERO per voto
+  al giorno) e ogni gauge ha un cap in AERO al secondo (`FactoryRegistry.emissionCap`), riletto insieme
+  all'idoneità dei gauge. A un gauge va il minore tra voti × emissioni per voto e il cap. Un operatore riscrive ogni
+  pochi minuti i cap dei gauge che incassano, e questi seguono le fee: a ogni giro il monitor misura quanto vale il
+  cap rispetto al ritmo delle fee delle ultime 3 ore (di solito circa 2 volte) e lo esporta. Un gauge fermo resta
+  al cap che aveva, di solito il minimo (8,64 AERO al giorno).
+
+La sezione «Pool da avviare» della pagina porta tutto in dollari al giorno per i tuoi voti (l'Allocation Power del
+radar) e per la liquidità che metteresti (un campo, salvato sul dispositivo):
+
+- **Fee**: volume della coppia altrove × la quota di liquidità che il pool avrebbe con la tua × la fee del pool; a
+  te la parte dei tuoi voti. Dove la coppia non scambia altrove vale la metà di quello che darebbero, alla stessa
+  quota di liquidità, le altre coppie del token più raro.
+- **Emissioni**: il minore tra quello che chiamano i voti e il cap ricalcolato sulle fee stimate, per la tua parte
+  della liquidità del pool. Se il cap di oggi è più alto di così la riga lo segnala («cap ancora alto»).
+- **Confronto**: l'allocazione del radar per gli stessi voti, che non chiede capitale.
+
+Sono stime grezze: assumono che il volume si divida come la liquidità, a parità di fee e di range, e che tutta la
+liquidità del pool sia in stake. Per misura, a ogni giro il monitor calcola come va davvero ai pool Aero piccoli che
+già scambiano (la loro quota di volume divisa per la loro quota di liquidità: mediana e quartili) e la pagina lo
+scrive sotto l'elenco. Serve capitale tuo, con il rischio di impermanent loss; il gas non è contato. Dal contratto
+del gauge: le emissioni maturano solo sulla liquidità in stake e dentro il range (quelle maturate mentre nessuna
+posizione è nel range vanno perse), e chi incassa o ritira entro un numero minimo di blocchi dal deposito perde le
+emissioni di quella posizione (su Base, a novembre 2026, 75 blocchi: circa 15 secondi, una regola contro la
+liquidità just-in-time).
+
 ## Tendenze fee
 
 Per ogni pool con almeno 50.000 voti (i 160 più votati) il monitor legge da GeckoTerminal le candele orarie delle

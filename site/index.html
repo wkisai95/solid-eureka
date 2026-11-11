@@ -114,6 +114,8 @@ h2 { font: 600 19px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
 .stk-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin-top: 4px; }
 .stk-bar input[type=search] { flex: 1 1 180px; max-width: 280px; }
 .trd-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.trd-top .stkc { align-content: start; }
+.fold-body > .linkish { justify-self: start; }
 .trd-ev { display: grid; gap: 6px; font: 13px/1.45 var(--f-num); }
 .trd-ev b { font-weight: 600; }
 .wdbars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; align-items: end; height: 64px; }
@@ -129,6 +131,23 @@ table.trd td.num { font-family: var(--f-num); }
 table.trd .wdbars { width: 84px; height: 20px; gap: 2px; }
 table.trd tr.open td { border-bottom: 0; }
 table.trd td.det { white-space: normal; font: 12.5px/1.5 var(--f-num); color: var(--ink-2); padding-top: 0; }
+table.trd td.det > div { max-width: min(92vw, 880px); }
+.tbl.cq { container-type: inline-size; }
+.tbl.cq table.trd td.det > div { max-width: min(calc(100cqw - 16px), 880px); position: sticky; left: 8px; }
+@media (max-width: 700px) {
+  table.bs, table.bs tbody, table.bs tbody tr { display: block; }
+  table.bs thead { display: none; }
+  table.bs tbody tr.trow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 10px 0 9px; border-bottom: 1px solid var(--line); }
+  table.bs tbody tr.trow.open { border-bottom: 0; padding-bottom: 6px; }
+  table.bs tbody td { display: block; border: 0; padding: 0; white-space: normal; text-align: left; position: static; background: none; }
+  table.bs tr.trow td:first-child, table.bs tr.trow td.key { flex: 0 0 100%; }
+  table.bs tr.trow td.num { font-size: 12px; color: var(--ink-2); text-align: left; }
+  table.bs tr.trow td.num::before { content: attr(data-l) " "; font-family: var(--f-body); color: var(--ink-2); opacity: .8; }
+  table.bs tr.trow td.key { font-size: 14px; color: var(--ink); }
+  table.bs tr.trow td.key.up { color: var(--good); }
+  table.bs td.det { padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+  table.bs td.det > div { max-width: none; }
+}
 table.trd tbody tr.trow { cursor: pointer; }
 .up { color: var(--good); } .down { color: var(--warn); }
 .wt { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 10px; }
@@ -555,8 +574,28 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     </details>
   </section>
 
+  <details class="panel fold" data-fold="boot" open id="boot">
+    <summary class="panel-head"><h2>Pool da avviare</h2><span class="sub" id="bs-sub"></span></summary>
+    <div class="fold-body">
+    <p class="note">Il gioco: un gauge quasi senza voti e senza liquidità, su una coppia che altrove scambia molto. Lo voti (le fee degli allocatori sono tutte tue) e ci metti tu un po' di liquidità in stake per far partire gli swap; le emissioni che i tuoi voti portano al pool tornano a te che sei quasi l'unico a fornire liquidità. Per un giorno o due l'APR a 48 ore mostra ancora le ore morte di prima, e nessun altro lo vede. Qui sotto: i gauge dove potresti farlo, e quelli che qualcuno ha appena fatto partire.</p>
+    <div class="opts">
+      <div class="field"><label for="bs-liq">Liquidità che metteresti ($)</label><input id="bs-liq" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>Tua, in stake nel gauge</small></div>
+      <div class="field"><span class="flabel">I tuoi voti</span><b id="bs-ap">—</b><small id="bs-ap-s">L'Allocation Power che hai scritto nel radar</small></div>
+      <div class="field"><span class="flabel">Emissioni</span><small id="bs-em"></small></div>
+    </div>
+    <div class="stk-bar">
+      <div class="seg" id="bs-view" role="group" aria-label="Elenco"><button type="button" data-v="start" aria-pressed="true">Da avviare</button><button type="button" data-v="started" aria-pressed="false">Appena partiti</button></div>
+      <input id="bs-q" type="search" placeholder="Cerca un pool" autocomplete="off" spellcheck="false" aria-label="Cerca un pool">
+    </div>
+    <div class="tbl cq"><table class="trd bs"><thead><tr id="bs-head"></tr></thead><tbody id="bs-rows"></tbody></table></div>
+    <button type="button" class="linkish" id="bs-more" hidden></button>
+    <p class="note" id="bs-foot"></p>
+    </div>
+  </details>
+
   <details class="panel fold" data-fold="trends" open id="trends">
     <summary class="panel-head"><h2>Tendenze fee</h2><span class="sub" id="trd-sub"></span></summary>
+    <div class="fold-body">
     <p class="note">Come si muovono le fee di ogni pool nei giorni della settimana e cosa le ha fatte saltare. Le fee seguono il volume: qui c'è il volume orario di ogni pool delle ultime sei settimane (GeckoTerminal), con i giorni eccezionali contati a parte perché un evento non passi per un'abitudine. Giorni in UTC. 1,0× è il giorno medio del pool.</p>
     <div class="trd-top">
       <div class="stkc"><div class="h"><b>Mercato Aero per giorno</b><span class="d" id="trd-m-n"></span></div><div class="wdbars" id="trd-m-wd"></div><div class="wdlab" id="trd-m-lab"></div><div class="d" id="trd-m-txt"></div></div>
@@ -568,11 +607,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="seg" id="trd-sort" role="group" aria-label="Ordina"><button type="button" data-s="ap" aria-pressed="true">Più votati</button><button type="button" data-s="next" aria-pressed="false">Meglio nelle prossime 48 ore</button><button type="button" data-s="swing" aria-pressed="false">Più legati al giorno</button></div>
       <input id="trd-q" type="search" placeholder="Cerca un pool" autocomplete="off" spellcheck="false" aria-label="Cerca un pool">
     </div>
-    <div class="tbl"><table class="trd">
+    <div class="tbl cq"><table class="trd">
       <thead><tr><th>Pool</th><th>Lun → Dom</th><th>Giorno migliore</th><th>Giorno peggiore</th><th class="num">Prossime 48 ore</th><th class="num">Giorno tipico</th><th>Ultimo evento</th></tr></thead>
       <tbody id="trd-rows"></tbody>
     </table></div>
     <button type="button" class="linkish" id="trd-more" hidden></button>
+    </div>
   </details>
 
   <details class="panel fold" data-fold="stocks" open id="stocks">
@@ -3073,7 +3113,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       return;
     }
     const now = TRD.generated, today = (Math.floor(now / 86400) + 3) % 7;
-    $("trd-sub").textContent = `${TRD.have} pool su ${TRD.tracked} · dal ${dayTxt(m.from)} al ${dayTxt(m.to)}`;
+    $("trd-sub").textContent = (TRD.have >= TRD.tracked ? `${TRD.have} pool` : `${TRD.have} pool su ${TRD.tracked}`) + ` · dal ${dayTxt(m.from)} al ${dayTxt(m.to)}`;
     $("trd-m-wd").replaceWith(Object.assign(wdBars(m.wd, today), { id: "trd-m-wd" }));
     WD.forEach((d, i) => { const c = el(i === today ? "b" : "span", "", `${d} ${m.wd[i] == null ? "—" : String(m.wd[i].toFixed(2)).replace(".", ",")}`); $("trd-m-lab").append(c); });
     $("trd-m-n").textContent = `${Math.min(...m.n)}–${Math.max(...m.n)} settimane per giorno`;
@@ -3125,6 +3165,151 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   document.querySelectorAll("#trd-sort button").forEach(b => b.addEventListener("click", () => { trdSort = b.dataset.s; trendsRender(); }));
   $("trd-more").addEventListener("click", () => { trdAll = !trdAll; trendsRender(); });
   { let t = 0; $("trd-q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(trendsRender, 150); }); }
+  // ---------------------------------------------------------------- pools to start (bootstrap.json)
+  let BOOT = null, bsView = "start", bsAll = false, bsOpen = null, bsLiq = 5000;
+  const BS_TOP = 20;
+  try { const v = +localStorage.getItem("radar-bs-liq"); if (v > 0) bsLiq = v; } catch (e) {}
+  const pct2 = v => String((v * 100).toFixed(v * 100 >= 10 ? 0 : v * 100 >= 1 ? 1 : 2)).replace(".", ",") + "%";
+  const ilPct = v => { const t = pct2(v), n = parseInt(t, 10); return (n === 0 ? "lo " : n === 1 || n === 11 || String(n)[0] === "8" ? "l'" : "il ") + t; };
+  const feeTxt = f => f == null ? "fee non letta" : "fee " + String((f * 100).toFixed(f * 100 >= 0.1 ? 2 : 4)).replace(".", ",") + "%";
+  // what starting one pool could bring, for the votes of the radar and the liquidity typed here: the pool takes the
+  // share of the pair's trading that its liquidity is of the pair's (yours added), fees at the pool's own fee;
+  // emissions are what the votes bring, up to the gauge's cap, for your share of the pool's liquidity
+  const BS_TOK = 0.5;
+  function bootEpv() {
+    const e = BOOT && BOOT.epv;
+    if (typeof e === "number") return e;
+    const v = e && typeof e === "object" ? Object.values(e).filter(x => typeof x === "number" && x > 0) : [];
+    return v.length ? Math.max(...v) : 0;
+  }
+  function bsCalc(c) {
+    const V = Math.max(0, rdNum(RD.ap, 0)), L = bsLiq, px = rdPrice() || BOOT.aero_usd || 0;
+    const fee = c.fee != null ? c.fee : 0.003;
+    const share = (c.liq + L) / Math.max(1, c.pl + c.al + c.liq + L), volPair = (c.pv + c.av + c.vol) * share;
+    // a pair that trades nowhere else: half of what its rarer token's other pairs would give at the same share of liquidity
+    const tokShare = c.tv > 0 && c.tl != null ? (c.liq + L) / Math.max(1, c.tl + c.pl + c.al + c.liq + L) : 0, volTok = (c.tv || 0) * tokShare * BS_TOK;
+    const byTok = volTok > volPair, vol = Math.max(volPair, volTok), fees = vol * fee;
+    const mine = V > 0 ? V / (c.ap + V) : 1, lp = L / (c.liq + L), epv = c.epv || bootEpv();
+    const rate = (c.ap + V) * epv;
+    // the cap follows the pool's fees: where it goes once it is worked out again on the fees expected here, never under the minimum
+    const capFees = BOOT.cap_k && px > 0 ? Math.max(BOOT.min_cap || 0, BOOT.cap_k * fees / px) : c.cap != null ? c.cap : Infinity;
+    const em = Math.min(rate, capFees) * lp * px, emNow = c.cap != null ? Math.min(rate, c.cap) * lp * px : null;
+    return { V, L, px, fee, share, tokShare, byTok, vol, fees, mine, lp, rate, capFees, feeMe: fees * mine, em, emNow, tot: fees * mine + em, high: emNow != null && emNow > em * 1.5 + 5 };
+  }
+  function bootRender() {
+    const head = $("bs-head"), rows = $("bs-rows"), more = $("bs-more");
+    head.replaceChildren(); rows.replaceChildren();
+    const V = Math.max(0, rdNum(RD.ap, 0));
+    $("bs-ap").textContent = V > 0 ? fmtN(V) : "—";
+    $("bs-ap-s").textContent = V > 0 ? "L'Allocation Power che hai scritto nel radar" : "Scrivi la tua Allocation Power nel radar: senza, le fee sono quelle di tutto il pool";
+    if (document.activeElement !== $("bs-liq")) $("bs-liq").value = Math.round(bsLiq).toLocaleString("it-IT");
+    document.querySelectorAll("#bs-view button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === bsView)));
+    if (!BOOT) { $("bs-sub").textContent = ""; $("bs-em").textContent = "I dati arrivano con il prossimo aggiornamento."; more.hidden = true; $("bs-foot").textContent = ""; return; }
+    const px = rdPrice() || BOOT.aero_usd || 0, epv = bootEpv();
+    $("bs-sub").textContent = `${BOOT.start.length} da avviare · ${BOOT.started.length} appena partiti`;
+    $("bs-em").textContent = epv ? `Ogni voto porta ${String(epv.toFixed(5)).replace(".", ",")} AERO al giorno al pool che vota` + (V > 0 ? ` (i tuoi: ${fmtN(V * epv)} AERO, ${r$(V * epv * px)} al giorno)` : "") +
+      ", ma solo fino al cap del gauge. Il cap segue le fee del pool" + (BOOT.cap_k ? `: di solito vale ${String(BOOT.cap_k.toFixed(1)).replace(".", ",")} volte il ritmo delle fee delle ultime ${BOOT.cap_h || 3} ore` : "") +
+      (BOOT.min_cap != null ? `, e un gauge fermo resta al minimo (${String(BOOT.min_cap).replace(".", ",")} AERO al giorno).` : ".")
+      : "Le emissioni per voto arrivano con il prossimo aggiornamento.";
+    const q = $("bs-q").value.trim().toLowerCase(), hit = c => !q || `${c.name} ${c.chain}`.toLowerCase().includes(q);
+    const th = (t, num) => head.append(el("th", num ? "num" : "", t));
+    const cell = (cls, txt, label) => { const td = el("td", cls, txt); td.dataset.l = label; return td; };
+    const kNum = x => String(x >= 10 ? Math.round(x) : x.toFixed(1)).replace(".", ",");
+    const aeroN = x => x < 100 ? String(+x.toFixed(x < 10 ? 2 : 1)).replace(".", ",") : fmtN(x);
+    const radarDay = rdLast && rdLast.r && rdLast.r.total > 0 ? rdLast.r.total / 2 : 0;
+    let list;
+    if (bsView === "start") {
+      ["Pool", "Al giorno", "Fee a te", "Emissioni a te", "Altrove 24 ore", "Voti ora", "Liquidità"].forEach((t, i) => th(t, i > 0));
+      const going = new Map(BOOT.started.map(x => [x.k, x]));
+      list = BOOT.start.filter(hit).map(c => ({ c, e: bsCalc(c) })).sort((a, b) => b.e.tot - a.e.tot);
+      for (const o of (bsAll || q ? list : list.slice(0, BS_TOP))) {
+        const c = o.c, e = o.e, tr = el("tr", "trow" + (bsOpen === c.k ? " open" : ""));
+        const c0 = el("td"), g = going.get(c.k); c0.append(el("b", "", c.name), el("span", "sub", ` ${c.chain} · ${c.kind} · ${feeTxt(c.fee)}` + (g ? " · già in moto" : "") + (e.high ? " · cap ancora alto" : ""))); tr.append(c0);
+        tr.append(cell("num key " + (radarDay && e.tot > radarDay ? "up" : ""), r$(e.tot), "A te al giorno"));
+        tr.append(cell("num", r$(e.feeMe), "fee"));
+        tr.append(cell("num", r$(e.em), "emissioni"));
+        tr.append(cell("num", e.byTok ? `${usd(c.tv)} il token` : usd(c.pv + c.av), "altrove"), cell("num", fmtN(c.ap), "voti"), cell("num", c.listed === false ? "non letta" : usd(c.liq), "liquidità"));
+        tr.addEventListener("click", () => { bsOpen = bsOpen === c.k ? null : c.k; bootRender(); });
+        rows.append(tr);
+        if (bsOpen === c.k) {
+          const dr = el("tr"), td = el("td", "det"); td.colSpan = 7;
+          const line = t => td.append(el("div", "", t));
+          const feeNote = c.fee == null ? "fee del pool non letta: contata allo 0,30%" : feeTxt(c.fee);
+          line(c.pn > 0 || c.av > 0 ? `Altrove sulla rete la coppia scambia ${usd(c.pv)} al giorno su ${c.pn} pool` + (c.dex ? ` (il maggiore su ${c.dex})` : "") + `, con ${usd(c.pl)} di liquidità` + (c.av > 0 ? `; altri ${usd(c.av)} passano da altri pool Aero della stessa coppia (liquidità ${usd(c.al)}).` : ".")
+            : "Altrove sulla rete questa coppia non scambia.");
+          if (e.byTok) line(`Il token più raro della coppia però scambia ${usd(c.tv)} al giorno in altre coppie, con ${usd(c.tl)} di liquidità. Con ${usd(e.L)} il pool avrebbe ${ilPct(e.tokShare)} di quella liquidità: contando la metà di quanto farebbe a parità, sono circa ${usd(e.vol)} di volume al giorno, cioè ${r$(e.fees)} di fee (${feeNote}).` +
+            (Array.isArray(BOOT.k_tok) ? ` Per misura, su ${BOOT.k_tok[3]} pool Aero piccoli che sono soli sulla loro coppia: di solito fanno ${kNum(BOOT.k_tok[1])} volte la loro quota, uno su quattro meno di ${kNum(BOOT.k_tok[0])}.` : ""));
+          else line(`Con ${usd(e.L)} il pool avrebbe ${ilPct(e.share)} della liquidità della coppia sulla rete: a parità di fee e di range sono circa ${usd(e.vol)} di volume al giorno, cioè ${r$(e.fees)} di fee (${feeNote}).`);
+          line(`Voti: ${fmtN(c.ap)} oggi` + (c.top != null && c.ap > 0 ? `, il primo votante ha ${ilPct(c.top)}` : "") + (e.V > 0 ? `. Con i tuoi ${fmtN(e.V)} avresti ${ilPct(e.mine)} delle fee: ${r$(e.feeMe)} al giorno.` : ". Scrivi la tua Allocation Power nel radar per vedere la tua parte."));
+          line(`Emissioni: con questi voti il gauge chiamerebbe ${aeroN(e.rate)} AERO al giorno` +
+            (BOOT.cap_k && e.capFees !== Infinity ? `, ma solo fino al cap, che segue le fee del pool: con le fee stimate qui sarebbe ${aeroN(e.capFees)} AERO` : "") +
+            `. A te, che avresti ${ilPct(e.lp)} della liquidità del pool, ${r$(e.em)} al giorno.` +
+            (c.cap == null ? "" : e.high ? ` Oggi però il cap è ancora ${aeroN(c.cap)} AERO: finché non viene ricalcolato sulle fee, le emissioni a te sarebbero ${r$(e.emNow)} al giorno.` : ` Oggi il cap è ${aeroN(c.cap)} AERO.`));
+          if (g) line(`Qualcuno l'ha già messo in moto: nelle ultime 24 ore ha fatto ${r$(g.f24)} di fee contro ${r$(g.fb)} delle 24 prima (è anche tra gli «Appena partiti»).`);
+          if (radarDay) line(`Per confronto, gli stessi voti nell'allocazione del radar: ${r$(radarDay)} al giorno, senza mettere liquidità.`);
+          if (c.tv && !e.byTok) line(`Il token più raro della coppia scambia altri ${usd(c.tv)} al giorno in altre coppie della rete.`);
+          if (c.listed === false) line("DexScreener non elenca questo pool: la sua liquidità è contata a zero perché non ha fee misurate da due giorni e il cap è al minimo. Controllala sul sito di Aero prima di fidarti della stima.");
+          line(c.src === "market" ? "Coppia letta dallo snapshot orario del mercato: gli altri pool Aero della stessa coppia non sono ancora distinti dal resto."
+            : `Pool della coppia letti ${c.age != null ? String(c.age).replace(".", ",") + " ore fa" : "di recente"}.`);
+          dr.append(td); rows.append(dr);
+        }
+      }
+      const kp = Array.isArray(BOOT.k_pair) ? BOOT.k_pair : null;
+      const kTxt = kp ? ` Per misura, su ${kp[3]} pool Aero piccoli che già scambiano: il volume è di solito ${kNum(kp[1])} volte la loro quota di liquidità, in un caso su quattro meno di ${kNum(kp[0])}.` : "";
+      $("bs-foot").textContent = `«Al giorno» è quello che andrebbe a te a regime: le fee del pool per la tua parte di voti più le emissioni per la tua parte di liquidità, con il cap del gauge ricalcolato sulle fee stimate. In verde quando supera l'allocazione del radar con gli stessi voti. Stime grezze: assumono che il volume della coppia si divida come la liquidità, a parità di fee e di range, e che tutta la liquidità del pool sia in stake.${kTxt} Serve capitale tuo (con il rischio di impermanent loss), il gas non è contato, e le emissioni maturano solo sulla liquidità in stake e dentro il range: se il prezzo esce dal tuo range non prendi né fee né emissioni.` +
+        (BOOT.read ? ` Coppie lette per ${BOOT.read.fresh} token su ${BOOT.read.tokens}: gli altri arrivano nei prossimi giri.` : "");
+    } else {
+      ["Pool", "APR di oggi", "A 48 ore", "Con i tuoi voti", "Fee 24 ore (prima)", "Voti", "Primo votante"].forEach((t, i) => th(t, i > 0));
+      const apr = (c, day) => c.ap > 0 && px > 0 ? day * 365 / (c.ap * px) * 100 : null;
+      list = BOOT.started.filter(hit).map(c => ({ c, a24: apr(c, c.f24 + c.inc24) })).sort((a, b) => (b.a24 || 0) - (a.a24 || 0));
+      for (const o of (bsAll || q ? list : list.slice(0, BS_TOP))) {
+        const c = o.c, tr = el("tr", "trow" + (bsOpen === c.k ? " open" : ""));
+        const still = c.f6 * 4 < 0.2 * c.f24;
+        const c0 = el("td"); c0.append(el("b", "", c.name), el("span", "sub", ` ${c.chain} · ${c.kind} · ${feeTxt(c.fee)}` + (still ? " · fermo da 6 ore" : ""))); tr.append(c0);
+        const a6 = apr(c, c.f6 * 4 + c.inc24), a48 = apr(c, (c.f24 + c.fb) / 2 + c.inc24);
+        const mine = V > 0 ? (c.f24 + c.inc24) * V / (c.ap + V) : null;
+        tr.append(cell("num key up", fmtPct(o.a24), "APR a ritmo di oggi"), cell("num", fmtPct(a48), "a 48 ore"));
+        tr.append(cell("num " + (mine != null && radarDay && mine > radarDay ? "up" : ""), mine != null ? r$(mine) : "—", "con i tuoi voti"));
+        tr.append(cell("num", `${r$(c.f24)} (${r$(c.fb)})`, "fee 24 ore (prima)"), cell("num", fmtN(c.ap), "voti"), cell("num", c.top != null ? pct2(c.top) : "—", "primo votante"));
+        tr.addEventListener("click", () => { bsOpen = bsOpen === c.k ? null : c.k; bootRender(); });
+        rows.append(tr);
+        if (bsOpen === c.k) {
+          const dr = el("tr"), td = el("td", "det"); td.colSpan = 7;
+          const line = t => td.append(el("div", "", t));
+          const e = c.epv || epv, rate = c.ap * e;
+          line(`Nelle ultime 24 ore ha fatto ${r$(c.f24)} di fee, nelle 24 prima ${r$(c.fb)}` + (c.inc24 > 0 ? ` (più ${r$(c.inc24)} di incentivi al giorno)` : "") + `: l'APR a 48 ore che vedono tutti è ancora ${fmtPct(a48)}, a ritmo di oggi è ${fmtPct(o.a24)}, a ritmo delle ultime 6 ore ${fmtPct(a6)}.` +
+            (still ? ` Nelle ultime 6 ore però sono entrati solo ${r$(c.f6)}: le fee di oggi potrebbero essere state un episodio.` : ""));
+          line(`Voti: ${fmtN(c.ap)}` + (c.ap24 != null && c.ap24 > 0 && Math.abs(c.ap / c.ap24 - 1) >= 0.02 ? ` (${c.ap > c.ap24 ? "+" : "−"}${fmtPct(Math.abs(c.ap / c.ap24 - 1) * 100)} in 24 ore)` : "") + (c.top != null ? `, ${c.voters} votant${c.voters === 1 ? "e" : "i"}: il primo ha ${ilPct(c.top)}.` : ".") +
+            (c.liq != null ? ` Liquidità ${c.liq24 != null && c.liq24 !== c.liq ? `${usd(c.liq24)} un giorno fa, ${usd(c.liq)} ora` : usd(c.liq)}.` : ""));
+          if (c.vol != null) line(`Volume del pool nelle 24 ore ${usd(c.vol)}` + (c.pair ? `, della coppia su tutta la rete ${usd(c.pair)}.` : "."));
+          line(`Emissioni: i voti di adesso chiamano ${fmtN(rate)} AERO al giorno, il cap del gauge è ${c.cap != null ? fmtN(c.cap) + " AERO" : "assente"}` + (c.cap != null && rate > c.cap ? ": già sopra, altri voti non portano altre emissioni finché le fee non lo alzano." : "."));
+          if (V > 0) line(`Con i tuoi ${fmtN(V)} voti avresti ${ilPct(V / (c.ap + V))} delle fee: ${r$(mine)} al giorno a ritmo di oggi` + (radarDay ? `, contro ${r$(radarDay)} dell'allocazione del radar.` : "."));
+          dr.append(td); rows.append(dr);
+        }
+      }
+      $("bs-foot").textContent = "Pool con pochi voti le cui fee misurate delle ultime 24 ore superano di almeno quattro volte quelle delle 24 ore prima: l'APR a 48 ore non li mostra ancora. «APR di oggi» conta solo le ultime 24 ore; «Con i tuoi voti» è la tua parte delle fee di oggi se entrassi adesso, al giorno. Un giorno buono non è una tendenza: tocca la riga per vedere chi l'ha votato e come si muove la liquidità.";
+    }
+    if (!list.length) { const tr = el("tr"), td = el("td", "", q ? "Nessun pool con questo nome." : bsView === "start" ? "Nessun gauge con questi requisiti per ora." : "Nessun pool appena partito per ora."); td.colSpan = 7; tr.append(td); rows.append(tr); }
+    more.hidden = !!q || list.length <= BS_TOP;
+    more.textContent = bsAll ? `Mostra solo i primi ${BS_TOP}` : `Mostra tutti i ${list.length}`;
+  }
+  document.querySelectorAll("#bs-view button").forEach(b => b.addEventListener("click", () => { bsView = b.dataset.v; bsAll = false; bsOpen = null; bootRender(); }));
+  $("bs-more").addEventListener("click", () => { bsAll = !bsAll; bootRender(); });
+  { let t = 0; const later = () => { clearTimeout(t); t = setTimeout(bootRender, 200); };
+    $("bs-q").addEventListener("input", later);
+    $("bs-liq").addEventListener("input", () => { const v = numIn($("bs-liq").value); if (v > 0) { bsLiq = v; try { localStorage.setItem("radar-bs-liq", String(v)); } catch (e) {} later(); } });
+    $("bs-liq").addEventListener("blur", bootRender);
+    for (const id of ["rd-ap", "rd-price"]) $(id).addEventListener("input", later); }
+  async function loadBoot() {
+    try {
+      const r = await dataFetch("bootstrap.json");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      BOOT = await r.json();
+      if (!BOOT || !Array.isArray(BOOT.start)) BOOT = null;
+    } catch (e) { BOOT = null; }
+    bootRender();
+  }
+
   // ---------------------------------------------------------------- monitored allocations (on this device)
   let WATCH = [], PH = null;
   try { WATCH = JSON.parse(localStorage.getItem("radar-watch") || "[]") || []; } catch (e) { WATCH = []; }
@@ -3243,6 +3428,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       loadSim();
       loadStocks();
       loadTrends();
+      loadBoot();
       loadWatch();
     } catch (e) {
       $("updated").textContent = "Non riesco a leggere i dati: " + e.message + ". Riprovo tra un minuto.";
