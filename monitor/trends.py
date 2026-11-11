@@ -388,6 +388,16 @@ def verify(state, now, log, model=None):
         log(f"trends: {done} forecasts of 48 hours ago checked against the measured fees")
 
 
+def drop_mispriced(state, diffs):
+    """The forecasts saved for pools whose fee hours were priced with a broken price are not checked."""
+    lv = book(state).get("lv") or {}
+    for key, hours in diffs.items():
+        since = min(hours)
+        for snap in lv.get("snaps") or []:
+            if snap["t"] + HOUR > since:
+                snap["f"].pop(key, None)
+
+
 def _pool_scores(state, key):
     """{name: [sum |error|, sum error, samples]} of one pool: its backtest plus its live checks, weighted."""
     t = book(state)

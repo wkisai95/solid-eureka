@@ -212,6 +212,9 @@ def apply_events(state, cid, events, cooldown):
             t["n"] = t.get("n", 0) + 1
             t["last"] = ev["ts"]
             t.setdefault("first", ev["ts"])
+            if ev.get("epv"):
+                # AERO emitted per vote per second on this chain, as of the newest allocation (bootstrap.py)
+                cs["epv"] = [ev["ts"], ev["epv"] / 1e18]
             for g in ev["allocs"]:
                 state["gauges"].setdefault(gkey(cid, g), {})
         elif k == "leaf_reduction":
@@ -606,6 +609,23 @@ def settle_rewards(state, prices, now, log):
 
 
 MAX_RUN_USD = 1_000_000      # fees one gauge can earn between two runs: more means a broken price, held back
+FEE_SLACK = 15               # ... and so does this many times the pool's traded volume times its fee
+FEE_SLACK_MIN_USD = 20       # (amounts below this are never held back)
+MARKET_MAX_AGE = 3 * HOUR
+
+
+def _fee_ceiling(state, key, seconds, now):
+    """The most a pool can plausibly have earned in `seconds`: FEE_SLACK times its trading pace (the fastest of
+    the last hour, 6 and 24 hours, from the hourly market snapshot) times its fee. None when the pool has no
+    recent market figures or no known fee: then only MAX_RUN_USD applies. Measured fees sit at about 1 time
+    volume times fee (9 in 10 pools under 1.5), so only a broken price or amount gets past 15."""
+    mk = state.get("market") or {}
+    m = (mk.get("pools") or {}).get(key)
+    fee = (state["gauges"].get(key) or {}).get("fee_raw")
+    if not m or not fee or now - int(mk.get("at") or 0) > MARKET_MAX_AGE:
+        return None
+    pace = max(float(m[2] or 0) / 86400, float(m[1] or 0) / 21600, float(m[0] or 0) / 3600)
+    return max(FEE_SLACK_MIN_USD, FEE_SLACK * fee / 1e6 * pace * max(1, seconds))
 
 
 def chain_gauges(state, cid):
@@ -691,8 +711,10 @@ def settle_accrual(state, prices, now, log):
                 started += 1
                 continue
             usd, carry = _accrued(state, prices, cid, key, prev, now_p, col)
-            if usd > MAX_RUN_USD:
-                log(f"rewards: {usd:,.0f} USD of fees on {key} in one run held back (a broken price?)")
+            ceiling = _fee_ceiling(state, key, t - int(prev["t"]), now) if usd > FEE_SLACK_MIN_USD else None
+            if usd > MAX_RUN_USD or (ceiling is not None and usd > ceiling):
+                log(f"rewards: {usd:,.2f} USD of fees on {key} in one run held back (a broken price?"
+                    + (f" its volume allows {ceiling:,.2f}" if ceiling is not None else "") + ")")
                 g = state["gauges"].get(key) or {}
                 carry = [int(now_p[i]) - int(prev["p"][i]) + int(prev["c"][i]) +
                          int(col.get((tok or "").lower(), 0)) for i, tok in enumerate((g.get("t0"), g.get("t1")))]
@@ -711,6 +733,38 @@ def settle_accrual(state, prices, now, log):
     log(f"rewards: fees earned measured on {len(fresh)} gauges, {sum(u for _, _, u in fresh):,.0f} USD"
         + (f", {started} gauges counted from now" if started else "") + (f", {held} held back" if held else ""))
     return fresh
+
+
+def repair_mispriced(state, dropped, prices, now, log):
+    """dropped: [(token key, when it was last cached, price)] from market.scrub: prices found broken. The measured
+    fee hours of the gauges with that token that stand far above the pool's typical hour go back to it: far means
+    100 times (less when the price was off by less; a price is dropped for being off by much more), so an honest
+    busy hour stays. The typical hour is the median of the kept hours, the broken ones being few among them.
+    Returns {gauge: {hour: USD taken off}}."""
+    acc = state.get("acc") or {}
+    h1 = now - now % HOUR
+    out = {}
+    for tk, _, bad in dropped:
+        cid, tok = tk.split(":", 1)
+        right = prices.get(tk)
+        off = max(bad / right, right / bad) if right and bad > 0 else 1e9
+        far = max(3.0, min(100.0, off / 5))
+        for key, g in state["gauges"].items():
+            hours = acc.get(key)
+            if not hours or chain_of(key) != int(cid) or tok not in ((g.get("t0") or "").lower(),
+                                                                       (g.get("t1") or "").lower()):
+                continue
+            vals = sorted(hours.get(str(h), 0.0) for h in range(h1 - 95 * HOUR, h1 + HOUR, HOUR))
+            typical = (vals[47] + vals[48]) / 2
+            for h in list(hours):
+                if hours[h] > max(5.0, far * typical):
+                    d = out.setdefault(key, {})
+                    d[int(h)] = round(d.get(int(h), 0.0) + hours[h] - typical, 6)
+                    hours[h] = round(typical, 6)
+    for key, d in out.items():
+        log(f"rewards: {key}: {len(d)} fee hours priced with a broken price put back "
+            f"({sum(d.values()):,.2f} USD taken off)")
+    return out
 
 
 def _block_at(cid, cs, t):
@@ -949,13 +1003,15 @@ def refresh_eligibility(rpc, cid, state, now, log, every=6 * HOUR):
     """Marks gauges an ordinary position can vote: activated on the leaf and with a non-zero emission cap."""
     cid = int(cid)
     cs = chain_state(state, cid)
-    if now - cs.get("eligibility_at", 0) < every:
+    pref = f"{cid}:"
+    # (a chain whose caps were never stored is read at once: bootstrap.py needs them)
+    capped = any("cap" in m for k, m in state["gauges"].items() if k.startswith(pref) and m.get("vrm"))
+    if now - cs.get("eligibility_at", 0) < every and capped:
         return
     registry = (cs.get("params") or {}).get("factory_registry") or (C.FACTORY_REGISTRY if cid == C.BASE_CHAIN
                                                                        else None)
     if not registry:
         return
-    pref = f"{cid}:"
     keys = [k for k, m in state["gauges"].items() if k.startswith(pref) and m.get("vrm")]
     calls = []
     for k in keys:
@@ -970,6 +1026,8 @@ def refresh_eligibility(rpc, cid, state, now, log, every=6 * HOUR):
         if act is None or cap is None:
             continue
         state["gauges"][k]["ok"] = bool(act) and cap > 0
+        # the gauge's emission cap in AERO per second (it follows the fees the pool makes); None: no cap
+        state["gauges"][k]["cap"] = None if cap >= 2 ** 127 else float(f"{cap / 1e18:.6g}")
         blocked += 0 if state["gauges"][k]["ok"] else 1
     cs["eligibility_at"] = now
     log(f"{C.chain_short(cid)}: eligibility {len(keys)} gauges checked, {blocked} not votable by ordinary positions")

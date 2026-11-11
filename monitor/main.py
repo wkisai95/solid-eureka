@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from . import aero as A
 from . import bestchoice as BC
+from . import bootstrap as BS
 from . import earnings as E
 from . import alerts as N
 from . import big as B
@@ -250,12 +251,16 @@ def run(args):
     for k, cid, pool, t0, t1 in targets:
         want |= {A.tkey(cid, t0), A.tkey(cid, t1)}
     want |= A.accrual_tokens(state)
+    # cached prices that cannot be right for their asset go first, so the right one is read again in this run
+    bad_prices = M.scrub(state["prices"], state["erc20"], log)
+    want |= {k for k, _, _ in bad_prices}
     prices = M.fetch_prices(want, state["prices"], now, log, chains_cfg, state["erc20"],
                             state.setdefault("dex_slugs", {}))
     new_inc, _ = A.settle_rewards(state, prices, now, log)
     new_inc = list(dict.fromkeys(new_inc + new_programs))
     # the fees each pool earned in this run, measured on its gauge (the transfers only move them, on a claim)
     fresh_fees = A.settle_accrual(state, prices, now, log)
+    mispriced = A.repair_mispriced(state, bad_prices, prices, now, log) if bad_prices else {}
     measured_back = []
     if any(int(cs.get("acc_from") or 0) == now and not cs.get("acc_backfill") for cs in state["chains"].values()):
         # the gauges are measured for the first time: their last two days too, where old state can be read
@@ -288,6 +293,11 @@ def run(args):
         except Exception as e:
             status["errors"].append(f"stocks: {e}")
             log(f"stocks failed: {traceback.format_exc()[-400:]}")
+        # pools worth starting: where the pairs of the little-voted gauges trade on other DEXes
+        try:
+            BS.refresh(state, chains_cfg, now, log, busy=markets_read)
+        except Exception:
+            log(f"bootstrap failed: {traceback.format_exc()[-400:]}")
 
     # paper allocation of a fixed size, followed through every cooldown
     # options loaded from the page ("Carica queste opzioni nella simulazione"): kept until the next load
@@ -316,11 +326,18 @@ def run(args):
         state["repairs"].append("broken_prices_1")
     aero_key = A.tkey(C.BASE_CHAIN, params["aero"])
     T.accrue(tr, state, prices, fresh_fees, now, params["cooldown"])
+    if mispriced:
+        # fee hours priced with a broken price: out of the pool history, the saved forecasts and the alerts too
+        T.repair_mispriced(tr, state, prices, mispriced, now, log)
+        TR.drop_mispriced(state, mispriced)
+        state["migrated_at"] = now
     # what every real position earns, for the page's "I tuoi sAERO"
     try:
         E.accrue(state, prices, fresh_fees, now, log)
         if measured_back:
             E.rebuild_hours(state, prices, now, log)
+        if mispriced:
+            E.take_off(state, mispriced, now, log)
     except Exception:
         status["errors"].append("earnings: " + traceback.format_exc()[-200:])
         log(f"earnings failed: {traceback.format_exc()[-600:]}")
@@ -438,6 +455,10 @@ def run(args):
         save_json(out / "trends.json", trends_report)
     except Exception:
         log(f"trends failed: {traceback.format_exc()[-400:]}")
+    try:
+        save_json(out / "bootstrap.json", BS.export(state, public_report, prices, now))
+    except Exception:
+        log(f"bootstrap export failed: {traceback.format_exc()[-400:]}")
     try:
         save_json(out / "stocks.json", S.export(state, now))
     except Exception:

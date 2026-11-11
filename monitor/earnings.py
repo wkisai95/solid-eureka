@@ -260,6 +260,59 @@ def rebuild_hours(state, prices, now, log):
         f"{moved:+,.0f} USD in all")
 
 
+def take_off(state, diffs, now, log):
+    """diffs: {gauge: {hour: USD taken off}} from aero.repair_mispriced (fee hours priced with a broken price).
+    The same amounts come off the positions that were credited them: the pool's voters by their share of its votes
+    in that hour (from when they allocated), out of their hours, days, pool and total. Positions that have since
+    left the pool keep what they were credited there, which cannot be more than the pool really paid in the hours
+    kept: anything above that comes off too."""
+    pe = _book(state)
+    h0 = int(pe.get("h0") or 0)
+    gauges = _by_gauge(state)
+    idx = {k: str(i) for i, k in enumerate(pe["gi"])}
+    moved = [0, 0.0]
+
+    def off(p, gi, h, usd):
+        usd = min(usd, p["g"].get(gi, 0.0))
+        if usd <= 0:
+            return
+        p["g"][gi] = round(p["g"][gi] - usd, 5)
+        p["t"] = round(max(0.0, p["t"] - usd), 5)
+        day = str(h - h % DAY)
+        if day in p["d"]:
+            p["d"][day] = round(max(0.0, p["d"][day] - usd), 5)
+        i = (h0 - h) // HOUR
+        if 0 <= i < len(p.get("h") or []):
+            p["h"][i] = round(max(0.0, p["h"][i] - usd), 5)
+        moved[1] += usd
+
+    for g, hours in diffs.items():
+        gi = idx.get(g)
+        members = gauges.get(g) or []
+        if gi is None:
+            continue
+        inside = set()
+        for h, d in sorted(hours.items()):
+            tot = _total(state, g, members, h)
+            for tid, a, last in members:
+                p = pe["p"].get(tid)
+                if not p or last >= h + HOUR or tot <= 0:
+                    continue
+                inside.add(tid)
+                off(p, gi, h, d * a / tot * (1.0 if last <= h else (h + HOUR - last) / HOUR))
+        legit = sum(A.fee_hours(state, g).values())
+        spread = sum(hours.values()) or 1.0
+        for tid, p in pe["p"].items():
+            extra = p["g"].get(gi, 0.0) - legit
+            if tid in inside or extra <= 0.01:
+                continue
+            for h, d in hours.items():
+                off(p, gi, h, extra * d / spread)
+            moved[0] += 1
+    log(f"earnings: {moved[1]:,.2f} USD credited on fee hours priced with a broken price taken off"
+        + (f" ({moved[0]} positions that have left those pools)" if moved[0] else ""))
+
+
 def windows(p, now, h0):
     """{hours: (USD, seconds)} for the last 1, 6, 12 and 24 hours, plus 7 days under 168.
 

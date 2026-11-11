@@ -103,8 +103,9 @@ def decode_log(lg, ts_of=block_ts):
             "emitter": lg["address"].lower()}
     try:
         if t0 == T["leaf_alloc"]:
-            allocs, _ = decode(["(address,uint128,bytes)[]", "uint256"], _data(lg))
-            return {**base, "kind": "leaf_alloc", "token": int(lg["topics"][1], 16),
+            allocs, epv = decode(["(address,uint128,bytes)[]", "uint256"], _data(lg))
+            # epv: the chain's emissions per unit of voting power per second (1e18-scaled), stored with the event
+            return {**base, "kind": "leaf_alloc", "token": int(lg["topics"][1], 16), "epv": int(epv),
                     "allocs": {g.lower(): a / 1e18 for g, a, _ in allocs if g.lower() != ZERO and a > 0}}
         if t0 == T["leaf_reduction"]:
             reduction, accumulated = decode(["uint48", "uint48"], _data(lg))

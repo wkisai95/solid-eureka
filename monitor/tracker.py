@@ -435,6 +435,48 @@ def repair_broken_prices(tr, now, log, limit=1e7):
     return n
 
 
+def repair_mispriced(tr, state, prices, diffs, now, log):
+    """diffs: {gauge: {hour: USD taken off}} from aero.repair_mispriced. The simulation's record of what each of
+    those pools paid (the monitored allocations of the page read it) is written again from the repaired fee hours
+    and the incentives, from the first of those hours on; the same amounts come off the allocations it saved that
+    hold those pools and off its virtual positions."""
+    ap = state["ap"]
+    n = 0
+    for k, hours in diffs.items():
+        hist = tr.setdefault("pool_hist", {}).setdefault(k, {})
+        fees = A.fee_hours(state, k)
+        for h in range(min(hours) - HOUR, now - now % HOUR + HOUR, HOUR):
+            row = hist.get(str(h))
+            usd = fees.get(h, 0.0) + A.incentive_usd(state, prices, k, h, min(now, h + HOUR))
+            if row is None and usd <= 0:
+                continue
+            votes = row[1] if row else round(float(ap.get(k, 0.0)))
+            hist[str(h)] = [round(usd, 4), votes, round(usd * 1000 / (votes + 1000), 6)]
+            n += 1
+        a = float(ap.get(k, 0.0))
+        for snaps in tr.get("open", {}).values():
+            for snap in snaps:
+                x = snap[1].get(k)
+                if not x:
+                    continue
+                e = sum(d for h, d in hours.items() if h + HOUR > snap[0]) * x[0] / (a + x[0])
+                e = min(e, x[2])
+                x[2] = round(x[2] - e, 6)
+                snap[3] = round(max(0.0, snap[3] - e), 6)
+        for v in tr.get("virtual", {}).values():
+            x = (v.get("alloc") or {}).get(k)
+            if not x:
+                continue
+            x = x[0] if isinstance(x, list) else x
+            for h, d in sorted(hours.items()):
+                e = d * x / (a + x)
+                v["usd"] = round(max(0.0, v["usd"] - e), 6)
+                for hh in [hh for hh in v.get("curve", {}) if int(hh) >= h]:
+                    v["curve"][hh] = round(max(0.0, v["curve"][hh] - e), 4)
+    if n:
+        log(f"tracker: {n} pool hours written again after a broken price")
+
+
 def _reco_bucket(tr, k, day):
     return tr["pool_reco"].setdefault(k, {}).setdefault(day, [0.0, 0.0, 0.0, 0])
 

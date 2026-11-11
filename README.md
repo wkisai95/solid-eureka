@@ -282,7 +282,12 @@ NTFY_TOPIC=... python -m monitor.main --out out
 ## Fonti
 
 - Contratti e indirizzi: [Dromos-Labs/metadex-public](https://github.com/Dromos-Labs/metadex-public)
-- Prezzi: DexScreener
+- Prezzi: DexScreener. Il prezzo di un token è la mediana delle sue coppie più profonde (almeno tre: un pool
+  falsato da solo non lo sposta), deve stare nella fascia del suo bene (stablecoin intorno a 1 $, ETH e BTC
+  incartati o in staking intorno a ETH e BTC) e, se è molto lontano dall'ultimo, vale solo se le coppie concordano o
+  se viene letto due volte. Un prezzo in memoria fuori fascia viene tolto e le ore di fee che ha gonfiato tornano al
+  valore tipico del pool, insieme a quanto era stato accreditato alle posizioni. In più le fee misurate in un giro
+  non possono superare 15 volte il volume scambiato dal pool per la sua fee: il resto aspetta un prezzo giusto.
 - Volumi: DexScreener, GeckoTerminal, DefiLlama
 - Quote: KyberSwap, Velora (ParaSwap)
 
