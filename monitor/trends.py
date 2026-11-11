@@ -78,6 +78,28 @@ def _digest(candles, now):
     return days, hours
 
 
+HOURLY_DAYS = 28            # hourly volume and price moves kept per pool, for bestchoice's model
+
+
+def _hourly(candles, days):
+    """[first hour, [volume per hour], [|ln(close / open)| x 10000 per hour]] over the last HOURLY_DAYS complete days."""
+    if not days:
+        return None
+    end = max(int(d) for d in days) + DAY
+    start = max(min(int(d) for d in days), end - HOURLY_DAYS * DAY)
+    n = (end - start) // HOUR
+    vol, mv = [0] * n, [0] * n
+    for c in candles:
+        if not c or len(c) < 6:
+            continue
+        i = (int(c[0]) - start) // HOUR
+        if 0 <= i < n:
+            o, cl = MD._num(c[1]), MD._num(c[4])
+            vol[i] = round(MD._num(c[5]))
+            mv[i] = round(abs(math.log(cl / o)) * 10000) if o > 0 and cl > 0 else 0
+    return [start, vol, mv]
+
+
 def _spikes(days):
     """{day: times the median} for the catalyst days of {day: [volume, ...]}."""
     vols = [v[0] for v in days.values()]
@@ -120,7 +142,7 @@ def refresh(state, now, log):
         p = P.get(k) or {}
         if p.get("miss"):
             return now - p.get("tried", 0) > RETRY_MISSING
-        return now - p.get("at", 0) > EVERY or "bt" not in p
+        return now - p.get("at", 0) > EVERY or "bt" not in p or "hx" not in p
 
     queue = sorted((k for k in targets if due(k)), key=lambda k: (P.get(k) or {}).get("at", 0))[:PER_RUN]
     done = missing = 0
@@ -154,7 +176,7 @@ def refresh(state, now, log):
             continue
         old = {d: v for d, v in (p.get("d") or {}).items() if d not in days and int(d) >= now - KEEP_DAYS * DAY}
         P[k] = {"at": now, "tried": now, "d": {**old, **days}, "b": _blocks(days, hours),
-                "bt": backtest(days, hours)}
+                "bt": backtest(days, hours), "hx": _hourly(candles, days)}
         done += 1
     _fee_days(state, t, now)
     if queue:
@@ -237,11 +259,13 @@ def _block_of(ts):
     return ((ts // DAY + 3) % 7) * 4 + (ts % DAY) // (6 * HOUR)
 
 
-def _season(blocks, t, look):
+def _season(blocks, t, look, closed=()):
     """Typical level of the 48 hours after t against the `look` hours before it, from 28 weekly blocks; 1 if
     unknown; kept between 0.6 and 1.6."""
     def avg(a, b):
-        vals = [blocks[_block_of(h)] for h in range(a, b, HOUR)]
+        # a day its market is closed (closed: day starts) counts as a Saturday
+        vals = [blocks[20 + (h % DAY) // (6 * HOUR) if h - h % DAY in closed else _block_of(h)]
+                for h in range(a, b, HOUR)]
         vals = [v for v in vals if v is not None]
         return sum(vals) / len(vals) if vals else None
     nxt, past = avg(t, t + BT_AHEAD * HOUR), avg(t - look * HOUR, t)
@@ -287,6 +311,8 @@ def backtest(days, hours):
 
 
 NAMES = [n + g for n in PREDICTORS for g in ("", "+g")]
+MODEL = "bc"                # bestchoice's model: checked live with the others, chosen only by its own option
+_simple = lambda sc: {nm: v for nm, v in sc.items() if nm.replace("+g", "") in PREDICTORS}
 LIVE_EVERY = 6 * HOUR       # the monitor's own forecasts are saved this often and checked 48 hours later
 LIVE_WEIGHT = 3             # a check on the fees really measured counts as this many backtest samples
 LIVE_MIN_USD = 5            # pools that earned less in the 48 hours are not scored: the ratio would be noise
@@ -318,7 +344,7 @@ def _measured_look(state, key, h0):
     return 96 if since <= h0 - 96 * HOUR else 48
 
 
-def verify(state, now, log):
+def verify(state, now, log, model=None):
     """The live check that refines the choice: every six hours every forecast of every pool is saved, and 48 hours
     later compared with the fees really measured. The errors add to the backtest's (scores) and give each pool
     its own bias (forecast). Also keeps how much the votes of each pool moved in those 48 hours."""
@@ -333,7 +359,7 @@ def verify(state, now, log):
             if real < LIVE_MIN_USD:
                 continue
             book_k = lv["s"].setdefault(key, {})
-            for nm, v in zip(NAMES, vals):
+            for nm, v in zip(NAMES + [MODEL], vals):
                 if v is None or v <= 0:
                     continue
                 e = math.log(v / real)
@@ -351,7 +377,7 @@ def verify(state, now, log):
             look = _measured_look(state, key, h0)
             if ap < 1000 or not look:
                 continue
-            vals = _all_forecasts(state, key, h0, look)
+            vals = _all_forecasts(state, key, h0, look) + [(model or {}).get(key)]
             if any(v for v in vals):
                 f[key] = [round(ap), vals]
         if f:
@@ -397,7 +423,7 @@ def scores(state, live_only=False):
 
 def best(state, max_look=96):
     """Name of the forecast with the smallest typical error among those reading at most max_look hours."""
-    sc = {nm: v for nm, v in scores(state).items() if PREDICTORS[nm.replace("+g", "")][0] <= max_look}
+    sc = {nm: v for nm, v in _simple(scores(state)).items() if PREDICTORS[nm.replace("+g", "")][0] <= max_look}
     return min(sc, key=lambda nm: sc[nm][0]) if sc else None
 
 
@@ -410,7 +436,7 @@ def forecast(state, key, now, sc=None):
     h0 = now - now % HOUR
     look = _measured_look(state, key, h0)
     sc = sc if sc is not None else scores(state)
-    cands = {nm: v for nm, v in sc.items() if PREDICTORS[nm.replace("+g", "")][0] <= look}
+    cands = {nm: v for nm, v in _simple(sc).items() if PREDICTORS[nm.replace("+g", "")][0] <= look}
     if not cands:
         return None
     name = min(cands, key=lambda nm: cands[nm][0])
@@ -488,7 +514,7 @@ def export(state, names, now):
     sc = scores(state)
     out["forecasts"] = [{"k": nm, "name": LABELS.get(nm.replace("+g", ""), nm) + (", corretta per il giorno della settimana" if nm.endswith("+g") else ""),
                          "err": round(v[0], 3), "bias": round(v[1], 3), "n": v[2]}
-                        for nm, v in sorted(sc.items(), key=lambda kv: kv[1][0])]
+                        for nm, v in sorted(_simple(sc).items(), key=lambda kv: kv[1][0])]
     out["best"] = best(state)
     lv = book(state).get("lv") or {}
     live = scores(state, live_only=True)

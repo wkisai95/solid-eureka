@@ -137,6 +137,28 @@ in dollari. Dieci pool a ogni giro (limite dell'API gratuita), ognuno riletto du
   danno a ogni pool il suo scarto (quanto la previsione tende a stare sopra o sotto), tolto dalla previsione man
   mano che le verifiche crescono. Tiene anche quanto si sono mossi i voti del pool in quelle 48 ore.
 
+## Best choice (probably)
+
+Un'unica voce del radar («Calcola sull'APR») che mette insieme tutto quello che il monitor sa sulle prossime 48 ore
+(`monitor/bestchoice.py`):
+
+- **Fee**: un modello unico per tutti i pool, sulla loro storia oraria di quattro settimane. Parte da una previsione
+  base (media pesata sulle ultime 24 ore) e la corregge con: le finestre del pool (6, 48, 96 ore, mediana di quattro
+  giorni), le abitudini per giorno e ora del pool e del mercato, la direzione del mercato, la volatilità dei prezzi
+  del pool e del mercato. È stimato sui primi due terzi della storia e giudicato sull'ultimo terzo, che non ha mai
+  visto: viene usato solo se lì batte la previsione semplice, altrimenti vale quella. Si ristima ogni sei ore e le
+  sue previsioni entrano nella verifica dal vivo.
+- **Voti**: un secondo modello, sugli otto giorni di voti orari, prevede come cambia la quota di voti di un pool in
+  48 ore dal suo APR rispetto al mercato e dai voti dell'ultimo giorno. Stessa regola: usato solo se batte «i voti
+  restano fermi» sui dati mai visti. «Concorrenza attesa» resta attiva.
+- **Calendario**: nei giorni di chiusura della borsa USA (festività NYSE 2026-2027) i pool di azioni tokenizzate
+  contano come di sabato.
+- **Scelta prudente**: ogni pool è scelto con la parte di fee divisa per la radice del suo errore tipico (gli
+  incentivi programmati contano per intero) e al massimo il 40% dei voti per pool. L'incasso mostrato resta la
+  previsione piena, non quella ridotta.
+
+Sotto la voce la pagina dice, con i numeri dell'ultima stima, quali dei due modelli sono in uso.
+
 ## Allocazioni monitorate
 
 Nel radar, «Monitora questa allocazione» salva sul dispositivo l'allocazione suggerita in quel momento (pool, voti,

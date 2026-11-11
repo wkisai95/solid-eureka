@@ -457,7 +457,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field" id="rd-mypos-f" hidden><span class="flabel">Posizioni da riallocare</span><div class="mypos" id="rd-mypos"></div><small id="rd-mypos-s"></small></div>
       <div class="field"><label for="rd-ap">Allocation Power</label><input id="rd-ap" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>I tuoi sAERO, dalla card del tuo stake</small></div>
       <div class="field"><label for="rd-price">Prezzo AERO $</label><input id="rd-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="rd-price-s">Solo per l'APR. Vuoto: il prezzo letto dal monitor</small></div>
-      <div class="field"><label for="rd-win">Calcola sull'APR</label><select id="rd-win"><option value="pred">Previsione più affidabile (backtest)</option><option value="48">delle ultime 48 ore</option><option value="24">delle ultime 24 ore</option><option value="12">delle ultime 12 ore</option><option value="6">delle ultime 6 ore</option><option value="1">dell'ultima ora</option></select><small id="rd-win-s">Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati</small></div>
+      <div class="field"><label for="rd-win">Calcola sull'APR</label><select id="rd-win"><option value="best">Best choice (probably)</option><option value="pred">Previsione più affidabile (backtest)</option><option value="48">delle ultime 48 ore</option><option value="24">delle ultime 24 ore</option><option value="12">delle ultime 12 ore</option><option value="6">delle ultime 6 ore</option><option value="1">dell'ultima ora</option></select><small id="rd-win-s">Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati</small></div>
       <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
       <div class="field"><span class="flabel">Correggi per il giorno della settimana</span><label class="switch"><input id="rd-sea" type="checkbox" role="switch"><span id="rd-sea-s">Spento</span></label>
         <small id="rd-sea-info">Porta le fee della finestra scelta ai giorni delle prossime 48 ore, con le tendenze di ogni pool (sotto, «Tendenze fee»)</small></div>
@@ -1750,7 +1750,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     return fh.slice(0, n + 1).reduce((a, b) => a + b, 0) * n / (n + part);
   }
   // 0 stands for the backtested forecast (trends.json says which one won); it falls back to the 48 hours pool by pool
-  const rdWin = () => RD.win === "pred" ? 0 : [1, 6, 12, 24].includes(+RD.win) ? +RD.win : 48;
+  // «Best choice (probably)»: the model's fee forecast, votes expected, each pool discounted by its own typical
+  // error, at most BEST_CAP% per pool; like "pred" it has no window (0)
+  const rdBest = () => RD.win === "best", BEST_CAP = 40;
+  const bestFee = p => p.bcf != null ? p.bcf : p.pred != null ? p.pred : p.fee;
+  const bestErr = p => p.bce || p.perr || (TRD && TRD.bc && TRD.bc.fees && (TRD.bc.fees.used ? TRD.bc.fees.err : TRD.bc.fees.simple)) || 1.7;
+  const rdWin = () => RD.win === "pred" || RD.win === "best" ? 0 : [1, 6, 12, 24].includes(+RD.win) ? +RD.win : 48;
   // tendencies by day of the week (trends.json): average of a pool's 28 six-hour blocks between two times
   let TRD = null, TRD_BY = {};
   function blockAvg(b, t0, t1) {
@@ -1776,6 +1781,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // the week when asked, plus the scheduled incentives
   const projected = (p, w) => {
     const n = rdWin(), sx = RD.sea && n ? seasonX(p.key, n) : 1;
+    if (rdBest()) return Math.max(0, p.inc + bestFee(p));
     if (!n) return Math.max(0, p.inc + (p.pred != null ? p.pred : p.fee));
     if (n < 48) {
       const f = winFee(p, n);
@@ -1831,7 +1837,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           d: p.dfee != null ? p.dfee : null, prev: p.fees_prev48h != null ? p.fees_prev48h : null,
           alloc: p.ap || 0, dh: { 1: p.d1h, 6: p.d6h, 24: p.d24h, 48: p.d48h }, spark: p.spark, fh: p.fh || [], inc24: p.inc24h || 0,
           vh: p.vh || null, fpv: p.fpv || 0, mine: mine[p.key] || 0,
-          pred: p.pred48 != null ? p.pred48 : null, perr: p.pred_err || null };
+          pred: p.pred48 != null ? p.pred48 : null, perr: p.pred_err || null,
+          bcf: p.bc_f != null ? p.bc_f : null, bce: p.bc_e || null, bca: p.bc_a || null };
         q.on = !(XS.keys.has(q.key) || ruleFor(q) || chainOff(q));
         return q;
       });
@@ -2024,21 +2031,26 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     };
     const act = list.filter(p => p.on && !(stab && stab.ids.has(p.key))).map(p => {
       const R = value(p), A0 = Math.max(0, p.alloc - p.mine);     // your moving votes leave the pool
-      return { p, R, A0, A: N && avg > 0 ? Math.max(A0, R / (N * avg)) : A0, k: 0 };
+      // best choice: the votes the pool is expected to have on average, and for choosing (Rc) the fee part cut by
+      // the square root of the pool's typical error: the incentives are scheduled, the fees are a forecast
+      const best = rdBest(), Ae = best && p.bca ? A0 * p.bca : A0;
+      const Rc = best ? p.inc + Math.max(0, R - p.inc) / Math.sqrt(bestErr(p)) : R;
+      return { p, R, Rc, A0, A: N && avg > 0 ? Math.max(Ae, R / (N * avg)) : Ae, k: 0 };
     });
     const slice = ap / 100;
     const earn = (o, k) => { const x = k * slice; return x <= 0 ? 0 : o.R * x / (o.A + x); };
+    const pick = (o, k) => { const x = k * slice; return x <= 0 ? 0 : o.Rc * x / (o.A + x); };
     const run = cands => {
       act.forEach(o => o.k = 0);
       const n = cands.filter(o => o.R > 0).length;
-      const capK = Math.max(1, Math.round(cap), Math.ceil(100 / Math.max(1, n)));   // too few pools: just enough room
+      const capK = Math.max(1, Math.round(rdBest() ? Math.min(cap, BEST_CAP) : cap), Math.ceil(100 / Math.max(1, n)));   // too few pools: just enough room
       const per = {};
       for (let s = 0; s < 100; s++) {
         let best = null, bg = -1;
         for (const o of cands) {
-          if (o.k >= capK || !(o.R > 0)) continue;
+          if (o.k >= capK || !(o.Rc > 0)) continue;
           if (!o.k && (per[o.p.chain] || 0) >= PER_CHAIN) continue;
-          const g = earn(o, o.k + 1) - earn(o, o.k);
+          const g = pick(o, o.k + 1) - pick(o, o.k);
           if (g > bg) { bg = g; best = o; }
         }
         if (!best) break;
@@ -2081,9 +2093,16 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     $("rd-trend-v").textContent = (+RD.trend || 0) + "%";
     const short = r.win < 48;
     $("rd-trend").disabled = short; $("rd-spk").disabled = short; $("rd-spkK").disabled = short;
+    const nBest = list.filter(p => p.bcf != null).length, bcF = TRD && TRD.bc && TRD.bc.fees, bcV = TRD && TRD.bc && TRD.bc.votes, pc = e => Math.round((e - 1) * 100) + "%";
     const nPred = list.filter(p => p.pred != null).length, bestF = TRD && (TRD.forecasts || []).find(f => f.k === TRD.best);
     $("rd-sea").disabled = !r.win;
-    $("rd-win-s").textContent = !r.win ? (nPred ? `La previsione che nel backtest ha sbagliato meno${bestF ? ` (${bestF.name}, errore tipico ${Math.round((bestF.err - 1) * 100)}%)` : ""}, fatta sulle fee misurate ora per ora di ${nPred} pool, più gli incentivi programmati. Gli altri pool restano sulle ultime 48 ore`
+    $("rd-win-s").textContent = rdBest() ? (
+        (bcF ? (bcF.used ? `Fee dal modello che mette insieme finestre, giorno della settimana, mercato e volatilità: sui dati mai visti sbaglia di solito del ${pc(bcF.err)}, la previsione semplice del ${pc(bcF.simple)}. `
+                         : `Il modello completo non batte ancora la previsione semplice sui dati mai visti (${pc(bcF.err)} contro ${pc(bcF.simple)}): per le fee vale quella, finché non la supera. `)
+              : "Il modello delle fee aspetta la storia oraria dei pool (qualche ora): per ora vale la previsione del backtest. ") +
+        (bcV ? (bcV.used ? `Voti attesi dal modello (errore ${pc(bcV.err)} contro ${pc(bcV.still)} di «restano fermi»). ` : `I voti restano quelli di adesso: il modello dei voti non batte ancora «restano fermi» (${pc(bcV.err)} contro ${pc(bcV.still)}). `) : "") +
+        `Ogni pool è scelto con le fee ridotte secondo il suo errore tipico, gli incentivi programmati contati per intero, e al massimo il ${BEST_CAP}% per pool. Previsione per ${nBest} pool`)
+      : !r.win ? (nPred ? `La previsione che nel backtest ha sbagliato meno${bestF ? ` (${bestF.name}, errore tipico ${Math.round((bestF.err - 1) * 100)}%)` : ""}, fatta sulle fee misurate ora per ora di ${nPred} pool, più gli incentivi programmati. Gli altri pool restano sulle ultime 48 ore`
         : "Il backtest non è ancora pronto: per ora valgono le ultime 48 ore, più gli incentivi programmati")
       : !short ? "Le fee di ogni pool nelle ultime 48 ore, più gli incentivi programmati"
       : `Le fee ${r.win === 1 ? "dell'ultima ora" : `delle ultime ${r.win} ore`} portate a 48 ore, più gli incentivi programmati` +
@@ -2148,7 +2167,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           `: se esce, ${exitGain(Math.min(apx.share, 0.99))}.`));
       }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
-      if (!rdWin() && o.p.pred != null) {
+      if (rdBest()) {
+        const f = bestFee(o.p), e = bestErr(o.p), parts = [`fee previste ${r$(f)} (errore tipico ${Math.round((e - 1) * 100)}%, contate al ${Math.round(100 / Math.sqrt(e))}% nella scelta)`];
+        if (o.p.inc > 0) parts.push(`incentivi programmati ${r$(o.p.inc)}, certi`);
+        if (o.p.bca && Math.abs(o.p.bca - 1) >= 0.02) parts.push(`voti attesi ${o.p.bca > 1 ? "+" : "−"}${fmtPct(Math.abs(o.p.bca - 1) * 100)} in media`);
+        left.append(el("div", "apx", "🎯 Nelle prossime 48 ore: " + parts.join(" · ")));
+      } else if (!rdWin() && o.p.pred != null) {
         const e = o.p.perr;
         left.append(el("div", "apx", `🎯 Previsione delle fee: ${r$(o.p.pred)} nelle prossime 48 ore (ultime 48: ${r$(o.p.fee)})` +
           (e ? `. Nel backtest su questo pool ha sbagliato di solito di ${Math.round((e - 1) * 100)}%` + (e >= 1.6 ? ": pool poco prevedibile" : "") : "")));

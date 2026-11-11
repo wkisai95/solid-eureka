@@ -15,6 +15,7 @@ from time import time as wall_clock
 from zoneinfo import ZoneInfo
 
 from . import aero as A
+from . import bestchoice as BC
 from . import earnings as E
 from . import alerts as N
 from . import big as B
@@ -399,7 +400,9 @@ def run(args):
     public_report["personal_alerts"] = bool(cfg["my_positions"]) and bool(N.topic_of(cfg))
     try:
         # fees expected in the next 48 hours by the forecast that the backtest finds most accurate (trends.py)
-        TR.verify(state, now, log)
+        # «Best choice (probably)»: the fees and votes models, and their forecast for every pool
+        BC.update(state, now, log)
+        TR.verify(state, now, log, model=BC.annotate(state, public_report.get("pools") or [], now, log))
         sc = TR.scores(state)
         for p in public_report.get("pools") or []:
             f = TR.forecast(state, p["key"], now, sc) if p.get("key") else None
@@ -427,7 +430,9 @@ def run(args):
         # fee tendencies by weekday and catalyst days, from each pool's hourly candles
         TR.refresh(state, now, log)
         names = {p["key"]: (p["name"], p["chain"], p.get("fpv")) for p in public_report.get("pools") or []}
-        save_json(out / "trends.json", TR.export(state, names, now))
+        trends_report = TR.export(state, names, now)
+        trends_report["bc"] = BC.export(state)
+        save_json(out / "trends.json", trends_report)
     except Exception:
         log(f"trends failed: {traceback.format_exc()[-400:]}")
     try:
