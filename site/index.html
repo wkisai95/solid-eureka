@@ -562,6 +562,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="stkc"><div class="h"><b>Mercato Aero per giorno</b><span class="d" id="trd-m-n"></span></div><div class="wdbars" id="trd-m-wd"></div><div class="wdlab" id="trd-m-lab"></div><div class="d" id="trd-m-txt"></div></div>
       <div class="stkc"><div class="h"><b>Quale previsione sbaglia meno</b><span class="d" id="trd-f-n"></span></div><div class="trd-ev" id="trd-f"></div></div>
       <div class="stkc"><div class="h"><b>Eventi di mercato</b><span class="d">giorni in cui si sono mossi molti pool insieme</span></div><div class="trd-ev" id="trd-m-ev"></div></div>
+      <div class="stkc"><div class="h"><b>Calendario macro USA</b><span class="d" id="trd-mc-n"></span></div><div class="trd-ev" id="trd-mc"></div></div>
     </div>
     <div class="stk-bar">
       <div class="seg" id="trd-sort" role="group" aria-label="Ordina"><button type="button" data-s="ap" aria-pressed="true">Più votati</button><button type="button" data-s="next" aria-pressed="false">Meglio nelle prossime 48 ore</button><button type="button" data-s="swing" aria-pressed="false">Più legati al giorno</button></div>
@@ -1838,7 +1839,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           alloc: p.ap || 0, dh: { 1: p.d1h, 6: p.d6h, 24: p.d24h, 48: p.d48h }, spark: p.spark, fh: p.fh || [], inc24: p.inc24h || 0,
           vh: p.vh || null, fpv: p.fpv || 0, mine: mine[p.key] || 0,
           pred: p.pred48 != null ? p.pred48 : null, perr: p.pred_err || null,
-          bcf: p.bc_f != null ? p.bc_f : null, bce: p.bc_e || null, bca: p.bc_a || null };
+          bcf: p.bc_f != null ? p.bc_f : null, bce: p.bc_e || null, bca: p.bc_a || null,
+          d6: p.d6h || 0, d24: p.d24h || 0, fa: p.free_now_active || 0 };
         q.on = !(XS.keys.has(q.key) || ruleFor(q) || chainOff(q));
         return q;
       });
@@ -2101,6 +2103,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
                          : `Il modello completo non batte ancora la previsione semplice sui dati mai visti (${pc(bcF.err)} contro ${pc(bcF.simple)}): per le fee vale quella, finché non la supera. `)
               : "Il modello delle fee aspetta la storia oraria dei pool (qualche ora): per ora vale la previsione del backtest. ") +
         (bcV ? (bcV.used ? `Voti attesi dal modello (errore ${pc(bcV.err)} contro ${pc(bcV.still)} di «restano fermi»). ` : `I voti restano quelli di adesso: il modello dei voti non batte ancora «restano fermi» (${pc(bcV.err)} contro ${pc(bcV.still)}). `) : "") +
+        (bcV && !bcV.free ? `I voti liberi di spostarsi vengono registrati ogni sei ore${bcV.free_days ? ` (${String(bcV.free_days).replace(".", ",")} giorni finora)` : ""}: entrano nel modello dei voti quando coprono tutta la sua storia. ` : "") +
+        (() => { const now = DATA.generated, ev = ((TRD && TRD.macro && TRD.macro.next) || []).filter(e => e[0] >= now && e[0] < now + 48 * 3600);
+          return ev.length ? `Nelle prossime 48 ore: ${ev.map(e => `${e[1]} (${when(e[0])})`).join(", ")}. ` : ""; })() +
         `Ogni pool è scelto con le fee ridotte secondo il suo errore tipico, gli incentivi programmati contati per intero, e al massimo il ${BEST_CAP}% per pool. Previsione per ${nBest} pool`)
       : !r.win ? (nPred ? `La previsione che nel backtest ha sbagliato meno${bestF ? ` (${bestF.name}, errore tipico ${Math.round((bestF.err - 1) * 100)}%)` : ""}, fatta sulle fee misurate ora per ora di ${nPred} pool, più gli incentivi programmati. Gli altri pool restano sulle ultime 48 ore`
         : "Il backtest non è ancora pronto: per ora valgono le ultime 48 ore, più gli incentivi programmati")
@@ -2172,6 +2177,13 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         if (o.p.inc > 0) parts.push(`incentivi programmati ${r$(o.p.inc)}, certi`);
         if (o.p.bca && Math.abs(o.p.bca - 1) >= 0.02) parts.push(`voti attesi ${o.p.bca > 1 ? "+" : "−"}${fmtPct(Math.abs(o.p.bca - 1) * 100)} in media`);
         left.append(el("div", "apx", "🎯 Nelle prossime 48 ore: " + parts.join(" · ")));
+        { // allocation movements: what the votes of the pool did, and how many could leave at once
+          const P = o.p, mv = [], sg = v => (v > 0 ? "+" : "−") + fmtN(Math.abs(v));
+          if (P.alloc > 0 && Math.abs(P.d6) >= 0.005 * P.alloc) mv.push(`${sg(P.d6)} nelle ultime 6 ore`);
+          if (P.alloc > 0 && Math.abs(P.d24) >= 0.01 * P.alloc) mv.push(`${sg(P.d24)} in 24 ore`);
+          if (P.alloc > 0 && P.fa > 0) mv.push(`${Math.round(Math.min(1, P.fa / P.alloc) * 100)}% già libero di spostarsi (posizioni attive)`);
+          if (mv.length) left.append(el("div", "apx", "🔀 Voti del pool: " + mv.join(" · ")));
+        }
       } else if (!rdWin() && o.p.pred != null) {
         const e = o.p.perr;
         left.append(el("div", "apx", `🎯 Previsione delle fee: ${r$(o.p.pred)} nelle prossime 48 ore (ultime 48: ${r$(o.p.fee)})` +
@@ -3027,6 +3039,15 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     return parts.join(" · ");
   }
   function trendsRender() {
+    { const box = $("trd-mc"), mc = TRD && TRD.macro, now = (TRD && TRD.generated) || 0;
+      box.replaceChildren();
+      $("trd-mc-n").textContent = mc ? (mc.feed ? "Fed, inflazione, lavoro e gli eventi della settimana" : "Fed, inflazione, lavoro") : "";
+      const nx = ((mc && mc.next) || []).slice(0, 5);
+      if (!nx.length) box.append(el("div", "", "Nessun evento nelle prossime tre settimane."));
+      for (const e of nx) { const d = el("div"), soon = e[0] < now + 48 * 3600; d.append(el("b", soon ? "down" : "", when(e[0])), ` · ${e[1]}` + (soon ? " · entro 48 ore" : "")); box.append(d); }
+      const ps = ((mc && mc.past) || []).slice(-3).reverse();
+      if (ps.length) box.append(el("div", "", "Passati: " + ps.map(e => `${e[1]} (${dayTxt(e[0])})`).join(" · ")));
+    }
     const rows = $("trd-rows"), m = TRD && TRD.market;
     { const box = $("trd-f"), fs = (TRD && TRD.forecasts) || [];
       box.replaceChildren();
@@ -3064,7 +3085,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     for (const e of m.events.slice(0, 6)) {
       const d = el("div"), b = el("b", "", dayTxt(e.day));
       const mv = [e.eth != null ? `ETH ${pctTxt(e.eth)}` : "", e.btc != null ? `BTC ${pctTxt(e.btc)}` : ""].filter(Boolean).join(", ");
-      d.append(b, ` · volume ${x2t(e.x)} il solito · ${Math.round(e.share * 100)}% dei pool in picco${mv ? " · " + mv : ""}`);
+      const mac = ((TRD.macro && TRD.macro.past) || []).filter(x => x[0] >= e.day && x[0] < e.day + 86400).map(x => x[1]);
+      d.append(b, ` · volume ${x2t(e.x)} il solito · ${Math.round(e.share * 100)}% dei pool in picco${mv ? " · " + mv : ""}${mac.length ? " · quel giorno: " + mac.join(", ") : ""}`);
       $("trd-m-ev").append(d);
     }
     const q = $("trd-q").value.trim().toLowerCase();

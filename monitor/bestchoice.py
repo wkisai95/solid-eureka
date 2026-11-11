@@ -25,6 +25,7 @@ import math
 import time
 
 from . import aero as A
+from . import macro as MC
 from . import trends as TR
 
 HOUR, DAY = 3600, 86400
@@ -32,8 +33,11 @@ EVERY = 6 * HOUR            # the models are fitted again this often
 WARM, AHEAD, STEP = 168, 48, 6
 RIDGE = 5.0
 FEE_FEATS = ["ultime 6 ore", "ultime 48 ore", "ultimi 4 giorni", "mediana di 4 giorni", "giorno e ora del pool",
-             "giorno e ora del mercato", "direzione del mercato", "volatilità del pool", "volatilità del mercato"]
-VOTE_FEATS = ["APR rispetto al mercato", "voti dell'ultimo giorno"]
+             "giorno e ora del mercato", "direzione del mercato", "volatilità del pool", "volatilità del mercato",
+             "eventi macro nelle 48 ore"]
+VOTE_FEATS = ["APR rispetto al mercato", "voti dell'ultimo giorno", "voti delle ultime 6 ore",
+              "voti liberi delle posizioni attive"]
+FREE_KEEP = 10 * DAY        # the share of each pool's votes free to move is recorded every six hours and kept
 MIN_GAIN = 0.99             # a model is used when its error on unseen data is below this share of the simple one's
 # days the New York Stock Exchange is closed (UTC day starts), 2026-2027
 NYSE_CLOSED = ["2026-11-26", "2026-12-25", "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31",
@@ -85,15 +89,17 @@ def _apply(coef, f, lim=1.0):
     return _clip(coef[0] + sum(c * x for c, x in zip(coef[1:], f)), lim)
 
 
-def _fee_feats(x, s, ms, mx, v, mv):
+def _fee_feats(x, s, ms, mx, v, mv, macro=0):
     """Features from the last 96 hourly values of the pool (x) and of the market (mx), the season factors (s, ms)
-    and the last 96 hourly price moves of the pool (v) and of the market (mv). Returns (base forecast, features)."""
+    the last 96 hourly price moves of the pool (v) and of the market (mv), and the number of macro events in the
+    48 hours ahead. Returns (base forecast, features)."""
     base = _ewma(x)
     if base <= 0:
         return 0.0, None
     f = [_lr(sum(x[-6:]) * 8, base), _lr(sum(x[-48:]), base), _lr(sum(x) / 2, base), _lr(_med(x), base),
          math.log(s), math.log(ms), _lr(sum(mx[-24:]) * 4, sum(mx)),
-         _lr(sum(v[-24:]) * 4, sum(v), 2.0) if v else 0.0, _lr(sum(mv[-24:]) * 4, sum(mv), 2.0) if mv else 0.0]
+         _lr(sum(v[-24:]) * 4, sum(v), 2.0) if v else 0.0, _lr(sum(mv[-24:]) * 4, sum(mv), 2.0) if mv else 0.0,
+         min(2, macro) / 2]
     return base, f
 
 
@@ -147,9 +153,11 @@ def fit_fees(state, now, log):
     if len(steps) < 12:
         return None
     mb = _Blocks(start)
-    mseason = {}
+    mseason, macro = {}, {}
+    evs = MC.events(state)
     for i in steps:
         mseason[i] = TR._season(mb.upto(mx, i), start + i * HOUR, 48)
+        macro[i] = MC.count(evs, start + i * HOUR, start + (i + AHEAD) * HOUR)
     samples = []
     for k, (x, v) in pools.items():
         bl = _Blocks(start)
@@ -162,7 +170,7 @@ def fit_fees(state, now, log):
             if real <= 0 or sum(past[-24:]) <= 0:
                 continue
             s = TR._season(bl.upto(x, i), start + i * HOUR, 48)
-            base, f = _fee_feats(past, s, mseason[i], mx[i - 96:i], v[i - 96:i], mv[i - 96:i])
+            base, f = _fee_feats(past, s, mseason[i], mx[i - 96:i], v[i - 96:i], mv[i - 96:i], macro[i])
             if f is None:
                 continue
             samples.append((i, k, f, _clip(math.log(real / base))))
@@ -217,10 +225,32 @@ def _vote_series(state, now):
     return start, n, out, [sum(r.values()) for r in rows]
 
 
-def _vote_feats(rev48, ap, ap24, mkt, tot=1.0, tot24=1.0):
-    """mkt: the market's revenue per vote over the same 48 hours; tot, tot24: all the votes now and a day ago."""
+def _vote_feats(rev48, ap, ap24, mkt, tot=1.0, tot24=1.0, ap6=None, tot6=1.0, free=None):
+    """mkt: the market's revenue per vote over the same 48 hours; tot, tot24, tot6: all the votes now, a day and
+    six hours ago; free: share of the pool's votes held by active positions already out of their cooldown."""
     rel = _lr(rev48 / ap, mkt) if rev48 > 0 and ap > 0 and mkt > 0 else -3.0
-    return [rel, _clip(_lr(ap, ap24, 1.0) - _lr(tot, tot24, 1.0), 1.0)]
+    return [rel, _clip(_lr(ap, ap24, 1.0) - _lr(tot, tot24, 1.0), 1.0),
+            _clip(_lr(ap, ap6, 1.0) - _lr(tot, tot6, 1.0), 1.0) if ap6 else 0.0,
+            max(0.0, min(1.0, free)) if free is not None else 0.0]
+
+
+def record_free(state, pools, now):
+    """Every six hours: the share of each pool's votes that active positions could move at once (out of their
+    cooldown). The votes model learns from it once a week of it exists."""
+    fa = TR.book(state).setdefault("fa", {})
+    h0 = now - now % HOUR
+    if h0 % (6 * HOUR) or str(h0) in fa:
+        return
+    fa[str(h0)] = {p["key"]: round(min(1.0, (p.get("free_now_active") or 0) / p["ap"]), 3)
+                   for p in pools if p.get("key") and (p.get("ap") or 0) >= 10_000}
+    for h in [h for h in fa if int(h) < now - FREE_KEEP]:
+        del fa[h]
+
+
+def _free_at(fa, t):
+    """The record of the six-hour mark at or just before t, or None."""
+    g = t - t % (6 * HOUR)
+    return fa.get(str(g))
 
 
 def fit_votes(state, now, log):
@@ -232,34 +262,43 @@ def fit_votes(state, now, log):
     steps = list(range(48, n - AHEAD + 1, STEP))
     if len(steps) < 9:
         return None
-    samples = []
+    fa = TR.book(state).get("fa") or {}
+    samples, with_free = [], 0
     for i in steps:
         j = i + AHEAD - 1
-        if tot[i] <= 0 or tot[j] <= 0 or tot[i - 24] <= 0:
+        if tot[i] <= 0 or tot[j] <= 0 or tot[i - 24] <= 0 or tot[i - 6] <= 0:
             continue
         r48 = {k: sum(p[0][i - 48:i]) for k, p in pools.items()}
         mkt = sum(r48.values()) / tot[i]
         g = math.log(tot[j] / tot[i])
+        free = _free_at(fa, start + i * HOUR)
         for k, (rev, ap) in pools.items():
             if ap[i] < 10_000 or ap[j] <= 0 or ap[i - 24] <= 0:
                 continue
-            samples.append((i, _vote_feats(r48[k], ap[i], ap[i - 24], mkt, tot[i], tot[i - 24]),
+            fr = free.get(k) if free else None
+            with_free += fr is not None
+            samples.append((i, _vote_feats(r48[k], ap[i], ap[i - 24], mkt, tot[i], tot[i - 24], ap[i - 6], tot[i - 6], fr),
                             _clip(math.log(ap[j] / ap[i]) - g, 2.0)))
+    # the free votes count only when they are known for nearly every sample: half-known, they would mislead
+    use_free = bool(samples) and with_free >= 0.85 * len(samples)
+    d = 4 if use_free else 3
+    samples = [(i, f[:d], y) for i, f, y in samples]
     cut = steps[len(steps) * 2 // 3]
     train = [(f, y) for i, f, y in samples if i + AHEAD <= cut]
     test = [(f, y) for i, f, y in samples if i >= cut]
     if len(train) < 200 or len(test) < 100:
         return None
-    c0 = _ridge(train, 2, 50.0)
+    c0 = _ridge(train, d, 50.0)
     err_model = sum(abs(y - _apply(c0, f, 0.7)) for f, y in test) / len(test)
     err_still = sum(abs(y) for _, y in test) / len(test)
     used = err_model < err_still * MIN_GAIN
-    log(f"best choice: votes model on {len(samples)} samples: on the unseen third it misses a pool's votes after 48 "
-        f"hours by {(math.exp(err_model) - 1) * 100:.0f}%, 'votes stay as they are' by "
+    log(f"best choice: votes model on {len(samples)} samples ({d} signals): on the unseen third it misses a pool's "
+        f"votes after 48 hours by {(math.exp(err_model) - 1) * 100:.0f}%, 'votes stay as they are' by "
         f"{(math.exp(err_still) - 1) * 100:.0f}%" + ("" if used else ": not used"))
-    return {"coef": [round(c, 5) for c in _ridge([(f, y) for _, f, y in samples], 2, 50.0)],
+    return {"coef": [round(c, 5) for c in _ridge([(f, y) for _, f, y in samples], d, 50.0)],
             "err": round(math.exp(err_model), 4), "still": round(math.exp(err_still), 4), "n": len(samples),
-            "test": len(test), "used": used}
+            "test": len(test), "used": used, "free": use_free,
+            "free_days": round(len(fa) / 4, 1)}
 
 
 def update(state, now, log):
@@ -299,6 +338,7 @@ def annotate(state, pools, now, log):
     {gauge: fee forecast} for the live checks."""
     bc = TR.book(state).get("bc") or {}
     fm, vm = bc.get("fees"), bc.get("votes")
+    record_free(state, pools, now)
     out = {}
     h0 = now - now % HOUR
     sc = TR.scores(state)
@@ -309,6 +349,7 @@ def annotate(state, pools, now, log):
         ms = TR._season(fm["mb"], h0, 48) if fm.get("mb") else 1.0
         mv24, mv96 = fm.get("mv") or [0, 0]
         mvr = _lr(mv24, mv96, 2.0)
+        n_macro = MC.count(MC.events(state), h0, h0 + AHEAD * HOUR)
         lv = (T.get("lv") or {}).get("s") or {}
         for p in pools:
             key = p.get("key")
@@ -323,11 +364,11 @@ def annotate(state, pools, now, log):
             s = TR._season(tp["b"], h0, 48, closed) if tp.get("b") else 1.0
             hx = tp.get("hx")
             v = [float(a) for a in hx[2][-96:]] if hx and len(hx[2]) >= 96 else None
-            base, f = _fee_feats(x, s, ms, mx, v, None)
+            base, f = _fee_feats(x, s, ms, mx, v, None, n_macro)
             if f is None:
                 continue
             f[8] = mvr
-            if fm.get("used"):
+            if fm.get("used") and len(fm["coef"]) == len(f) + 1:
                 usd, name = base * math.exp(_apply(fm["coef"], f)), TR.MODEL
             else:
                 simple = TR.forecast(state, key, now, sc)
@@ -350,16 +391,21 @@ def annotate(state, pools, now, log):
             if fm.get("used"):
                 out[key] = round(usd, 4)
     if vm and vm.get("used"):
-        was = (state.get("ap_hist") or {}).get(str(h0 - 24 * HOUR)) or {}
+        ah = state.get("ap_hist") or {}
+        was, was6 = ah.get(str(h0 - 24 * HOUR)) or {}, ah.get(str(h0 - 6 * HOUR)) or {}
         rows = [(p, (p.get("fees48h") or 0) + (p.get("inc48h") or 0), float(p.get("ap") or 0)) for p in pools]
         tot_ap = sum(a for _, _, a in rows)
         mkt = sum(r for _, r, _ in rows) / tot_ap if tot_ap > 0 else 0
-        tot24 = sum(was.values()) or tot_ap
         seen = sum(a for p, _, a in rows if p.get("key") in was) or tot_ap       # the same pools, today
+        seen6 = sum(a for p, _, a in rows if p.get("key") in was6) or tot_ap
+        d_feats = len(vm["coef"]) - 1
         for p, r48, ap in rows:
             if ap < 10_000 or not p.get("key"):
                 continue
-            d = _apply(vm["coef"], _vote_feats(r48, ap, float(was.get(p["key"]) or ap), mkt, seen, tot24), 0.7)
+            f = _vote_feats(r48, ap, float(was.get(p["key"]) or ap), mkt, seen, sum(was.values()) or tot_ap,
+                            float(was6.get(p["key"]) or ap), sum(was6.values()) or seen6,
+                            min(1.0, (p.get("free_now_active") or 0) / ap))
+            d = _apply(vm["coef"], f[:d_feats], 0.7)
             p["bc_a"] = round(math.exp(max(-0.5, d) / 2), 3)       # the average of the 48 hours: half the way
     return out
 
@@ -370,10 +416,12 @@ def export(state):
     if bc.get("fees"):
         f = bc["fees"]
         out["fees"] = {k: f[k] for k in ("err", "simple", "base", "n", "test", "used")}
+        if len(f["coef"]) - 1 != len(FEE_FEATS):
+            out["fees"]["used"] = False
         out["fees"]["coef"] = dict(zip(FEE_FEATS, f["coef"][1:]))
     if bc.get("votes"):
         v = bc["votes"]
-        out["votes"] = {k: v[k] for k in ("err", "still", "n", "test", "used")}
+        out["votes"] = {k: v.get(k) for k in ("err", "still", "n", "test", "used", "free", "free_days")}
         out["votes"]["coef"] = dict(zip(VOTE_FEATS, v["coef"][1:]))
     out["closed"] = sorted(CLOSED)
     return out

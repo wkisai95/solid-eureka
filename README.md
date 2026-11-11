@@ -151,6 +151,13 @@ Un'unica voce del radar («Calcola sull'APR») che mette insieme tutto quello ch
 - **Voti**: un secondo modello, sugli otto giorni di voti orari, prevede come cambia la quota di voti di un pool in
   48 ore dal suo APR rispetto al mercato e dai voti dell'ultimo giorno. Stessa regola: usato solo se batte «i voti
   restano fermi» sui dati mai visti. «Concorrenza attesa» resta attiva.
+- **Calendario macro** (`monitor/macro.py`): decisioni della Fed sui tassi, inflazione (CPI) e lavoro (payrolls)
+  dai calendari ufficiali fino a fine 2027 (da allungare in `macro.py` quando escono i nuovi), più gli eventi USA
+  ad alto impatto della settimana dal feed gratuito di ForexFactory quando risponde. Il numero di eventi nelle 48
+  ore è un segnale del modello delle fee; la sezione Tendenze li elenca e li accosta ai giorni di mercato anomali.
+- **Movimenti di allocazione**: il modello dei voti legge anche i voti delle ultime 6 ore e, da quando ne esiste una
+  settimana di registrazioni (una ogni sei ore), la quota di voti del pool che le posizioni attive possono già
+  spostare. Sotto ogni pool suggerito: voti entrati o usciti in 6 e 24 ore e quota già libera.
 - **Calendario**: nei giorni di chiusura della borsa USA (festività NYSE 2026-2027) i pool di azioni tokenizzate
   contano come di sabato.
 - **Scelta prudente**: ogni pool è scelto con la parte di fee divisa per la radice del suo errore tipico (gli
