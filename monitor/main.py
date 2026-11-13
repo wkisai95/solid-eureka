@@ -326,6 +326,14 @@ def run(args):
         state["repairs"].append("broken_prices_1")
     aero_key = A.tkey(C.BASE_CHAIN, params["aero"])
     T.accrue(tr, state, prices, fresh_fees, now, params["cooldown"])
+    # fees that had waited and were credited in this run: the pool history spreads them like the fee hours do
+    waited = state.pop("respread", None) or {}
+    if "held_1" not in state["repairs"]:
+        # (the three pools whose fees the old rule kept waiting for a day and more, until 13 Nov 2026 08:51 UTC)
+        waited.update({k: min(RP.HELD_1_FROM, waited.get(k, now)) for k in RP.HELD_1 if k in state["gauges"]})
+        state["repairs"].append("held_1")
+    if waited:
+        T.respread(tr, state, prices, waited, now, log)
     if mispriced:
         # fee hours priced with a broken price: out of the pool history, the saved forecasts and the alerts too
         T.repair_mispriced(tr, state, prices, mispriced, now, log)

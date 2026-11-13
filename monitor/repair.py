@@ -15,6 +15,12 @@ from the switch (three days later, a month in the future). This repair puts thos
     the moves big.py recorded for the big positions. The estimate waiting for a transfer starts again from the fees
     accrued since the last one;
   - the simulation's record of what each Base pool paid, and the allocations it saved in the last cooldown.
+
+held_1. Fees held back as too big for the pool's volume were judged every run against the last run alone while the
+amount waiting grew, so three pools never got them back (USDC/SPCXc and WETH/DRV on Base, USDG/NVDA on Robinhood:
+8,889 USD waiting for 18 to 35 hours). The run of 13 Nov 2026 08:51 UTC credited them and spread them over the fee
+hours; the simulation's record of what those pools paid took them in that one hour, and is written again from the
+fee hours (main.py, with tracker.respread).
 """
 import bisect
 
@@ -23,6 +29,9 @@ from . import earnings as E
 from . import marketdata as MD
 
 HOUR = 3600
+HELD_1 = ("8453:0x0ccf7cb21169934f4686cb895518aa179bfcea53", "8453:0x512138372510fd89240fa78d3834f01614204b63",
+          "4663:0x5874f5b8728776993de4c90c61473d76eeab90db")
+HELD_1_FROM = 1794427200                        # 11 Nov 2026 20:00 UTC, before the first of them began to wait
 DENIM = "denim_1"
 DENIM_H = C.DENIM_TS - C.DENIM_TS % HOUR       # 18:00, the first hour bucket with post-Denim times
 

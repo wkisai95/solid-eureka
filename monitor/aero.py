@@ -706,7 +706,8 @@ def settle_accrual(state, prices, now, log):
     An amount too big for the pool's trading is held back in the carry (a broken price?). It is judged again every
     run against the trading of the whole time it has waited, not of the last run alone: a real burst of fees,
     bigger than the volume of an hour ago allowed, is credited as soon as the time waited explains it, and spread
-    over that time; what a broken price inflates stays out until the price is right again."""
+    over that time; what a broken price inflates stays out until the price is right again. state["respread"]
+    {gauge: since when} lists the gauges credited this way in this run, for tracker.respread."""
     pend = state.setdefault("pend", {})
     acc = state.setdefault("acc", {})
     vrm_map = state.get("vrm_map") or {}
@@ -749,6 +750,9 @@ def settle_accrual(state, prices, now, log):
                 if old > 0 and since < int(prev["t"]):
                     _spread(acc.setdefault(key, {}), since, int(prev["t"]), old)
                     usd_new = usd - old
+                    # (the simulation's pool history takes this run's fees in this hour: it is told to spread them too)
+                    back = state.setdefault("respread", {})
+                    back[key] = min(since, back.get(key, since))
                 else:
                     usd_new = usd
                 if usd_new > 0:

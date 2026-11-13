@@ -435,6 +435,36 @@ def repair_broken_prices(tr, now, log, limit=1e7):
     return n
 
 
+def _rewrite_hours(tr, state, prices, k, first, now):
+    """The record of what pool k paid, hour by hour from the hour of `first`, written again from its fee hours and
+    its incentives. Returns the hours written."""
+    ap = state["ap"]
+    hist = tr.setdefault("pool_hist", {}).setdefault(k, {})
+    fees = A.fee_hours(state, k)
+    n = 0
+    for h in range(int(first) - int(first) % HOUR, now - now % HOUR + HOUR, HOUR):
+        row = hist.get(str(h))
+        usd = fees.get(h, 0.0) + A.incentive_usd(state, prices, k, h, min(now, h + HOUR))
+        if row is None and usd <= 0:
+            continue
+        votes = row[1] if row else round(float(ap.get(k, 0.0)))
+        hist[str(h)] = [round(usd, 4), votes, round(usd * 1000 / (votes + 1000), 6)]
+        n += 1
+    if not hist:
+        tr["pool_hist"].pop(k, None)
+    return n
+
+
+def respread(tr, state, prices, spans, now, log):
+    """spans: {gauge: since when} from aero.settle_accrual: fees that waited (held back, or without a price) and
+    were credited in this run, spread over the hours they had waited. The record of what those pools paid took
+    them all in this hour: it is written again from the fee hours, so the monitored allocations of the page and
+    the forecasts trained on it see them where they belong."""
+    n = sum(_rewrite_hours(tr, state, prices, k, since, now) for k, since in spans.items())
+    if n:
+        log(f"tracker: {n} pool hours written again for {len(spans)} pools whose fees had waited")
+
+
 def repair_mispriced(tr, state, prices, diffs, now, log):
     """diffs: {gauge: {hour: USD taken off}} from aero.repair_mispriced. The simulation's record of what each of
     those pools paid (the monitored allocations of the page read it) is written again from the repaired fee hours
@@ -443,16 +473,7 @@ def repair_mispriced(tr, state, prices, diffs, now, log):
     ap = state["ap"]
     n = 0
     for k, hours in diffs.items():
-        hist = tr.setdefault("pool_hist", {}).setdefault(k, {})
-        fees = A.fee_hours(state, k)
-        for h in range(min(hours) - HOUR, now - now % HOUR + HOUR, HOUR):
-            row = hist.get(str(h))
-            usd = fees.get(h, 0.0) + A.incentive_usd(state, prices, k, h, min(now, h + HOUR))
-            if row is None and usd <= 0:
-                continue
-            votes = row[1] if row else round(float(ap.get(k, 0.0)))
-            hist[str(h)] = [round(usd, 4), votes, round(usd * 1000 / (votes + 1000), 6)]
-            n += 1
+        n += _rewrite_hours(tr, state, prices, k, min(hours) - HOUR, now)
         a = float(ap.get(k, 0.0))
         for snaps in tr.get("open", {}).values():
             for snap in snaps:
