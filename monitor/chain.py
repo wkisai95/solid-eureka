@@ -169,6 +169,11 @@ S = {k: sel(v) for k, v in {
     "stable": "stable()",
     "tickSpacing": "tickSpacing()",
     "fee": "fee()",
+    "poolType": "POOL_TYPE()",
+    "factory": "factory()",
+    "getReserves": "getReserves()",
+    "defaultFee": "defaultFee()",
+    "getBaseFee": "getBaseFee(address,address,uint256,uint256,uint256,uint256)",
     "symbol": "symbol()",
     "decimals": "decimals()",
 }.items()}
@@ -187,6 +192,19 @@ def _dec(types, ok, data):
 def _dec_addr(ok, data):
     a = _dec(["address"], ok, data)
     return a.lower() if a and a.lower() != ZERO else None
+
+
+def _dec_text32(ok, data):
+    """A bytes32 holding a short text (a pool's POOL_TYPE): the text, or None."""
+    if not ok or len(data) != 32:
+        return None
+    s = data.rstrip(b"\0").decode("ascii", "ignore")
+    return s if s and s.isprintable() else None
+
+
+def basic_kind(pool_type):
+    """'V2_VOLATILE' -> 'volatile', 'V2_STABLE' -> 'stable': the type a basic (constant-curve) pool declares."""
+    return pool_type[3:].lower() if pool_type and pool_type.startswith("V2_") else (pool_type or "").lower() or None
 
 
 def _dec_symbol(ok, data):
@@ -296,14 +314,15 @@ def read_gauge_meta(rpc, gauges):
     pools = sorted({m["pool"] for m in meta.values() if m["pool"]})
     calls = []
     for p in pools:
-        for k in ("token0", "token1", "stable", "tickSpacing", "fee"):
+        for k in ("token0", "token1", "stable", "tickSpacing", "fee", "poolType"):
             calls.append((p, S[k]))
     res = rpc.multicall(calls) if calls else []
     pinfo = {}
     for i, p in enumerate(pools):
-        r = res[5 * i:5 * i + 5]
+        r = res[6 * i:6 * i + 6]
         pinfo[p] = {"t0": _dec_addr(*r[0]), "t1": _dec_addr(*r[1]),
-                    "stable": _dec(["bool"], *r[2]), "tick": _dec(["int24"], *r[3]), "fee": _dec(["uint24"], *r[4])}
+                    "stable": _dec(["bool"], *r[2]), "tick": _dec(["int24"], *r[3]), "fee": _dec(["uint24"], *r[4]),
+                    "type": _dec_text32(*r[5])}
     for g, m in meta.items():
         p = pinfo.get(m["pool"]) or {}
         m["t0"] = m["t0"] or p.get("t0")
@@ -313,10 +332,57 @@ def read_gauge_meta(rpc, gauges):
         elif p.get("stable") is not None:
             m["kind"] = "stable" if p["stable"] else "volatile"
         else:
-            m["kind"] = "?"
+            m["kind"] = basic_kind(p.get("type")) or "?"
         if p.get("fee") is not None:
             m["fee_raw"] = int(p["fee"])
     return meta
+
+
+MAX_BASIC_FEE_BPS = 2000        # the pool factory takes at most 20%: more is not a fee
+
+
+def read_pool_facts(rpc, concentrated, basic):
+    """{pool: {"fee_raw": pips, "kind": ...}}: what drifts on a pool, as it is now.
+    Concentrated pools answer fee() in pips (it moves: many have a dynamic fee). Basic pools have no fee() of their
+    own: their factory answers, in basis points, with the base fee of a small swap on the pool's reserves
+    (getBaseFee) or with its default; they also declare their type (POOL_TYPE), which names the ones read before
+    this was known. Whatever a pool does not answer is left out."""
+    concentrated, basic = list(concentrated), list(basic)
+    out = {p: {} for p in concentrated + basic}
+    res = rpc.multicall([(p, S["fee"]) for p in concentrated]) if concentrated else []
+    for p, r in zip(concentrated, res):
+        fee = _dec(["uint24"], *r)
+        if fee:
+            out[p]["fee_raw"] = int(fee)
+    if not basic:
+        return out
+    calls = []
+    for p in basic:
+        calls += [(p, S["poolType"]), (p, S["factory"]), (p, S["getReserves"])]
+    res = rpc.multicall(calls)
+    ask = []
+    for i, p in enumerate(basic):
+        r = res[3 * i:3 * i + 3]
+        kind = basic_kind(_dec_text32(*r[0]))
+        if kind:
+            out[p]["kind"] = kind
+        factory = _dec_addr(*r[1])
+        rs = _dec(["uint256", "uint256", "uint256"], *r[2])
+        if factory:
+            ask.append((p, factory, int(rs[0]) if rs else 0, int(rs[1]) if rs else 0))
+    calls = []
+    for p, factory, r0, r1 in ask:
+        calls.append((factory, S["getBaseFee"] + encode(["address", "address", "uint256", "uint256", "uint256", "uint256"],
+                                                        [p, ZERO, 1, 0, r0, r1])))
+        calls.append((factory, S["defaultFee"]))
+    res = rpc.multicall(calls) if calls else []
+    for i, (p, _, _, _) in enumerate(ask):
+        for r in res[2 * i:2 * i + 2]:
+            bps = _dec(["uint256"], *r)
+            if bps and bps <= MAX_BASIC_FEE_BPS:
+                out[p]["fee_raw"] = int(bps) * 100
+                break
+    return out
 
 
 def read_erc20(rpc, tokens):

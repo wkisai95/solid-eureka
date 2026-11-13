@@ -637,7 +637,8 @@ def chain_gauges(state, cid):
 def read_pending(rpc, cid, cs, state, now, log):
     """Reads what every gauge of the chain has pending for its voters (chain.read_pending_fees), for
     settle_accrual. Only this chain's state is written: chains are read in parallel."""
-    gauges = chain_gauges(state, cid)
+    # (an address the voter lists without a pool behind it is not a gauge: nothing to read)
+    gauges = [g for g in chain_gauges(state, cid) if (state["gauges"].get(gkey(cid, g)) or {}).get("pool")]
     if not gauges:
         return
     v = C.read_pending_fees(rpc, gauges)
@@ -662,13 +663,15 @@ def _spread(bucket, t0, t1, usd):
 
 
 def _accrued(state, prices, cid, key, prev, now_p, collected):
-    """(USD earned, raw amounts carried) from a gauge's pending fees before and now, the raw amounts collected in
-    between and the carry: a negative remainder (a collection whose event comes next run) or an amount without a
-    price waits for the next run."""
+    """(USD earned, raw amounts carried, USD of it that was waiting) from a gauge's pending fees before and now, the
+    raw amounts collected in between and the carry: a negative remainder (a collection whose event comes next run)
+    or an amount without a price waits for the next run. The third figure is the part of the USD that comes from
+    amounts carried by earlier runs, which accrued before the last reading."""
     g = state["gauges"].get(key) or {}
-    usd, carry = 0.0, []
+    usd, old, carry = 0.0, 0.0, []
     for i, tok in enumerate((g.get("t0"), g.get("t1"))):
-        d = int(now_p[i]) - int(prev["p"][i]) + int(prev["c"][i]) + int(collected.get((tok or "").lower(), 0))
+        before = int(prev["c"][i])
+        d = int(now_p[i]) - int(prev["p"][i]) + before + int(collected.get((tok or "").lower(), 0))
         tk = tkey(cid, tok) if tok else None
         price = prices.get(tk) if tk else None
         if d <= 0 or price is None:
@@ -676,8 +679,21 @@ def _accrued(state, prices, cid, key, prev, now_p, collected):
             continue
         dec = (state["erc20"].get(tk) or {}).get("dec", 18)
         usd += d / 10 ** dec * price
+        old += min(d, max(0, before)) / 10 ** dec * price
         carry.append(0)
-    return usd, carry
+    return usd, carry, old
+
+
+def _waiting_since(acc, key, prev):
+    """Since when the amounts a gauge carries have been waiting: the time written when they were first held
+    ("h"), or, for a carry older than that field, the end of the last hour the gauge was credited."""
+    t = int(prev["t"])
+    if not any(int(c) > 0 for c in prev["c"]):
+        return t
+    if prev.get("h"):
+        return min(t, int(prev["h"]))
+    hours = [int(h) for h, v in (acc.get(key) or {}).items() if v > 0]
+    return min(t, max(hours) + HOUR) if hours else t
 
 
 def settle_accrual(state, prices, now, log):
@@ -685,7 +701,12 @@ def settle_accrual(state, prices, now, log):
     was collected in between (the FeesCollected events of this run). Writes them to the hour buckets of
     state["acc"] and returns [(time, gauge, USD)] for this run (what the earnings and the simulation credit).
 
-    A gauge read for the first time starts its count; one not read this run keeps its collected amounts in its carry."""
+    A gauge read for the first time starts its count; one not read this run keeps its collected amounts in its carry.
+
+    An amount too big for the pool's trading is held back in the carry (a broken price?). It is judged again every
+    run against the trading of the whole time it has waited, not of the last run alone: a real burst of fees,
+    bigger than the volume of an hour ago allowed, is credited as soon as the time waited explains it, and spread
+    over that time; what a broken price inflates stays out until the price is right again."""
     pend = state.setdefault("pend", {})
     acc = state.setdefault("acc", {})
     vrm_map = state.get("vrm_map") or {}
@@ -710,18 +731,28 @@ def settle_accrual(state, prices, now, log):
                 pend[key] = {"p": [str(x) for x in now_p], "c": ["0", "0"], "t": t}
                 started += 1
                 continue
-            usd, carry = _accrued(state, prices, cid, key, prev, now_p, col)
-            ceiling = _fee_ceiling(state, key, t - int(prev["t"]), now) if usd > FEE_SLACK_MIN_USD else None
+            usd, carry, old = _accrued(state, prices, cid, key, prev, now_p, col)
+            since = _waiting_since(acc, key, prev)
+            ceiling = _fee_ceiling(state, key, t - since, now) if usd > FEE_SLACK_MIN_USD else None
             if usd > MAX_RUN_USD or (ceiling is not None and usd > ceiling):
-                log(f"rewards: {usd:,.2f} USD of fees on {key} in one run held back (a broken price?"
-                    + (f" its volume allows {ceiling:,.2f}" if ceiling is not None else "") + ")")
+                log(f"rewards: {usd:,.2f} USD of fees on {key} held back, waiting {(t - since) / HOUR:.1f} h "
+                    f"(a broken price?" + (f" its volume allows {ceiling:,.2f}" if ceiling is not None else "") + ")")
                 g = state["gauges"].get(key) or {}
                 carry = [int(now_p[i]) - int(prev["p"][i]) + int(prev["c"][i]) +
                          int(col.get((tok or "").lower(), 0)) for i, tok in enumerate((g.get("t0"), g.get("t1")))]
-                usd, held = 0.0, held + 1
+                usd, old, held = 0.0, 0.0, held + 1
             pend[key] = {"p": [str(x) for x in now_p], "c": [str(x) for x in carry], "t": t}
+            if any(c > 0 for c in carry):
+                pend[key]["h"] = since                      # still waiting: from when
             if usd > 0:
-                _spread(acc.setdefault(key, {}), int(prev["t"]), t, usd)
+                # what waited accrued before the last reading, the rest since
+                if old > 0 and since < int(prev["t"]):
+                    _spread(acc.setdefault(key, {}), since, int(prev["t"]), old)
+                    usd_new = usd - old
+                else:
+                    usd_new = usd
+                if usd_new > 0:
+                    _spread(acc.setdefault(key, {}), int(prev["t"]), t, usd_new)
                 fresh.append((t, key, usd))
     # gauges not read this run: what was collected waits in their carry
     for key, col in collected.items():
@@ -1000,34 +1031,79 @@ def fee_change(state, key, now):
 
 
 def refresh_eligibility(rpc, cid, state, now, log, every=6 * HOUR):
-    """Marks gauges an ordinary position can vote: activated on the leaf and with a non-zero emission cap."""
+    """Every run: the emission cap of each gauge (an operator rewrites the caps of the earning gauges every few
+    minutes, following their fees). Every `every`: which gauges an ordinary position can vote (activated on the
+    leaf, with a non-zero cap) and what drifts on their pools (refresh_pool_facts)."""
     cid = int(cid)
     cs = chain_state(state, cid)
     pref = f"{cid}:"
-    # (a chain whose caps were never stored is read at once: bootstrap.py needs them)
-    capped = any("cap" in m for k, m in state["gauges"].items() if k.startswith(pref) and m.get("vrm"))
-    if now - cs.get("eligibility_at", 0) < every and capped:
-        return
     registry = (cs.get("params") or {}).get("factory_registry") or (C.FACTORY_REGISTRY if cid == C.BASE_CHAIN
                                                                        else None)
     if not registry:
         return
     keys = [k for k, m in state["gauges"].items() if k.startswith(pref) and m.get("vrm")]
+    # (the first run that knows about pool facts reads them at once)
+    full = now - cs.get("eligibility_at", 0) >= every or not cs.get("facts_at")
     calls = []
     for k in keys:
         g = addr_of(k)
-        calls.append((C.LEAF, C.S["isActivated"] + encode(["address"], [g])))
         calls.append((registry, C.S["emissionCap"] + encode(["address"], [g])))
-    res = rpc.multicall(calls) if calls else []
+        if full:
+            calls.append((C.LEAF, C.S["isActivated"] + encode(["address"], [g])))
+    try:
+        res = rpc.multicall(calls) if calls else []
+    except Exception as e:
+        if full:
+            raise
+        # the caps alone are not worth a failed run: the ones read before stay
+        log(f"{C.chain_short(cid)}: emission caps not read this run: {type(e).__name__}: {str(e)[:160]}")
+        return
+    step = 2 if full else 1
     blocked = 0
     for i, k in enumerate(keys):
-        act = C._dec(["bool"], *res[2 * i])
-        cap = C._dec(["uint128"], *res[2 * i + 1])
-        if act is None or cap is None:
+        cap = C._dec(["uint128"], *res[step * i])
+        if cap is None:
             continue
-        state["gauges"][k]["ok"] = bool(act) and cap > 0
-        # the gauge's emission cap in AERO per second (it follows the fees the pool makes); None: no cap
-        state["gauges"][k]["cap"] = None if cap >= 2 ** 127 else float(f"{cap / 1e18:.6g}")
-        blocked += 0 if state["gauges"][k]["ok"] else 1
+        m = state["gauges"][k]
+        # AERO per second; None: no cap
+        m["cap"] = None if cap >= 2 ** 127 else float(f"{cap / 1e18:.6g}")
+        if full:
+            act = C._dec(["bool"], *res[step * i + 1])
+            if act is not None:
+                m["ok"] = bool(act) and cap > 0
+                blocked += 0 if m["ok"] else 1
+    if not full:
+        return
     cs["eligibility_at"] = now
     log(f"{C.chain_short(cid)}: eligibility {len(keys)} gauges checked, {blocked} not votable by ordinary positions")
+    try:
+        refresh_pool_facts(rpc, cid, state, keys, log)
+        cs["facts_at"] = now
+    except Exception as e:
+        log(f"{C.chain_short(cid)}: pool fees not refreshed: {type(e).__name__}: {str(e)[:200]}")
+
+
+def refresh_pool_facts(rpc, cid, state, keys, log):
+    """The swap fee of every pool as it is now (it is dynamic on many: the one read when the gauge was first seen
+    goes stale) and the type of the basic pools that were read before they declared one."""
+    by_pool = {}
+    for k in keys:
+        pool = state["gauges"][k].get("pool")
+        if pool:
+            by_pool.setdefault(pool, []).append(k)
+    kind_of = {p: str(state["gauges"][ks[0]].get("kind") or "?") for p, ks in by_pool.items()}
+    concentrated = sorted(p for p, kd in kind_of.items() if kd.startswith("CL"))
+    basic = sorted(p for p, kd in kind_of.items() if not kd.startswith("CL"))
+    facts = C.read_pool_facts(rpc, concentrated, basic)
+    fees = named = 0
+    for pool, f in facts.items():
+        for k in by_pool[pool]:
+            m = state["gauges"][k]
+            if f.get("fee_raw") and f["fee_raw"] != m.get("fee_raw"):
+                m["fee_raw"] = f["fee_raw"]
+                fees += 1
+            if f.get("kind") and m.get("kind") in (None, "?"):
+                m["kind"] = f["kind"]
+                named += 1
+    if fees or named:
+        log(f"{C.chain_short(cid)}: pool fees changed on {fees} gauges" + (f", {named} basic pools named" if named else ""))
