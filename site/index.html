@@ -238,8 +238,24 @@ input[type=password] { font: inherit; font-size: 14px; color: var(--ink); backgr
 details.more summary { cursor: pointer; color: var(--accent); font-size: 13px; padding: 2px 0; }
 .row > details.pairs { grid-column: 1 / -1; margin-top: 4px; }
 details.more[open] summary { margin-bottom: 3px; }
-/* folding: long sections open and close, and the page remembers which */
+/* the bar of the sections: jump to one (it opens), or close and open them all; it stays at the top while scrolling */
+.secnav { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  margin: -6px calc(-1 * max(16px, env(safe-area-inset-left, 0px))) -6px; padding: 8px max(16px, env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.secnav::-webkit-scrollbar { display: none; }
+.secnav:empty { display: none; }
+.secnav button { flex: none; white-space: nowrap; font: 500 13px/1.2 var(--f-body); padding: 7px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); cursor: pointer; min-height: 0; }
+.secnav button.on { color: var(--ink); border-color: var(--accent); }
+.secnav button.all { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.secnav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.panel { scroll-margin-top: 58px; }
+/* folding: every section opens and closes, and the page remembers which */
 details.fold > summary, details.sub-fold > summary { list-style: none; cursor: pointer; }
+details.fold > summary { margin: -16px; padding: 16px; border-radius: 13px; -webkit-tap-highlight-color: transparent; }
+details.fold[open] > summary { margin-bottom: -12px; padding-bottom: 12px; }
+details.fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: hover) { details.fold:not([open]) > summary:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); } }
 details.fold > summary::-webkit-details-marker, details.sub-fold > summary::-webkit-details-marker { display: none; }
 details.panel { display: block; }
 details.panel > .fold-body { display: grid; gap: 12px; margin-top: 12px; min-width: 0; }
@@ -423,6 +439,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     <div class="banner" id="banner" hidden></div>
   </header>
 
+  <nav class="secnav" id="secnav" aria-label="Sezioni della pagina"></nav>
+
   <section class="panel" id="gh-panel" hidden>
     <div class="panel-head"><h2>Avvia la raccolta da qui</h2><button type="button" class="linkish" id="gh-close">Chiudi</button></div>
     <p class="note">Per far partire il monitor da questa pagina serve un token GitHub che può solo avviare il workflow del monitor. Si crea una volta e resta salvato solo su questo dispositivo.</p>
@@ -440,8 +458,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     <div class="controls"><button type="button" class="ghost" id="gh-forget" hidden>Dimentica il token</button></div>
   </section>
 
-  <section class="panel" id="me">
-    <div class="panel-head"><h2>I tuoi sAERO</h2><span class="sub" id="me-when"></span></div>
+  <details class="panel fold" data-fold="me" open id="me">
+    <summary class="panel-head"><h2>I tuoi sAERO</h2><span class="sub" id="me-when"></span></summary>
+    <div class="fold-body">
     <form class="controls" id="me-form">
       <input type="text" id="me-addr" autocomplete="off" spellcheck="false" placeholder="Il tuo indirizzo 0x…" aria-label="Indirizzo del wallet">
       <button type="submit">Mostra</button>
@@ -461,10 +480,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p class="note">Per seguire posizioni che non sono su questo indirizzo, per esempio su un altro wallet.</p>
       </div>
     </details>
-  </section>
+    </div>
+  </details>
 
-  <section class="panel" id="radar">
-    <div class="panel-head"><h2>Radar sAERO</h2><span class="sub" id="rd-when"></span></div>
+  <details class="panel fold" data-fold="radar" open id="radar">
+    <summary class="panel-head"><h2>Radar sAERO</h2><span class="sub" id="rd-when"></span></summary>
+    <div class="fold-body">
     <p class="note">Dove allocare il tuo sAERO per incassare di più nelle prossime 48 ore. I pool arrivano dal monitor, con fee e incentivi letti dalla chain su tutte e sette le reti. Inserisci la tua Allocation Power: il radar divide il 100% tra i pool tenendo conto di quanto <b>la tua stessa allocazione diluisce</b> ogni pool.</p>
 
     <details class="sub-fold" data-fold="rd-mine" open>
@@ -472,6 +493,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="fold-body"><div class="mine3" id="rd-mine"></div></div>
     </details>
 
+    <details class="sub-fold" data-fold="rd-opts" open>
+      <summary><span class="fold-t">Opzioni</span><span class="sub" id="rd-opts-sum"></span></summary>
+      <div class="fold-body">
     <div class="opts" id="rd-opts">
       <div class="field" id="rd-mypos-f" hidden><span class="flabel">Posizioni da riallocare</span><div class="mypos" id="rd-mypos"></div><small id="rd-mypos-s"></small></div>
       <div class="field"><label for="rd-ap">Allocation Power</label><input id="rd-ap" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>I tuoi sAERO, dalla card del tuo stake</small></div>
@@ -495,6 +519,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <span class="sub" id="rd-load-state">La simulazione qui sotto non usa ancora queste opzioni.</span>
       <button type="button" class="ghost" id="rd-load">Carica queste opzioni nella simulazione</button>
     </div>
+      </div>
+    </details>
 
     <div class="rd-result">
       <div class="rd-main">
@@ -572,15 +598,16 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p><b>Cosa non sa.</b> Non vede i movimenti degli altri allocatori durante le 47 ore di cooldown, non prevede incentivi nuovi o picchi di volume, e ignora i limiti di emissione dei gauge, che limitano le ricompense AERO di un pool ma non la revenue che ricevi. Non è una consulenza finanziaria: è aritmetica su dati pubblici.</p>
       </div>
     </details>
-  </section>
+    </div>
+  </details>
 
   <details class="panel fold" data-fold="boot" open id="boot">
     <summary class="panel-head"><h2>Pool da avviare</h2><span class="sub" id="bs-sub"></span></summary>
     <div class="fold-body">
-    <p class="note">Il gioco: un gauge quasi senza voti e senza liquidità, su una coppia che altrove scambia molto. Lo voti (le fee degli allocatori sono tutte tue) e ci metti tu un po' di liquidità in stake per far partire gli swap; le emissioni che i tuoi voti portano al pool tornano a te che sei quasi l'unico a fornire liquidità. Per un giorno o due l'APR a 48 ore mostra ancora le ore morte di prima, e nessun altro lo vede. Qui sotto: i gauge dove potresti farlo, e quelli che qualcuno ha appena fatto partire.</p>
+    <p class="note">Gauge quasi vuoti su coppie che altrove scambiano: li voti, ci metti tu la liquidità in stake, e fee ed emissioni tornano a te. Qui sotto quelli dove potresti farlo e quelli che qualcuno ha appena fatto partire.</p>
     <div class="opts">
+      <div class="field"><label for="bs-ap">Voti che ci metteresti</label><input id="bs-ap" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small id="bs-ap-s"></small></div>
       <div class="field"><label for="bs-liq">Liquidità che metteresti ($)</label><input id="bs-liq" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"><small>Tua, in stake nel gauge</small></div>
-      <div class="field"><span class="flabel">I tuoi voti</span><b id="bs-ap">—</b><small id="bs-ap-s">L'Allocation Power che hai scritto nel radar</small></div>
       <div class="field"><span class="flabel">Emissioni</span><small id="bs-em"></small></div>
     </div>
     <div class="stk-bar">
@@ -589,7 +616,14 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     </div>
     <div class="tbl cq"><table class="trd bs"><thead><tr id="bs-head"></tr></thead><tbody id="bs-rows"></tbody></table></div>
     <button type="button" class="linkish" id="bs-more" hidden></button>
-    <p class="note" id="bs-foot"></p>
+    <details class="sub-fold" data-fold="bs-how">
+      <summary><span class="fold-t">Come ragiona</span></summary>
+      <div class="fold-body how">
+        <p><b>Il gioco.</b> Un gauge quasi senza voti e senza liquidità, su una coppia che altrove scambia molto. Lo voti (le fee degli allocatori sono tutte tue) e ci metti tu un po' di liquidità in stake per far partire gli swap; le emissioni che i tuoi voti portano al pool tornano a te, che sei quasi l'unico a fornire liquidità. Per un giorno o due l'APR a 48 ore mostra ancora le ore morte di prima, e nessun altro lo vede.</p>
+        <p><b>Emissioni.</b> <span id="bs-how-em"></span></p>
+        <p><b>Le stime.</b> <span id="bs-foot"></span></p>
+      </div>
+    </details>
     </div>
   </details>
 
@@ -597,12 +631,17 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     <summary class="panel-head"><h2>Tendenze fee</h2><span class="sub" id="trd-sub"></span></summary>
     <div class="fold-body">
     <p class="note">Come si muovono le fee di ogni pool nei giorni della settimana e cosa le ha fatte saltare. Le fee seguono il volume: qui c'è il volume orario di ogni pool delle ultime sei settimane (GeckoTerminal), con i giorni eccezionali contati a parte perché un evento non passi per un'abitudine. Giorni in UTC. 1,0× è il giorno medio del pool.</p>
+    <details class="sub-fold" data-fold="trd-mkt" open>
+      <summary><span class="fold-t">Mercato, previsioni ed eventi</span><span class="sub" id="trd-mkt-sum"></span></summary>
+      <div class="fold-body">
     <div class="trd-top">
       <div class="stkc"><div class="h"><b>Mercato Aero per giorno</b><span class="d" id="trd-m-n"></span></div><div class="wdbars" id="trd-m-wd"></div><div class="wdlab" id="trd-m-lab"></div><div class="d" id="trd-m-txt"></div></div>
       <div class="stkc"><div class="h"><b>Quale previsione sbaglia meno</b><span class="d" id="trd-f-n"></span></div><div class="trd-ev" id="trd-f"></div></div>
       <div class="stkc"><div class="h"><b>Eventi di mercato</b><span class="d">giorni in cui si sono mossi molti pool insieme</span></div><div class="trd-ev" id="trd-m-ev"></div></div>
       <div class="stkc"><div class="h"><b>Calendario macro USA</b><span class="d" id="trd-mc-n"></span></div><div class="trd-ev" id="trd-mc"></div></div>
     </div>
+      </div>
+    </details>
     <div class="stk-bar">
       <div class="seg" id="trd-sort" role="group" aria-label="Ordina"><button type="button" data-s="ap" aria-pressed="true">Più votati</button><button type="button" data-s="next" aria-pressed="false">Meglio nelle prossime 48 ore</button><button type="button" data-s="swing" aria-pressed="false">Più legati al giorno</button></div>
       <input id="trd-q" type="search" placeholder="Cerca un pool" autocomplete="off" spellcheck="false" aria-label="Cerca un pool">
@@ -1133,6 +1172,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   function meRender() {
     const ae = document.activeElement;
     if (ae && ae.closest && ae.closest(".claim")) { meDeferred = true; return; }      // a figure is being typed
+    if (waits("me", meRender)) { $("me-when").textContent = ME ? `letto da Base ${when(ME.at)}` : ""; return; }
     const stats = $("me-stats"), list = $("me-list");
     $("me-ids-sum").textContent = myIds.length ? myIds.map(i => "#" + i).join(" ") : "";
     stats.replaceChildren(); list.replaceChildren(); $("me-chart").replaceChildren(); $("me-when").textContent = "";
@@ -1206,7 +1246,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (ME) {
       const b = el("button", "linkish", `Usa ${fmtN(T.ap)} come Allocation Power nel Radar`);
       b.type = "button";
-      b.addEventListener("click", () => { const i = $("rd-ap"); i.value = String(Math.round(T.ap)); i.dispatchEvent(new Event("input")); document.getElementById("radar").scrollIntoView({ behavior: "smooth" }); });
+      b.addEventListener("click", () => { const i = $("rd-ap"); i.value = String(Math.round(T.ap)); i.dispatchEvent(new Event("input")); const rd = document.getElementById("radar"); rd.open = true; requestAnimationFrame(() => rd.scrollIntoView({ behavior: glide() })); });
       if (T.ap > 0) list.append(b);
     }
     for (const { id, sh, ent, r, oc, alloc, base } of rows) {
@@ -1293,6 +1333,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   meRefresh();
 
   function waves(d) {
+    if (waits("waves", () => DATA && waves(DATA))) return;
     const W = d.waves || [];
     const sum = (n, k) => W.slice(0, n).reduce((s, w) => s + (w[k] || 0), 0);
     const stats = $("wave-stats");
@@ -1333,6 +1374,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
 
   function calendar(d) {
+    if (waits("calendar", () => DATA && calendar(DATA))) return;
     const box = $("calendar");
     box.replaceChildren();
     const now = Date.now() / 1000;
@@ -1347,6 +1389,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
 
   function incentives(d) {
+    if (waits("incentives", () => DATA && incentives(DATA))) return;
     const box = $("incentives");
     box.replaceChildren();
     const now = Date.now() / 1000;
@@ -1381,6 +1424,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
 
   function pools(d) {
+    if (waits("pools", () => DATA && pools(DATA))) { $("pool-count").textContent = `${(d.pools || []).length} pool`; return; }
     const q = $("q").value.trim().toLowerCase();
     const big = $("big").checked, cf = $("chain-f").value;
     let rows = (d.pools || []).filter(p => (!cf || (p.chain || "Base") === cf) && (!big || p.ap >= 100000 || p.unallocated) && (!q || p.name.toLowerCase().includes(q) || (p.pool || "").includes(q)));
@@ -1437,6 +1481,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
 
   function chains(d) {
+    if (waits("chains", () => DATA && chains(DATA))) return;
     const box = $("chains");
     box.replaceChildren();
     const list = d.chains || [];
@@ -1496,6 +1541,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
 
   function alertsList(d) {
+    if (waits("alerts", () => DATA && alertsList(DATA))) return;
     const box = $("alerts");
     box.replaceChildren();
     const rows = (d.alerts || []).slice(0, 12);
@@ -1659,6 +1705,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const val = p => ySort === "name" ? p.name.toLowerCase() : p[ySort];
     rows.sort((a, b) => { const va = val(a), vb = val(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; return (va > vb ? 1 : va < vb ? -1 : 0) * yDir; });
     $("yield-count").textContent = `${rows.length} pool`;
+    if (waits("yield", () => SIM && yieldTable(SIM))) return;
     document.querySelectorAll("th[data-y]").forEach(th => { if (th.dataset.y === ySort) th.setAttribute("aria-sort", yDir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort"); });
     const tb = $("yield-rows");
     tb.replaceChildren();
@@ -1715,7 +1762,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       : "Nessuna opzione caricata dal Radar: per ora la simulazione non ha limiti per pool. Le carichi dal Radar in cima alla pagina.";
   }
 
-  function simRender() { if (SIM) { simRank(SIM); simLegend(SIM); simCards(SIM); simChart(SIM); yieldTable(SIM); rdLoadState(); } }
+  function simRender() {
+    if (!SIM) return;
+    rdLoadState(); yieldTable(SIM);
+    if (waits("sim", simRender)) return;
+    simRank(SIM); simLegend(SIM); simCards(SIM); simChart(SIM);
+  }
   document.querySelectorAll("#sim-mode button").forEach(b => b.addEventListener("click", () => {
     simMode = b.dataset.m;
     try { localStorage.setItem("radar-sim-mode", simMode); } catch (e) {}
@@ -2020,8 +2072,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   const allocAvg = (p, n) => { let t = 0; for (let h = 0; h < n; h++) t += (allocAgo(p, h) + allocAgo(p, h + 1)) / 2; return t / n; };
 
   // the Radar's allocation: 1% slices to the pool that pays most on the next slice, within the options
-  function rdAllocate(list) {
-    const win = rdWin(), ap = Math.max(0, rdNum(RD.ap, 0)), w = win < 48 ? 0 : (+RD.trend || 0) / 100, cap = +RD.cap || 100, N = +RD.comp || 0, minA = Math.max(0, +RD.minA || 0);
+  // (apOver: the same allocation for another number of votes, for «Pool da avviare»)
+  function rdAllocate(list, apOver) {
+    const win = rdWin(), ap = Math.max(0, apOver != null ? apOver : rdNum(RD.ap, 0)), w = win < 48 ? 0 : (+RD.trend || 0) / 100, cap = +RD.cap || 100, N = +RD.comp || 0, minA = Math.max(0, +RD.minA || 0);
     let sR = 0, sA = 0;
     for (const p of list) { sR += projected(p, w); sA += Math.max(0, p.alloc); }
     const avg = sA > 0 ? sR / sA : 0;     // the whole market: the others vote on the pools you leave out too
@@ -2126,12 +2179,19 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (!bad) toast.h = setTimeout(() => { if (t.textContent === text) t.textContent = ""; }, 5000);
   }
 
+  // the line in the radar's header: closed, it carries the estimate
+  function rdHead() {
+    if (!DATA) return;
+    const r = rdLast && rdLast.r;
+    $("rd-when").textContent = (!shown("radar") && r && r.total > 0 ? `stima ${r$(r.total)} in 48 ore · ` : "") + "dati del " + when(DATA.generated);
+  }
   function rdRender() {
     if (!DATA) return;
     const list = rdPools(), r = rdAllocate(list), price = rdPrice();
     rdLast = { list, r };
+    rdHead();
+    if (waits("radar", rdRender)) { bootSoon(); return; }      // closed: the estimate stays in its header
     pfRender();
-    $("rd-when").textContent = "dati del " + when(DATA.generated);
     $("rd-trend-v").textContent = (+RD.trend || 0) + "%";
     const short = r.win < 48;
     $("rd-trend").disabled = short; $("rd-spk").disabled = short; $("rd-spkK").disabled = short;
@@ -2230,7 +2290,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           (e ? `. Nel backtest su questo pool ha sbagliato di solito di ${Math.round((e - 1) * 100)}%` + (e >= 1.6 ? ": pool poco prevedibile" : "") : "")));
       }
       { const sx = rdWin() ? seasonX(o.p.key, rdWin()) : 1;
-        if (Math.abs(sx - 1) >= 0.1) left.append(el("div", "apx", `📅 Per i giorni della settimana, nelle prossime 48 ore le sue fee sono di solito ${String(sx.toFixed(2)).replace(".", ",")}× quelle della finestra` + (RD.sea ? " (già contato)" : " (non contato: accendi «Correggi per il giorno della settimana»)"))); }
+        if (Math.abs(sx - 1) >= 0.1) left.append(el("div", "apx", `📅 Nei giorni delle prossime 48 ore di solito fa ${String(sx.toFixed(2)).replace(".", ",")}× le fee della finestra` + (RD.sea ? " (già contato)" : " (non contato: opzione «Correggi per il giorno della settimana»)"))); }
       left.append(bar);
       // leave this pool out, like unticking it in the table; it comes back from the chips of excluded pools
       const xb = el("button", "x", "✕");
@@ -2309,6 +2369,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     rdMine(list, r);
     rdCooldown();
     rdLoadState();
+    { const sel = $("rd-win"), how = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+      $("rd-opts-sum").textContent = (r.ap > 0 ? `${fmtN(r.ap)} voti · ` : "") + (/^dell/.test(how) ? "APR " + how : how); }
+    bootSoon();
   }
 
   function rdChains(list) {
@@ -2636,19 +2699,46 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   });
   document.addEventListener("click", e => { const dd = $("rd-chains-dd"); if (dd.open && !dd.contains(e.target)) dd.open = false; });
 
-  // ---------------------------------------------------------------- folding: long sections open and close, remembered
+  // ---------------------------------------------------------------- folding: every section opens and closes, remembered
   let FOLD = {};
   try { FOLD = JSON.parse(lsGet("radar-fold") || "{}") || {}; } catch (e) {}
+  const saveFold = () => lsSet("radar-fold", JSON.stringify(FOLD));
   document.querySelectorAll("details[data-fold]").forEach(d => {
     const id = d.dataset.fold;
     if (id in FOLD) d.open = !!FOLD[id];
     d.addEventListener("toggle", () => {
       FOLD[id] = d.open;
-      lsSet("radar-fold", JSON.stringify(FOLD));
+      saveFold();
+      if (d.open) drawWaiting();
       if (d.open && id === "waves" && DATA) waves(DATA);
       if (d.open && id === "sim" && SIM) simChart(SIM);
+      if (id === "radar") rdHead();
+      if (d.classList.contains("panel")) secnav();
     });
   });
+
+  // the bar of the sections: the first button closes them all (or opens them all when none is open), the others
+  // open one and go to it
+  const NAV_NAMES = { me: "I tuoi sAERO", radar: "Radar", boot: "Pool da avviare", trends: "Tendenze", stocks: "Stocks", top10: "Top 10",
+    sim: "Simulazione", yield: "Rendimento nel tempo", waves: "Cooldown", calendar: "Uscite", incentives: "Incentivi", pools: "Pool",
+    chains: "Chain", alerts: "Avvisi", watch: "Monitorate" };
+  const navFolds = () => [...document.querySelectorAll("details.panel.fold[data-fold]")].filter(d => !d.hidden && !d.parentElement.hidden);
+  function secnav() {
+    const nav = $("secnav"), tops = navFolds(), anyOpen = tops.some(d => d.open);
+    const all = el("button", "all", anyOpen ? "Chiudi tutte" : "Apri tutte"); all.type = "button";
+    all.addEventListener("click", () => { for (const d of navFolds()) d.open = !anyOpen; if (anyOpen) window.scrollTo({ top: 0 }); });
+    const at = nav.scrollLeft;
+    nav.replaceChildren(all);
+    for (const d of tops) {
+      const h2 = d.querySelector("summary h2");
+      const b = el("button", d.open ? "on" : "", NAV_NAMES[d.dataset.fold] || (h2 ? h2.textContent : d.dataset.fold)); b.type = "button";
+      b.setAttribute("aria-pressed", String(d.open));
+      b.addEventListener("click", () => { d.open = true; requestAnimationFrame(() => d.scrollIntoView({ behavior: glide(), block: "start" })); });
+      nav.append(b);
+    }
+    nav.scrollLeft = at;
+  }
+  secnav();
 
   // ---------------------------------------------------------------- manual runs on GitHub Actions
   const REPO_DEFAULT = "wkisai95/solid-eureka", WORKFLOW = "monitor.yml";
@@ -2795,6 +2885,25 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     }
   } catch (e) {}
 
+  // A section draws itself only while it can be seen: closed, or hidden with the sections kept out of sight, its
+  // drawing waits and is done when it opens. Each renderer sets the line of its header first, then asks waits().
+  // (scrolling to a section glides, unless the device asks for less motion)
+  function glide() { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"; } catch (e) { return "auto"; } }
+  function shown(id) {
+    let d = document.querySelector(`details[data-fold="${id}"]`);
+    for (; d && d !== document.body; d = d.parentElement) if (d.hidden || (d.tagName === "DETAILS" && !d.open)) return false;
+    return true;
+  }
+  function waits(id, again) {
+    const later = waits.later || (waits.later = new Map());
+    if (shown(id)) { later.delete(id); return false; }
+    later.set(id, again);
+    return true;
+  }
+  function drawWaiting() {
+    for (const [id, again] of [...(waits.later || [])]) if (shown(id)) { waits.later.delete(id); again(); }
+  }
+
   function render() {
     if (!DATA) return;
     header(DATA); rdRender(); meRender(); autopilotRender(DATA); top10Render(DATA); waves(DATA); calendar(DATA); incentives(DATA); chainOptions(DATA); pools(DATA); chains(DATA); alertsList(DATA);
@@ -2822,6 +2931,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (!big || !big.autopilot) { box.append(el("p", "note", "I dati sull'Autopilot arrivano con il prossimo giro del monitor.")); return; }
     const rel = big.autopilot, total = big.total || 1, sum = rel.reduce((t, p) => t + p.alloc, 0);
     $("autopilot-sum").textContent = `${fmtN(sum)} voti in ${rel.length} relay, ${art(fmtPct(sum / total * 100))}${fmtPct(sum / total * 100)} di tutti i voti allocati`;
+    if (waits("autopilot", () => DATA && autopilotRender(DATA))) return;
     box.append(el("p", "note", "Ogni relay è una sola posizione che vota per tutti i suoi depositanti e, come le altre, dopo ogni allocazione aspetta 47 ore. " +
       "Quando sposta i voti, nei pool che lascia chi resta guadagna di più finché altri non entrano: «se esce» dice quanto renderebbe in più ogni voto che resta. " +
       "Ti arriva una notifica a ogni spostamento e 45 minuti prima della fine del cooldown dei relay più grandi."));
@@ -2877,6 +2987,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (!big || !big.top) { empty(box, "La classifica arriva con il prossimo giro del monitor."); return; }
     const total = big.total || 1;
     $("top10-sub").textContent = big.scan && big.scan.full_at ? `tra tutte le ${big.scan.live ? Math.round(big.scan.live).toLocaleString("it-IT") + " " : ""}posizioni con voti, lette tutte l'ultima volta ${when(big.scan.full_at)}` : "prima lettura di tutte le posizioni in corso";
+    if (waits("top10", () => DATA && top10Render(DATA))) return;
     const dmy = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" });
     for (const p of big.top) {
       const w = el("div", "row toprow");
@@ -2928,6 +3039,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     document.querySelectorAll(".grid2").forEach(g => { g.hidden = [...g.children].every(c => c.hidden); });
     $("hidden-txt").textContent = SHOW_HIDDEN ? "Sezioni nascoste visibili." : `Nascoste per ora, ma il monitor continua a raccoglierne i dati: ${HIDDEN.map(h => h[1]).join(", ")}.`;
     $("hidden-toggle").textContent = SHOW_HIDDEN ? "Nascondile di nuovo" : "Mostrale";
+    secnav();
+    if (SHOW_HIDDEN) drawWaiting();
   }
   $("hidden-toggle").addEventListener("click", () => {
     SHOW_HIDDEN = !SHOW_HIDDEN;
@@ -2940,7 +3053,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---------------------------------------------------------------- stocks on chain, hour by hour (stocks.json)
   let STK = null, stkChain = "4663", stkAll = false;
   try { stkChain = localStorage.getItem("radar-stk-chain") || "4663"; } catch (e) {}
-  const STK_NAMES = { 4663: "Robinhood Chain", 8453: "Base" }, STK_TOP = 15;
+  const STK_NAMES = { 4663: "Robinhood Chain", 8453: "Base" }, stkTop = () => narrow() ? 8 : 15;
   const usd = x => x == null ? "—" : "$" + fmtN(x);
   const pctCh = (a, b) => a != null && b != null && b > 0 ? (a - b) / b * 100 : null;
   const chTxt = v => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmtPct(Math.abs(v));
@@ -2983,6 +3096,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   }
   const hTxt = n => n === 1 ? "1h" : `${n}h`;
   function stocksRender() {
+    { const reads = Object.keys((STK && STK.read) || {}).map(Number);
+      $("stk-sub").textContent = STK && STK.tokens && STK.tokens.length && reads.length ? `ultima lettura ${when(STK.read[String(Math.max(...reads))])}` : "";
+      if (waits("stocks", stocksRender)) return; }
     const cards = $("stk-chains"), rows = $("stk-rows"), n = stkWin;
     cards.replaceChildren(); rows.replaceChildren();
     document.querySelectorAll("#stk-win button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.h === n)));
@@ -3025,8 +3141,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const q = $("stk-q").value.trim().toLowerCase();
     const W = t => (t.w && t.w[String(n)]) || [];
     const list = STK.tokens.filter(t => String(t.c) === stkChain && (!q || t.sym.toLowerCase().includes(q))).sort((a, b) => (W(b)[0] || 0) - (W(a)[0] || 0));
-    const shown = stkAll || q ? list : list.slice(0, STK_TOP);
-    for (const t of shown) {
+    const top = stkAll || q ? list : list.slice(0, stkTop());
+    for (const t of top) {
       const [v, vp, vy, tx, , sup, chg] = W(t), tr = document.createElement("tr");
       tr.append(el("td", null, t.sym), el("td", "num", t.px == null ? "—" : "$" + (t.px >= 100 ? t.px.toFixed(2) : t.px.toPrecision(4)).replace(".", ",")));
       const c1 = el("td", "num"); c1.append(chEl(chg != null ? chg : null)); tr.append(c1);
@@ -3041,8 +3157,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     }
     if (!list.length) { const tr = document.createElement("tr"), td = el("td", "muted", q ? "Nessun titolo corrisponde." : "Nessun titolo letto su questa rete."); td.colSpan = 9; tr.append(td); rows.append(tr); }
     const more = $("stk-more");
-    more.hidden = !!q || list.length <= STK_TOP;
-    more.textContent = stkAll ? `Mostra solo i primi ${STK_TOP}` : `Mostra tutti i ${list.length}`;
+    more.hidden = !!q || list.length <= stkTop();
+    more.textContent = stkAll ? `Mostra solo i primi ${stkTop()}` : `Mostra tutti i ${list.length}`;
   }
   document.querySelectorAll("#stk-win button").forEach(b => b.addEventListener("click", () => {
     stkWin = +b.dataset.h; try { localStorage.setItem("radar-stk-win", String(stkWin)); } catch (e) {}
@@ -3058,7 +3174,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---------------------------------------------------------------- fee tendencies (trends.json)
   const WD = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"], WDL = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
   let trdSort = "ap", trdAll = false, trdOpen = null;
-  const TRD_TOP = 25, x2t = v => v == null ? "—" : String(v.toFixed(2)).replace(".", ",") + "×";
+  const trdTop = () => narrow() ? 10 : 25, x2t = v => v == null ? "—" : String(v.toFixed(2)).replace(".", ",") + "×";
   const dayTxt = d => new Date(d * 1000).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
   function wdBars(wd, today) {
     const box = el("div", "wdbars"), max = Math.max(0.01, ...wd.filter(v => v != null));
@@ -3079,6 +3195,12 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     return parts.join(" · ");
   }
   function trendsRender() {
+    { const m = TRD && TRD.market, mc = TRD && TRD.macro, now = (TRD && TRD.generated) || 0;
+      $("trd-sub").textContent = !TRD || !TRD.pools || !TRD.pools.length || !m ? (TRD && TRD.tracked ? `raccolta in corso: ${TRD.have || 0} pool su ${TRD.tracked}` : "")
+        : (TRD.have >= TRD.tracked ? `${TRD.have} pool` : `${TRD.have} pool su ${TRD.tracked}`) + ` · dal ${dayTxt(m.from)} al ${dayTxt(m.to)}`;
+      const nx = ((mc && mc.next) || []).find(e => e[0] >= now);
+      $("trd-mkt-sum").textContent = nx ? `prossimo evento: ${nx[1]}, ${when(nx[0])}` : "";
+      if (waits("trends", trendsRender)) return; }
     { const box = $("trd-mc"), mc = TRD && TRD.macro, now = (TRD && TRD.generated) || 0;
       box.replaceChildren();
       $("trd-mc-n").textContent = mc ? (mc.feed ? "Fed, inflazione, lavoro e gli eventi della settimana" : "Fed, inflazione, lavoro") : "";
@@ -3136,8 +3258,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     });
     list.sort((a, b) => trdSort === "next" ? (b.next || 0) - (a.next || 0) : trdSort === "swing" ? b.swing - a.swing : b.p.ap - a.p.ap);
     document.querySelectorAll("#trd-sort button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.s === trdSort)));
-    const shown = trdAll || q ? list : list.slice(0, TRD_TOP);
-    for (const o of shown) {
+    const top = trdAll || q ? list : list.slice(0, trdTop());
+    for (const o of top) {
       const p = o.p, tr = el("tr", "trow" + (trdOpen === p.k ? " open" : ""));
       const c0 = el("td"); c0.append(el("b", "", p.name), el("span", "sub", ` ${p.chain}`)); tr.append(c0);
       const c1 = el("td"); c1.append(wdBars(p.wd, today)); tr.append(c1);
@@ -3159,15 +3281,33 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       }
     }
     const more = $("trd-more");
-    more.hidden = !!q || list.length <= TRD_TOP;
-    more.textContent = trdAll ? `Mostra solo i primi ${TRD_TOP}` : `Mostra tutti i ${list.length}`;
+    more.hidden = !!q || list.length <= trdTop();
+    more.textContent = trdAll ? `Mostra solo i primi ${trdTop()}` : `Mostra tutti i ${list.length}`;
   }
   document.querySelectorAll("#trd-sort button").forEach(b => b.addEventListener("click", () => { trdSort = b.dataset.s; trendsRender(); }));
   $("trd-more").addEventListener("click", () => { trdAll = !trdAll; trendsRender(); });
   { let t = 0; $("trd-q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(trendsRender, 150); }); }
   // ---------------------------------------------------------------- pools to start (bootstrap.json)
   let BOOT = null, bsView = "start", bsAll = false, bsOpen = null, bsLiq = 5000;
-  const BS_TOP = 20;
+  // rows shown before «Mostra tutti»: fewer on a phone, where each one is a card
+  function narrow() { try { return window.matchMedia("(max-width: 700px)").matches; } catch (e) { return false; } }
+  const bsTop = () => narrow() ? 8 : 20;
+  // the votes this section counts with: its own field, or the radar's Allocation Power while the field is empty
+  let bsAp = "";
+  try { bsAp = localStorage.getItem("radar-bs-ap") || ""; } catch (e) {}
+  const bsVotes = () => { const v = numIn(bsAp); return v > 0 ? v : Math.max(0, rdNum(RD.ap, 0)); };
+  // what the radar's allocation would earn a day with these votes: its own result when they are the radar's, else
+  // the same allocation worked out again for them (kept until the radar changes)
+  function radarDayFor(V) {
+    const r = rdLast && rdLast.r;
+    if (!r || !(V > 0)) return 0;
+    if (Math.abs(V - r.ap) < 0.5) return r.total > 0 ? r.total / 2 : 0;
+    const c = radarDayFor.last;
+    if (!c || c.of !== rdLast || c.V !== V) radarDayFor.last = { of: rdLast, V, day: rdAllocate(rdLast.list, V).total / 2 };
+    return radarDayFor.last.day;
+  }
+  // (the radar calls this after it has worked out a new allocation: the comparison here follows)
+  function bootSoon() { clearTimeout(bootSoon.t); bootSoon.t = setTimeout(() => { if (BOOT) bootRender(); }, 250); }
   try { const v = +localStorage.getItem("radar-bs-liq"); if (v > 0) bsLiq = v; } catch (e) {}
   const pct2 = v => String((v * 100).toFixed(v * 100 >= 10 ? 0 : v * 100 >= 1 ? 1 : 2)).replace(".", ",") + "%";
   const ilPct = v => { const t = pct2(v), n = parseInt(t, 10); return (n === 0 ? "lo " : n === 1 || n === 11 || String(n)[0] === "8" ? "l'" : "il ") + t; };
@@ -3183,7 +3323,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     return v.length ? Math.max(...v) : 0;
   }
   function bsCalc(c) {
-    const V = Math.max(0, rdNum(RD.ap, 0)), L = bsLiq, px = rdPrice() || BOOT.aero_usd || 0;
+    const V = bsVotes(), L = bsLiq, px = rdPrice() || BOOT.aero_usd || 0;
     const fee = c.fee != null ? c.fee : 0.003;
     // your liquidity takes its share of what the pair trades elsewhere; the liquidity already there keeps trading as it does today
     const all = c.pl + c.al + c.liq + L, share = L / Math.max(1, all), volPair = (c.pv + c.av) * share;
@@ -3204,30 +3344,36 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   function bootRender() {
     const head = $("bs-head"), rows = $("bs-rows"), more = $("bs-more");
     head.replaceChildren(); rows.replaceChildren();
-    const V = Math.max(0, rdNum(RD.ap, 0));
-    $("bs-ap").textContent = V > 0 ? fmtN(V) : "—";
-    $("bs-ap-s").textContent = V > 0 ? "L'Allocation Power che hai scritto nel radar" : "Scrivi la tua Allocation Power nel radar: senza, le fee sono quelle di tutto il pool";
+    $("bs-sub").textContent = BOOT ? `${BOOT.start.length} da avviare · ${BOOT.started.length} appena partiti` : "";
+    if (waits("boot", bootRender)) return;
+    const V = bsVotes(), own = numIn(bsAp) > 0, rdV = Math.max(0, rdNum(RD.ap, 0));
+    if (document.activeElement !== $("bs-ap")) $("bs-ap").value = own ? Math.round(numIn(bsAp)).toLocaleString("it-IT") : "";
+    $("bs-ap").placeholder = rdV > 0 ? rdV.toLocaleString("it-IT") : "es. 50.000";
+    $("bs-ap-s").textContent = own ? `Solo per questa sezione. Vuoto: l'Allocation Power del radar${rdV > 0 ? ` (${fmtN(rdV)})` : ""}`
+      : rdV > 0 ? "Vuoto: l'Allocation Power del radar. Scrivi qui i voti che daresti a un solo pool" : "Scrivi i voti: senza, le fee sono quelle di tutto il pool";
     if (document.activeElement !== $("bs-liq")) $("bs-liq").value = Math.round(bsLiq).toLocaleString("it-IT");
     document.querySelectorAll("#bs-view button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === bsView)));
-    if (!BOOT) { $("bs-sub").textContent = ""; $("bs-em").textContent = "I dati arrivano con il prossimo aggiornamento."; more.hidden = true; $("bs-foot").textContent = ""; return; }
+    if (!BOOT) { $("bs-em").textContent = "I dati arrivano con il prossimo aggiornamento."; $("bs-how-em").textContent = ""; more.hidden = true; $("bs-foot").textContent = ""; return; }
     const px = rdPrice() || BOOT.aero_usd || 0, epv = bootEpv();
-    $("bs-sub").textContent = `${BOOT.start.length} da avviare · ${BOOT.started.length} appena partiti`;
-    $("bs-em").textContent = epv ? `Ogni voto porta ${String(epv.toFixed(5)).replace(".", ",")} AERO al giorno al pool che vota` + (V > 0 ? ` (i tuoi: ${fmtN(V * epv)} AERO, ${r$(V * epv * px)} al giorno)` : "") +
-      ", ma solo fino al cap del gauge. Il cap segue le fee del pool" + (BOOT.cap_k ? `: di solito vale ${String(BOOT.cap_k.toFixed(1)).replace(".", ",")} volte il ritmo delle fee delle ultime ${BOOT.cap_h || 3} ore` : "") +
-      (BOOT.min_cap != null ? `, e un gauge fermo resta al minimo (${String(BOOT.min_cap).replace(".", ",")} AERO al giorno).` : ".")
-      : "Le emissioni per voto arrivano con il prossimo aggiornamento.";
+    $("bs-em").textContent = !epv ? "Le emissioni per voto arrivano con il prossimo aggiornamento."
+      : V > 0 ? `Questi voti chiamano ${fmtN(V * epv)} AERO al giorno (${r$(V * epv * px)}), ma solo fino al cap del gauge, che segue le fee del pool`
+      : "Ogni voto porta emissioni al pool che vota, fino al cap del gauge";
+    $("bs-how-em").textContent = epv ? `Ogni voto porta ${String(epv.toFixed(5)).replace(".", ",")} AERO al giorno al pool che vota, ma solo fino al cap del gauge. Il cap segue le fee del pool` +
+      (BOOT.cap_k ? `: di solito vale ${String(BOOT.cap_k.toFixed(1)).replace(".", ",")} volte il ritmo delle fee delle ultime ${BOOT.cap_h || 3} ore` : "") +
+      (BOOT.min_cap != null ? `, e un gauge fermo resta al minimo (${String(BOOT.min_cap).replace(".", ",")} AERO al giorno).` : ".") +
+      " Le emissioni vanno alla liquidità in stake e dentro il range: se il prezzo esce dal tuo range non prendi né fee né emissioni." : "";
     const q = $("bs-q").value.trim().toLowerCase(), hit = c => !q || `${c.name} ${c.chain}`.toLowerCase().includes(q);
     const th = (t, num) => head.append(el("th", num ? "num" : "", t));
     const cell = (cls, txt, label) => { const td = el("td", cls, txt); td.dataset.l = label; return td; };
     const kNum = x => String(x >= 10 ? Math.round(x) : x.toFixed(1)).replace(".", ",");
     const aeroN = x => x < 100 ? String(+x.toFixed(x < 10 ? 2 : 1)).replace(".", ",") : fmtN(x);
-    const radarDay = rdLast && rdLast.r && rdLast.r.total > 0 ? rdLast.r.total / 2 : 0;
+    const radarDay = radarDayFor(V);
     let list;
     if (bsView === "start") {
       ["Pool", "Al giorno", "Fee a te", "Emissioni a te", "Altrove 24 ore", "Voti ora", "Liquidità"].forEach((t, i) => th(t, i > 0));
       const going = new Map(BOOT.started.map(x => [x.k, x]));
       list = BOOT.start.filter(hit).map(c => ({ c, e: bsCalc(c) })).sort((a, b) => b.e.tot - a.e.tot);
-      for (const o of (bsAll || q ? list : list.slice(0, BS_TOP))) {
+      for (const o of (bsAll || q ? list : list.slice(0, bsTop()))) {
         const c = o.c, e = o.e, tr = el("tr", "trow" + (bsOpen === c.k ? " open" : ""));
         const c0 = el("td"), g = going.get(c.k); c0.append(el("b", "", c.name), el("span", "sub", ` ${c.chain} · ${c.kind} · ${feeTxt(c.fee)}` + (g ? " · già in moto" : "") + (e.high ? " · cap ancora alto" : ""))); tr.append(c0);
         tr.append(cell("num key " + (radarDay && e.tot > radarDay ? "up" : ""), r$(e.tot), "A te al giorno"));
@@ -3267,13 +3413,13 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       }
       const kp = Array.isArray(BOOT.k_pair) ? BOOT.k_pair : null;
       const kTxt = kp ? ` Per misura, su ${kp[3]} pool Aero piccoli che già scambiano: il volume è di solito ${kNum(kp[1])} volte la loro quota di liquidità, in un caso su quattro meno di ${kNum(kp[0])}.` : "";
-      $("bs-foot").textContent = `«Al giorno» è quello che andrebbe a te a regime: le fee del pool per la tua parte di voti più le emissioni per la tua parte di liquidità, con il cap del gauge ricalcolato sulle fee stimate. In verde quando supera l'allocazione del radar con gli stessi voti. Stime grezze: assumono che la tua liquidità prenda volume quanto la sua quota sulla coppia, a parità di fee e di range, ma non più di quanto rende oggi ogni dollaro già nel pool (dove ce ne sono almeno 2.000); che la liquidità già nel pool continui a scambiare come oggi, e che tutta sia in stake.${kTxt} Serve capitale tuo (con il rischio di impermanent loss), il gas non è contato, e le emissioni maturano solo sulla liquidità in stake e dentro il range: se il prezzo esce dal tuo range non prendi né fee né emissioni.` +
+      $("bs-foot").textContent = `«Al giorno» è quello che andrebbe a te a regime: le fee del pool per la tua parte di voti più le emissioni per la tua parte di liquidità, con il cap del gauge ricalcolato sulle fee stimate. In verde quando supera l'allocazione del radar con gli stessi voti. Stime grezze: assumono che la tua liquidità prenda volume quanto la sua quota sulla coppia, a parità di fee e di range, ma non più di quanto rende oggi ogni dollaro già nel pool (dove ce ne sono almeno 2.000); che la liquidità già nel pool continui a scambiare come oggi, e che tutta sia in stake.${kTxt} Serve capitale tuo, con il rischio di impermanent loss, e il gas non è contato.` +
         (BOOT.read ? ` Coppie lette per ${BOOT.read.fresh} token su ${BOOT.read.tokens}: gli altri arrivano nei prossimi giri.` : "");
     } else {
       ["Pool", "APR di oggi", "A 48 ore", "Con i tuoi voti", "Fee 24 ore (prima)", "Voti", "Primo votante"].forEach((t, i) => th(t, i > 0));
       const apr = (c, day) => c.ap > 0 && px > 0 ? day * 365 / (c.ap * px) * 100 : null;
       list = BOOT.started.filter(hit).map(c => ({ c, a24: apr(c, c.f24 + c.inc24) })).sort((a, b) => (b.a24 || 0) - (a.a24 || 0));
-      for (const o of (bsAll || q ? list : list.slice(0, BS_TOP))) {
+      for (const o of (bsAll || q ? list : list.slice(0, bsTop()))) {
         const c = o.c, tr = el("tr", "trow" + (bsOpen === c.k ? " open" : ""));
         const still = c.f6 * 4 < 0.2 * c.f24;
         const c0 = el("td"); c0.append(el("b", "", c.name), el("span", "sub", ` ${c.chain} · ${c.kind} · ${feeTxt(c.fee)}` + (still ? " · fermo da 6 ore" : ""))); tr.append(c0);
@@ -3301,15 +3447,18 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       $("bs-foot").textContent = "Pool con pochi voti le cui fee misurate delle ultime 24 ore superano di almeno quattro volte quelle delle 24 ore prima: l'APR a 48 ore non li mostra ancora. «APR di oggi» conta solo le ultime 24 ore; «Con i tuoi voti» è la tua parte delle fee di oggi se entrassi adesso, al giorno. Un giorno buono non è una tendenza: tocca la riga per vedere chi l'ha votato e come si muove la liquidità.";
     }
     if (!list.length) { const tr = el("tr"), td = el("td", "", q ? "Nessun pool con questo nome." : bsView === "start" ? "Nessun gauge con questi requisiti per ora." : "Nessun pool appena partito per ora."); td.colSpan = 7; tr.append(td); rows.append(tr); }
-    more.hidden = !!q || list.length <= BS_TOP;
-    more.textContent = bsAll ? `Mostra solo i primi ${BS_TOP}` : `Mostra tutti i ${list.length}`;
+    more.hidden = !!q || list.length <= bsTop();
+    more.textContent = bsAll ? `Mostra solo i primi ${bsTop()}` : `Mostra tutti i ${list.length}`;
   }
   document.querySelectorAll("#bs-view button").forEach(b => b.addEventListener("click", () => { bsView = b.dataset.v; bsAll = false; bsOpen = null; bootRender(); }));
   $("bs-more").addEventListener("click", () => { bsAll = !bsAll; bootRender(); });
   { let t = 0; const later = () => { clearTimeout(t); t = setTimeout(bootRender, 200); };
     $("bs-q").addEventListener("input", later);
     $("bs-liq").addEventListener("input", () => { const v = numIn($("bs-liq").value); if (v > 0) { bsLiq = v; try { localStorage.setItem("radar-bs-liq", String(v)); } catch (e) {} later(); } });
-    $("bs-liq").addEventListener("blur", bootRender);
+    // (leaving a field only tidies its figure: drawing the list again there would swallow the tap that took the focus away)
+    $("bs-liq").addEventListener("blur", () => { $("bs-liq").value = Math.round(bsLiq).toLocaleString("it-IT"); });
+    $("bs-ap").addEventListener("input", () => { bsAp = $("bs-ap").value.trim(); try { if (bsAp) localStorage.setItem("radar-bs-ap", bsAp); else localStorage.removeItem("radar-bs-ap"); } catch (e) {} later(); });
+    $("bs-ap").addEventListener("blur", () => { const v = numIn(bsAp); $("bs-ap").value = v > 0 ? Math.round(v).toLocaleString("it-IT") : ""; });
     for (const id of ["rd-ap", "rd-price"]) $(id).addEventListener("input", later); }
   async function loadBoot() {
     try {
@@ -3332,7 +3481,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     WATCH.unshift({ id: Date.now(), t: DATA.generated, ap: r.ap, price: DATA.aero_usd || 0, total: r.total,
       how: sel.options[sel.selectedIndex].text + (RD.sea && r.win ? ", corretta per il giorno" : ""),
       rows: used.map(o => ({ k: o.p.key, name: o.p.name, chain: o.p.chain, v: r.ap * o.k / 100, e: r.earn(o, o.k) })) });
-    watchSave(); watchRender();
+    watchSave(); loadWatch();
     toast("Allocazione salvata: la trovi in fondo, in «Allocazioni monitorate». I primi risultati arrivano al prossimo aggiornamento.");
   });
   // what v votes in a pool earned between t0 and t1, from the pool's hourly history; null when it is not covered
@@ -3355,6 +3504,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const box = $("wt-list");
     box.replaceChildren();
     $("wt-sub").textContent = WATCH.length ? `${WATCH.length} salvat${WATCH.length === 1 ? "a" : "e"}` : "";
+    if (waits("watch", watchRender) && !WATCH.some(w => !w.done)) return;      // (an allocation still running is followed anyway: its result is saved when the 48 hours end)
     if (!WATCH.length) { box.append(el("p", "note", "Ancora nessuna. Nel radar, sotto l'allocazione suggerita, premi «Monitora questa allocazione»: da quel momento qui vedi quanto avrebbe reso davvero, pool per pool, accanto a quanto prevedeva il radar.")); return; }
     const now = PH ? PH.generated : (DATA ? DATA.generated : 0), W = 48 * 3600;
     let dirty = false;
@@ -3398,7 +3548,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (dirty) watchSave();
   }
   async function loadWatch() {
-    if (WATCH.length || !PH) {
+    if (WATCH.length) {
       try {
         const r = await dataFetch("poolhist.json");
         if (r.ok) PH = await r.json();

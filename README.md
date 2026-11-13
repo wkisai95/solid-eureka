@@ -127,14 +127,15 @@ mostra ancora le ore morte di prima e nessun altro lo vede. `monitor/bootstrap.p
   mossi voti e liquidità, l'APR a ritmo di oggi contro quello a 48 ore, e un avviso quando nelle ultime 6 ore non è
   entrato quasi niente.
 - **Emissioni**: ogni evento di allocazione porta le emissioni per voto al secondo (oggi circa 0,0011 AERO per voto
-  al giorno) e ogni gauge ha un cap in AERO al secondo (`FactoryRegistry.emissionCap`), riletto insieme
-  all'idoneità dei gauge. A un gauge va il minore tra voti × emissioni per voto e il cap. Un operatore riscrive ogni
+  al giorno) e ogni gauge ha un cap in AERO al secondo (`FactoryRegistry.emissionCap`), riletto a ogni giro. A
+  un gauge va il minore tra voti × emissioni per voto e il cap. Un operatore riscrive ogni
   pochi minuti i cap dei gauge che incassano, e questi seguono le fee: a ogni giro il monitor misura quanto vale il
   cap rispetto al ritmo delle fee delle ultime 3 ore (di solito circa 2 volte) e lo esporta. Un gauge fermo resta
   al cap che aveva, di solito il minimo (8,64 AERO al giorno).
 
-La sezione «Pool da avviare» della pagina porta tutto in dollari al giorno per i tuoi voti (l'Allocation Power del
-radar) e per la liquidità che metteresti (un campo, salvato sul dispositivo):
+La sezione «Pool da avviare» della pagina porta tutto in dollari al giorno per i voti che ci metteresti e per la
+liquidità che metteresti. Sono due campi suoi, salvati sul dispositivo: i voti non toccano l'Allocation Power del
+radar e, finché il campo è vuoto, valgono quelli del radar.
 
 - **Fee**: quello che il pool scambia già, più il volume della coppia altrove × la quota che la tua liquidità
   avrebbe sulla coppia, il tutto × la fee del pool; a te la parte dei tuoi voti. Dove la coppia non scambia altrove
@@ -143,7 +144,7 @@ radar) e per la liquidità che metteresti (un campo, salvato sul dispositivo):
   (volume su liquidità): vale la stima più bassa.
 - **Emissioni**: il minore tra quello che chiamano i voti e il cap ricalcolato sulle fee stimate, per la tua parte
   della liquidità del pool. Se il cap di oggi è più alto di così la riga lo segnala («cap ancora alto»).
-- **Confronto**: l'allocazione del radar per gli stessi voti, che non chiede capitale.
+- **Confronto**: l'allocazione del radar ricalcolata per gli stessi voti, che non chiede capitale.
 
 Sono stime grezze: assumono che la tua liquidità prenda volume quanto la sua quota sulla coppia, a parità di fee e
 di range, che quella già nel pool continui a scambiare come oggi, e che tutta sia in stake. Per misura, a ogni giro il monitor calcola come va davvero ai pool Aero piccoli che
@@ -262,8 +263,15 @@ si azzera mai da sola né da un tasto.
 (Settings → Pages → Deploy from a branch → `data` / root). L'app Android **Monitor sAERO** carica la stessa pagina
 dal ramo `data`, quindi non va aggiornata quando cambia la pagina.
 
-Nella sezione «Le tue posizioni» scrivi i numeri delle tue sAERO: restano salvati solo nel dispositivo. Le sezioni
-lunghe si aprono e si chiudono toccando il titolo, e la pagina ricorda quali hai lasciato aperte.
+Nella sezione «Le tue posizioni» scrivi i numeri delle tue sAERO: restano salvati solo nel dispositivo.
+
+Ogni sezione è una finestra che si apre e si chiude toccando il titolo, e la pagina ricorda quali hai lasciato
+aperte. Chiusa, una sezione tiene nel titolo la sua riga più utile (il radar la stima delle 48 ore, «Pool da
+avviare» quanti ne ha trovati). In alto c'è la barra delle sezioni, che resta in vista mentre scorri: il primo
+tasto le chiude tutte (o le riapre tutte), gli altri aprono una sezione e ci portano. Dentro le sezioni più lunghe
+si ripiegano anche le parti: nel radar le opzioni, in «Tendenze fee» le card del mercato, in «Pool da avviare» le
+spiegazioni. Una sezione chiusa non viene disegnata finché non la apri, così la pagina si carica più in fretta; sul
+telefono gli elenchi lunghi mostrano meno righe prima di «Mostra tutti».
 
 Per ora la pagina non mostra Le 10 posizioni più grandi, Simulazione (con il tasto che le carica le opzioni del
 Radar), Ondate di cooldown, Posizioni grandi in uscita, Pool, Chain e Avvisi recenti: il monitor continua a
@@ -333,8 +341,13 @@ NTFY_TOPIC=... python -m monitor.main --out out
   falsato da solo non lo sposta), deve stare nella fascia del suo bene (stablecoin intorno a 1 $, ETH e BTC
   incartati o in staking intorno a ETH e BTC) e, se è molto lontano dall'ultimo, vale solo se le coppie concordano o
   se viene letto due volte. Un prezzo in memoria fuori fascia viene tolto e le ore di fee che ha gonfiato tornano al
-  valore tipico del pool, insieme a quanto era stato accreditato alle posizioni. In più le fee misurate in un giro
-  non possono superare 15 volte il volume scambiato dal pool per la sua fee: il resto aspetta un prezzo giusto.
+  valore tipico del pool, insieme a quanto era stato accreditato alle posizioni. In più le fee misurate non possono
+  superare 15 volte il volume scambiato dal pool per la sua fee: il resto resta in sospeso. Il sospeso è giudicato a
+  ogni giro sul volume di tutto il tempo che ha atteso, non del solo ultimo giro: un vero picco di fee esce appena
+  il tempo lo spiega e viene distribuito su quelle ore, mentre quello che un prezzo rotto gonfia resta fuori finché
+  il prezzo non torna giusto.
+- Pool: ogni sei ore il monitor rilegge la fee di ogni pool (su molti è dinamica) e, per i pool base, che non sono a
+  liquidità concentrata, il tipo che dichiarano (`POOL_TYPE`: volatile o stable) e la fee dalla loro factory.
 - Volumi: DexScreener, GeckoTerminal, DefiLlama
 - Quote: KyberSwap, Velora (ParaSwap)
 
