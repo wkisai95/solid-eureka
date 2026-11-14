@@ -203,6 +203,45 @@ def evaluate(report, state, cfg, now, new_incentives):
             title = (f"Il cooldown di Aero{where} ora è di {value / 3600:.1f} ore").replace(".", ",")
             body = "Il calendario dei cooldown usa già il nuovo valore."
         out.append({"key": f"param:{name}:{cid}:{ts}", "prio": 4, "tags": ["gear"], "title": title, "body": body})
+    # 8. the Autopilot and the biggest positions: reallocations, and cooldowns about to end
+    big = report.get("big") or {}
+
+    def where(r):
+        return r[1] if r[2] == "Base" else f"{r[1]} ({r[2]})"
+
+    for m in big.get("moves") or []:
+        if not m.get("new"):
+            continue
+        took = [r for r in m["rows"] if r[3] < 0]
+        put = sorted((r for r in m["rows"] if r[3] > 0), key=lambda r: -r[3])
+        moved = max(sum(-r[3] for r in took), sum(r[3] for r in put))
+        if moved < th.get("autopilot_move_min_saero", 500_000):
+            continue
+        who = m.get("who") or f"#{m['id']}"
+        if m.get("relay") and m.get("name") and m.get("name") != who:
+            who = f"{who} ({m['name']})"
+        left = "; ".join(f"{where(r)} −{fmt_n(-r[3])}" + (f", chi resta +{fmt_pct(-r[3] / r[4] * 100)} per voto"
+                                                           if r[4] > 1 else ", pool rimasto vuoto") for r in took[:4])
+        came = "; ".join(f"{where(r)} +{fmt_n(r[3])}" + (f", −{fmt_pct(r[3] / r[4] * 100)} per voto"
+                                                         if r[4] - r[3] > 1 else ", primo ad allocare")
+                         for r in put[:4])
+        out.append({"key": f"bigmove:{m['id']}:{m['t']}", "prio": 4 if m.get("relay") else 3,
+                    "tags": ["robot" if m.get("relay") else "whale"],
+                    "title": f"{who} ha spostato {fmt_n(moved)} voti",
+                    "body": (f"Usciti da: {left}. " if left else "") + (f"Entrati in: {came}. " if came else "") +
+                            "Nei pool lasciati chi resta prende una quota più grande delle fee finché gli altri "
+                            "non arrivano."})
+    soon = th.get("autopilot_heads_up_min", 45) * 60
+    for p in big.get("autopilot") or []:
+        e = p.get("ends") or 0
+        if p.get("ap", 0) < 5_000_000 or not e or not 0 < e - now <= soon:
+            continue
+        on = ", ".join(f"{where(r)} {fmt_n(r[3])}" for r in p["pools"][:3])
+        out.append({"key": f"bigcd:{p['id']}:{e}", "prio": 3, "tags": ["hourglass_flowing_sand"],
+                    "title": f"{p.get('who') or 'Autopilot'}: il cooldown finisce alle {fmt_time(e, tz, now)}",
+                    "body": f"Tra {fmt_in(e - now)} può riallocare {fmt_n(max(p['ap'], p['alloc']))} voti" +
+                            (f", di cui {fmt_n(p['ap'] - p['alloc'])} depositati dopo l'ultima allocazione"
+                             if p["ap"] - p["alloc"] > max(100_000, p["alloc"] * 0.02) else "") + f". Ora è su: {on}."})
     sent = state.setdefault("alerts", {})
     fresh = [a for a in out if a["key"] not in sent]
     return fresh

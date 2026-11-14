@@ -32,6 +32,89 @@ REFERENCE = {"eth": "8453:0x4200000000000000000000000000000000000006",
              "btc": "8453:0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"}
 
 
+# A fresh price this far from the last one, or from the asset it stands for, is a broken pair and is not used.
+MAX_JUMP = 20.0
+MAJOR_BAND = (0.7, 1.4)       # wrapped ETH/BTC against the same asset on Base
+USD_BAND = (0.8, 1.25)        # stablecoins
+# Staked and restaked ETH, and BTC wrappers: worth the asset or somewhat more, never thousands of times it. A
+# price outside this band of the asset is a broken pair (11 Nov 2026: wstETH on Base read at 133 million USD
+# from a spoofed pool, and the right price was then refused for being far from it).
+PEGGED = {**{s: "eth" for s in ("WSTETH", "WEETH", "CBETH", "RETH", "EZETH", "RSETH", "OSETH", "FRXETH", "SFRXETH",
+                                "METH", "SWETH", "ETHX", "ALETH", "MSETH", "WRSETH", "WEETH.BASE", "SUPEROETHB")},
+          **{s: "btc" for s in ("LBTC", "TBTC", "KBTC", "SOLVBTC", "EBTC", "UNIBTC", "CIRBTC", "FBTC", "PUMPBTC")}}
+PEG_BAND = (0.7, 1.7)
+TOP_PAIRS = 5                 # a price is the median of the token's deepest pairs, when it has at least three
+AGREE = 0.10                  # ... and "confirmed" when three of them are within this of the median
+CONFIRM_S = 600               # an unconfirmed price far from the last one is taken when read twice this far apart
+
+
+def _asset(k, erc20):
+    if k in STABLES:
+        return "usd"
+    return MAJORS.get(((erc20.get(k) or {}).get("sym") or "").upper())
+
+
+def _band(k, price, erc20, ref):
+    """Why a price cannot be right whatever the last one was (the asset it stands for), or None."""
+    asset = _asset(k, erc20)
+    if asset == "usd" and not USD_BAND[0] <= price <= USD_BAND[1]:
+        return "stablecoin"
+    if asset in ("eth", "btc") and k not in REFERENCE.values() and ref.get(asset):
+        if not MAJOR_BAND[0] <= price / ref[asset] <= MAJOR_BAND[1]:
+            return f"{asset.upper()} at {ref[asset]:,.0f}"
+    peg = PEGGED.get(((erc20.get(k) or {}).get("sym") or "").upper())
+    if peg and ref.get(peg) and not PEG_BAND[0] <= price / ref[peg] <= PEG_BAND[1]:
+        return f"{peg.upper()} at {ref[peg]:,.0f}"
+    return None
+
+
+def sane(k, price, cache, erc20, ref, now, confirmed=False):
+    """Why a freshly fetched price cannot be right, or None when it looks plausible.
+
+    confirmed: at least three of the token's deepest pairs agree on it. Such a price replaces a far-off last one
+    (which came from a single pair); an unconfirmed one must be read twice, CONFIRM_S apart, before it does."""
+    why = _band(k, price, erc20, ref)
+    if why:
+        return why
+    old = cache.get(k)
+    if old and old[0] > 0 and now - old[1] < 86400 and not 1 / MAX_JUMP <= price / old[0] <= MAX_JUMP:
+        if confirmed:
+            return None
+        pend = old[2] if len(old) > 2 else None
+        if pend and now - pend[1] >= CONFIRM_S and 0.8 <= price / pend[0] <= 1.25:
+            return None
+        if not pend or not 0.8 <= price / pend[0] <= 1.25:
+            old[2:] = [[price, now]]
+        return f"last price {old[0]:.6g}"
+    return None
+
+
+def scrub(cache, erc20, log):
+    """Drops cached prices that cannot be right for the asset they stand for (so a broken one cannot linger and
+    keep the right one out). Returns [(token key, the time it was cached, the price)] of what it dropped."""
+    ref = {name: (cache.get(r) or [None])[0] for name, r in REFERENCE.items()}
+    out = []
+    for k in list(cache):
+        why = _band(k, cache[k][0], erc20, ref)
+        if why:
+            out.append((k, int(cache[k][1]), cache[k][0]))
+            log(f"prices: cached {k} at {cache[k][0]:.6g} dropped ({why})")
+            del cache[k]
+    return out
+
+
+def _robust(cands):
+    """(price, confirmed) from [(price, liquidity)] of a token's pairs: the median of the deepest TOP_PAIRS when
+    there are at least three (one spoofed pool cannot move it), else the deepest one."""
+    top = sorted(cands, key=lambda c: -c[1])[:TOP_PAIRS]
+    if len(top) < 3:
+        return top[0][0], False
+    ps = sorted(c[0] for c in top)
+    med = ps[len(ps) // 2] if len(ps) % 2 else (ps[len(ps) // 2 - 1] + ps[len(ps) // 2]) / 2
+    agree = sum(1 for x in ps if abs(x / med - 1) <= AGREE)
+    return med, agree >= 3
+
+
 def _split(key):
     cid, addr = key.split(":", 1)
     return int(cid), addr.lower()
@@ -67,7 +150,7 @@ def fetch_prices(token_keys, cache, now, log, chains_cfg, erc20, slugs, max_age=
             continue
         cid, addr = _split(k)
         by_chain.setdefault(cid, []).append(addr)
-    fails, looked = 0, 0
+    fails, looked, fetched = 0, 0, {}
     taken = {str(c.get("dexscreener")) for c in chains_cfg.values() if c.get("dexscreener")}
     for cid, addrs in by_chain.items():
         ccfg = chains_cfg.get(str(cid)) or {}
@@ -90,26 +173,39 @@ def fetch_prices(token_keys, cache, now, log, chains_cfg, erc20, slugs, max_age=
                 fails += 1
                 log(f"dexscreener error ({slug}): {e}")
                 pairs = []
-            as_base, as_quote = {}, {}
+            cands = {}
             for p in pairs if isinstance(pairs, list) else []:
                 try:
                     liq = float((p.get("liquidity") or {}).get("usd") or 0)
                     pu, pn = float(p.get("priceUsd") or 0), float(p.get("priceNative") or 0)
                 except (TypeError, ValueError):
                     continue
+                if liq < 500:
+                    continue
                 b = (p.get("baseToken") or {}).get("address", "").lower()
                 q = (p.get("quoteToken") or {}).get("address", "").lower()
-                if b in part and pu > 0 and liq > as_base.get(b, (0, 0))[1]:
-                    as_base[b] = (pu, liq)
-                if q in part and pu > 0 and pn > 0 and liq > as_quote.get(q, (0, 0))[1]:
-                    as_quote[q] = (pu / pn, liq)
+                if b in part and pu > 0:
+                    cands.setdefault(b, []).append((pu, liq))
+                if q in part and pu > 0 and pn > 0:
+                    cands.setdefault(q, []).append((pu / pn, liq))
             for t in part:
-                best = as_base.get(t) if (as_base.get(t) or (0, 0))[1] >= 500 else as_quote.get(t)
-                if best and best[1] >= 500:
-                    k = f"{cid}:{t}"
-                    prices[k] = best[0]
-                    cache[k] = [best[0], now]
+                if cands.get(t):
+                    fetched[f"{cid}:{t}"] = _robust(cands[t])
             time.sleep(0.25)
+    # a broken pair (absurd priceNative, spoofed liquidity) must not price real fees: reference assets first
+    for k in sorted(fetched, key=lambda x: x not in REFERENCE.values()):
+        ref = {name: prices.get(r) or (cache.get(r) or [None])[0] for name, r in REFERENCE.items()}
+        price, confirmed = fetched[k]
+        why = sane(k, price, cache, erc20, ref, now, confirmed)
+        if why:
+            log(f"prices: {k} at {price:.6g} rejected ({why})")
+            continue
+        old = cache.get(k)
+        if old and old[0] > 0 and not 1 / MAX_JUMP <= price / old[0] <= MAX_JUMP:
+            log(f"prices: {k} at {price:.6g} replaces {old[0]:.6g} "
+                f"({'its deepest pairs agree' if confirmed else 'read twice'})")
+        prices[k] = price
+        cache[k] = [price, now]
     # fallbacks: old prices, $1 stables, the same asset on Base
     ref = {name: prices.get(k) or (cache.get(k) or [None])[0] for name, k in REFERENCE.items()}
     ref["usd"] = 1.0

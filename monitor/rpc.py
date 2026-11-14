@@ -277,11 +277,14 @@ class Rpc:
             if size < cap:
                 size = min(cap, size * 2)
 
-    def multicall(self, calls, batch=150):
+    def multicall(self, calls, batch=150, block="latest"):
         """calls: list of (target, calldata bytes). Returns list of (ok, returndata bytes).
 
-        Uses Multicall3 when the chain has it, otherwise plain eth_call one by one.
+        Uses Multicall3 when the chain has it, otherwise plain eth_call one by one. block: "latest" or a block
+        number (a past block needs an endpoint that keeps old state).
         """
+        if isinstance(block, int):
+            block = hex(block)
         if self.multicall3 is None:
             try:
                 self.multicall3 = self.has_code(MULTICALL3)
@@ -290,14 +293,14 @@ class Rpc:
             if not self.multicall3:
                 self.log(f"{self.name}: no Multicall3, using single calls")
         if not self.multicall3:
-            return self._single_calls(calls)
+            return self._single_calls(calls, block)
         out = []
         for i in range(0, len(calls), batch):
             part = calls[i:i + batch]
             payload = AGGREGATE3 + encode(["(address,bool,bytes)[]"], [[(t, True, d) for t, d in part]])
             for attempt in range(3):
                 try:
-                    raw = self.eth_call(MULTICALL3, payload)
+                    raw = self.eth_call(MULTICALL3, payload, block)
                     if not raw or raw == "0x":
                         raise RpcError("empty multicall result")
                     res = decode(["(bool,bytes)[]"], bytes.fromhex(raw[2:]))[0]
@@ -307,18 +310,18 @@ class Rpc:
                     if attempt == 2:
                         if len(part) > 20:
                             # split a batch that may exceed a provider's gas or size cap
-                            out.extend(self.multicall(part, batch=max(10, len(part) // 3)))
+                            out.extend(self.multicall(part, batch=max(10, len(part) // 3), block=block))
                             break
                         self.log(f"{self.name}: multicall batch failed: {str(e)[:200]}")
                         out.extend([(False, b"")] * len(part))
                     time.sleep(1.5 * (attempt + 1))
         return out
 
-    def _single_calls(self, calls):
+    def _single_calls(self, calls, block="latest"):
         out = []
         for target, data in calls:
             try:
-                raw = self.eth_call(target, data)
+                raw = self.eth_call(target, data, block)
                 out.append((True, bytes.fromhex(raw[2:])) if raw and raw != "0x" else (False, b""))
             except RpcError:
                 out.append((False, b""))

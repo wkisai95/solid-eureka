@@ -1,4 +1,4 @@
-"""Market data for the strategies and for a future predictive model.
+"""Market data for the simulation and for a future predictive model.
 
 Every hour:
 - volume and liquidity of every Aero pool (DexScreener, by pool address);
@@ -270,10 +270,13 @@ class _Market:
         return out
 
 
-def refresh(state, chains_cfg, now, log, every=55 * 60):
-    """Hourly snapshot of every Aero pool and chain. Returns True when it refreshed."""
+def refresh(state, chains_cfg, now, log, gap=40 * 60):
+    """Hourly snapshot of every Aero pool and chain: one per clock hour, at least `gap` after the previous one (a
+    fixed interval drifted across the runs, leaving some hours with two snapshots and others with none). Returns True
+    when it refreshed."""
     mk = market_state(state)
-    if now - mk.get("at", 0) < every:
+    at = int(mk.get("at", 0))
+    if now - at < gap or now - now % HOUR == at - at % HOUR:
         return False
     t_start = time.time()
     by_chain = {}
@@ -300,12 +303,16 @@ def refresh(state, chains_cfg, now, log, every=55 * 60):
                 continue
             for t in (t0, t1):
                 want[(cid, t)] = want.get((cid, t), 0.0) + vol + 1.0
-    lookups, stopped, looked = 0, "", set()
+    lookups, stopped, looked, last = 0, "", set(), 0.0
     deadline = time.time() + LOOKUP_BUDGET_S
     for (cid, tok), _w in sorted(want.items(), key=lambda kv: -kv[1]):
         if time.time() > deadline:
             stopped = "time budget reached"
             break
+        wait = LOOKUP_PACE_S - (time.time() - last)     # requests start at most every LOOKUP_PACE_S seconds
+        if wait > 0:
+            time.sleep(wait)
+        last = time.time()
         try:
             res = _get(f"{DS}/token-pairs/v1/{own[cid][0]}/{tok}")
         except Limited:
@@ -319,7 +326,6 @@ def refresh(state, chains_cfg, now, log, every=55 * 60):
             looked.add((cid, tok))
             for p in res:
                 markets[cid].add_ds(p)
-        time.sleep(LOOKUP_PACE_S)
 
     # the biggest pools of the chain from GeckoTerminal, where DexScreener did not already give them
     gt_used = []
@@ -387,6 +393,20 @@ def _sym(state, cid, t):
 
 # ---------------------------------------------------------------- history
 
+def hourly_volume(state, key, now, hours=24):
+    """(volume of each of the last `hours` hours, index 0 this hour and None where no snapshot was taken; volume of
+    the last 48 hours) of an Aero pool, from the hourly snapshots; (None, None) when the pool has none."""
+    vser = (market_state(state)["hist"]["pools"]).get(key) or {}
+    if not vser:
+        return None, None
+    h0 = now - now % HOUR
+    vh = [(vser.get(str(h0 - i * HOUR)) or [None])[0] for i in range(hours)]
+    last = max(vser, key=int)
+    old = vser.get(str(int(last) - 24 * HOUR))
+    v48 = (vser[last][1] or 0) + (old[1] if old else vser[last][1] or 0)
+    return vh, v48
+
+
 def record(mk, now):
     hour = str(now - now % HOUR)
     hp, hc = mk["hist"]["pools"], mk["hist"]["chains"]
@@ -435,12 +455,10 @@ def chain_share(mk, cid, ago=0, now=None):
     return _share(best[1])
 
 
-# ---------------------------------------------------------------- "Chain nuove" universe
+# ---------------------------------------------------------------- blue chips
 
 MAJORS = {"ETH", "WETH", "WBTC", "CBBTC", "TBTC", "LBTC", "BTC", "USDC", "USDC.E", "USDT", "USDT0", "USD₮0", "DAI",
           "USDS", "EURC", "USDG", "PYUSD", "GHO", "FRAX", "USDE"}
-NEW_CHAIN_RULES = {"home_chains": [8453, 10], "max_chain_share": 0.15, "pairs_per_chain": 10,
-                   "min_pair_volume_usd": 250000}
 
 
 def _both_majors(state, key):
@@ -449,40 +467,3 @@ def _both_majors(state, key):
     syms = [((state["erc20"].get(A.tkey(cid, t)) or {}).get("sym") or "").upper() for t in (m.get("t0"), m.get("t1"))
             if t]
     return len(syms) == 2 and all(s in MAJORS for s in syms)
-
-
-def new_chain_universe(state, rules=None):
-    """Big pairs on the chains where Aero is still small: the pools the 'Chain nuove' method may choose.
-
-    Chains: outside the home chains (Base and OP by default) and with Aero below max_chain_share of the chain's DEX
-    volume. Pairs: the pairs_per_chain largest by volume on every DEX of that chain, at least min_pair_volume_usd a
-    day, with every Aero pool of the pair; pools DexScreener does not list yet count when both tokens are blue chips.
-    """
-    r = {**NEW_CHAIN_RULES, **(rules or {})}
-    mk = market_state(state)
-    home = {int(c) for c in r["home_chains"]}
-    ok = set()
-    for cid in {A.chain_of(k) for k in state["gauges"]} - home:
-        share = chain_share(mk, cid)
-        if share is None or share < float(r["max_chain_share"]):
-            ok.add(cid)
-    pairs = {}
-    for k, v in (mk.get("pools") or {}).items():
-        cid = A.chain_of(k)
-        if cid not in ok or not v[4] or v[4] < float(r["min_pair_volume_usd"]):
-            continue
-        m = state["gauges"].get(k) or {}
-        pair = (cid, tuple(sorted(((m.get("t0") or "").lower(), (m.get("t1") or "").lower()))))
-        e = pairs.setdefault(pair, [0.0, []])
-        e[0] = max(e[0], v[4])
-        e[1].append(k)
-    by_chain = {}
-    for (cid, _pair), (vol, keys) in pairs.items():
-        by_chain.setdefault(cid, []).append((vol, keys))
-    out = set()
-    for lst in by_chain.values():
-        for _vol, keys in sorted(lst, key=lambda x: -x[0])[: int(r["pairs_per_chain"])]:
-            out |= set(keys)
-    covered = set(mk.get("pools") or {})
-    out |= {k for k in state["gauges"] if A.chain_of(k) in ok and k not in covered and _both_majors(state, k)}
-    return out, ok

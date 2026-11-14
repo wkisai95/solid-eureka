@@ -13,7 +13,9 @@ FACTORY_REGISTRY = "0x7b2A2c12dC5Ea2a31455952a05031C3E4BB28F3E"   # leaf factory
 BASE_CHAIN = 8453
 START_BLOCK = 52875727          # 2026-10-21 00:00 UTC on Base, before the Aero launch
 DEPLOY_BLOCK = 52688157         # root Voter and LeafVoter deployed on Base (2026-10-16)
-BASE_GENESIS_TS = 1686789347    # Base has fixed 2-second blocks: ts = genesis + 2 * block
+BASE_GENESIS_TS = 1686789347    # Base blocks: every 2 seconds from genesis, every 200 ms since the Denim upgrade
+DENIM_BLOCK = 53556127          # first 200 ms block (Denim, 5 Nov 2026 18:00 UTC)
+DENIM_TS = BASE_GENESIS_TS + 2 * DENIM_BLOCK     # its timestamp, 1793901601
 ZERO = "0x0000000000000000000000000000000000000000"
 
 CHAIN_NAMES = {1: "Ethereum", 10: "OP Mainnet", 8453: "Base", 42161: "Arbitrum",
@@ -31,12 +33,24 @@ def chain_short(cid):
 
 
 def block_ts(block):
-    """Timestamp of a Base block."""
-    return BASE_GENESIS_TS + 2 * int(block)
+    """Timestamp of a Base block. Since Denim five blocks share each second (timestamps are whole seconds)."""
+    b = int(block)
+    if b < DENIM_BLOCK:
+        return BASE_GENESIS_TS + 2 * b
+    return DENIM_TS + (b - DENIM_BLOCK) // 5
 
 
 def ts_block(ts):
-    return max(0, (int(ts) - BASE_GENESIS_TS) // 2)
+    """Last Base block with a timestamp at or before ts."""
+    t = int(ts)
+    if t < DENIM_TS:
+        return max(0, (t - BASE_GENESIS_TS) // 2)
+    return DENIM_BLOCK + (t - DENIM_TS) * 5 + 4
+
+
+def block_time(block):
+    """Seconds between Base blocks at this block."""
+    return 2.0 if int(block) < DENIM_BLOCK else 0.2
 
 
 def topic(sig):
@@ -89,8 +103,9 @@ def decode_log(lg, ts_of=block_ts):
             "emitter": lg["address"].lower()}
     try:
         if t0 == T["leaf_alloc"]:
-            allocs, _ = decode(["(address,uint128,bytes)[]", "uint256"], _data(lg))
-            return {**base, "kind": "leaf_alloc", "token": int(lg["topics"][1], 16),
+            allocs, epv = decode(["(address,uint128,bytes)[]", "uint256"], _data(lg))
+            # epv: the chain's emissions per unit of voting power per second (1e18-scaled), stored with the event
+            return {**base, "kind": "leaf_alloc", "token": int(lg["topics"][1], 16), "epv": int(epv),
                     "allocs": {g.lower(): a / 1e18 for g, a, _ in allocs if g.lower() != ZERO and a > 0}}
         if t0 == T["leaf_reduction"]:
             reduction, accumulated = decode(["uint48", "uint48"], _data(lg))
@@ -140,6 +155,7 @@ S = {k: sel(v) for k, v in {
     "isActivated": "isActivated(address)",
     "emissionCap": "emissionCap(address)",
     "tokenStates": "tokenStates(uint256)",
+    "pendingFees": "pendingFees()",
     "reduction": "accumulatedCooldownReduction(uint256)",
     "allocatedGauges": "allocatedGauges(uint256)",
     "allocations": "allocations(uint256,address)",
@@ -153,6 +169,11 @@ S = {k: sel(v) for k, v in {
     "stable": "stable()",
     "tickSpacing": "tickSpacing()",
     "fee": "fee()",
+    "poolType": "POOL_TYPE()",
+    "factory": "factory()",
+    "getReserves": "getReserves()",
+    "defaultFee": "defaultFee()",
+    "getBaseFee": "getBaseFee(address,address,uint256,uint256,uint256,uint256)",
     "symbol": "symbol()",
     "decimals": "decimals()",
 }.items()}
@@ -171,6 +192,19 @@ def _dec(types, ok, data):
 def _dec_addr(ok, data):
     a = _dec(["address"], ok, data)
     return a.lower() if a and a.lower() != ZERO else None
+
+
+def _dec_text32(ok, data):
+    """A bytes32 holding a short text (a pool's POOL_TYPE): the text, or None."""
+    if not ok or len(data) != 32:
+        return None
+    s = data.rstrip(b"\0").decode("ascii", "ignore")
+    return s if s and s.isprintable() else None
+
+
+def basic_kind(pool_type):
+    """'V2_VOLATILE' -> 'volatile', 'V2_STABLE' -> 'stable': the type a basic (constant-curve) pool declares."""
+    return pool_type[3:].lower() if pool_type and pool_type.startswith("V2_") else (pool_type or "").lower() or None
 
 
 def _dec_symbol(ok, data):
@@ -230,6 +264,18 @@ def read_token_states(rpc, token_ids):
     return out
 
 
+def read_pending_fees(rpc, gauges, block="latest"):
+    """{gauge: (token0, token1)}: the fees each gauge has accrued for its voters and not handed over yet (raw
+    amounts). The rewards manager credits exactly these to the votes; FeesCollected only moves them, on a claim."""
+    res = rpc.multicall([(g, S["pendingFees"]) for g in gauges], block=block)
+    out = {}
+    for g, r in zip(gauges, res):
+        v = _dec(["uint256", "uint256"], *r)
+        if v is not None:
+            out[g] = (int(v[0]), int(v[1]))
+    return out
+
+
 def read_token_allocations(rpc, token_ids):
     """Rebuilds the current allocation of each token on one chain straight from its leaf voter."""
     res = rpc.multicall([(LEAF, S["allocatedGauges"] + encode(["uint256"], [int(t)])) for t in token_ids])
@@ -268,14 +314,15 @@ def read_gauge_meta(rpc, gauges):
     pools = sorted({m["pool"] for m in meta.values() if m["pool"]})
     calls = []
     for p in pools:
-        for k in ("token0", "token1", "stable", "tickSpacing", "fee"):
+        for k in ("token0", "token1", "stable", "tickSpacing", "fee", "poolType"):
             calls.append((p, S[k]))
     res = rpc.multicall(calls) if calls else []
     pinfo = {}
     for i, p in enumerate(pools):
-        r = res[5 * i:5 * i + 5]
+        r = res[6 * i:6 * i + 6]
         pinfo[p] = {"t0": _dec_addr(*r[0]), "t1": _dec_addr(*r[1]),
-                    "stable": _dec(["bool"], *r[2]), "tick": _dec(["int24"], *r[3]), "fee": _dec(["uint24"], *r[4])}
+                    "stable": _dec(["bool"], *r[2]), "tick": _dec(["int24"], *r[3]), "fee": _dec(["uint24"], *r[4]),
+                    "type": _dec_text32(*r[5])}
     for g, m in meta.items():
         p = pinfo.get(m["pool"]) or {}
         m["t0"] = m["t0"] or p.get("t0")
@@ -285,10 +332,57 @@ def read_gauge_meta(rpc, gauges):
         elif p.get("stable") is not None:
             m["kind"] = "stable" if p["stable"] else "volatile"
         else:
-            m["kind"] = "?"
+            m["kind"] = basic_kind(p.get("type")) or "?"
         if p.get("fee") is not None:
             m["fee_raw"] = int(p["fee"])
     return meta
+
+
+MAX_BASIC_FEE_BPS = 2000        # the pool factory takes at most 20%: more is not a fee
+
+
+def read_pool_facts(rpc, concentrated, basic):
+    """{pool: {"fee_raw": pips, "kind": ...}}: what drifts on a pool, as it is now.
+    Concentrated pools answer fee() in pips (it moves: many have a dynamic fee). Basic pools have no fee() of their
+    own: their factory answers, in basis points, with the base fee of a small swap on the pool's reserves
+    (getBaseFee) or with its default; they also declare their type (POOL_TYPE), which names the ones read before
+    this was known. Whatever a pool does not answer is left out."""
+    concentrated, basic = list(concentrated), list(basic)
+    out = {p: {} for p in concentrated + basic}
+    res = rpc.multicall([(p, S["fee"]) for p in concentrated]) if concentrated else []
+    for p, r in zip(concentrated, res):
+        fee = _dec(["uint24"], *r)
+        if fee:
+            out[p]["fee_raw"] = int(fee)
+    if not basic:
+        return out
+    calls = []
+    for p in basic:
+        calls += [(p, S["poolType"]), (p, S["factory"]), (p, S["getReserves"])]
+    res = rpc.multicall(calls)
+    ask = []
+    for i, p in enumerate(basic):
+        r = res[3 * i:3 * i + 3]
+        kind = basic_kind(_dec_text32(*r[0]))
+        if kind:
+            out[p]["kind"] = kind
+        factory = _dec_addr(*r[1])
+        rs = _dec(["uint256", "uint256", "uint256"], *r[2])
+        if factory:
+            ask.append((p, factory, int(rs[0]) if rs else 0, int(rs[1]) if rs else 0))
+    calls = []
+    for p, factory, r0, r1 in ask:
+        calls.append((factory, S["getBaseFee"] + encode(["address", "address", "uint256", "uint256", "uint256", "uint256"],
+                                                        [p, ZERO, 1, 0, r0, r1])))
+        calls.append((factory, S["defaultFee"]))
+    res = rpc.multicall(calls) if calls else []
+    for i, (p, _, _, _) in enumerate(ask):
+        for r in res[2 * i:2 * i + 2]:
+            bps = _dec(["uint256"], *r)
+            if bps and bps <= MAX_BASIC_FEE_BPS:
+                out[p]["fee_raw"] = int(bps) * 100
+                break
+    return out
 
 
 def read_erc20(rpc, tokens):

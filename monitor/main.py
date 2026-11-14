@@ -15,12 +15,20 @@ from time import time as wall_clock
 from zoneinfo import ZoneInfo
 
 from . import aero as A
+from . import bestchoice as BC
+from . import bootstrap as BS
+from . import earnings as E
 from . import alerts as N
+from . import big as B
 from . import chain as C
 from . import market as M
+from . import macro as MC
 from . import marketdata as MD
+from . import repair as RP
 from . import report as R
+from . import stocks as S
 from . import tracker as T
+from . import trends as TR
 from .rpc import Rpc
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -150,6 +158,13 @@ def run(args):
     for cid in chain_ids:
         A.chain_state(state, cid)
         rpc_for(cid)
+    # Base times after the Denim upgrade (200 ms blocks since 5 Nov 2026): put back once, before anything reads them
+    if first_run:
+        state.setdefault("repairs", []).append(RP.DENIM)
+    elif RP.DENIM not in state.setdefault("repairs", []):
+        # if it fails the run stops with the state untouched: the old Base times must not mix with the new ones
+        RP.denim(state, base_rpc, now, log, A.FEE_WINDOW)
+        state["migrated_at"] = now          # what the repair moves is not news: this run's alerts stay quiet
 
     # 1. events of every chain, read in parallel (each worker touches only its own chain state)
     def read_chain(cid):
@@ -171,6 +186,12 @@ def run(args):
             events += A.fetch_reward_events(rpc, cid, cs, head, log, deadline=read_deadline, now=now)
         except Exception as e:
             log(f"{C.chain_short(cid)}: fee read failed: {type(e).__name__}: {str(e)[:300]}")
+        try:
+            # what each gauge has pending for its voters: with the transfers, the fees they earned (settle_accrual)
+            A.read_pending(rpc, cid, cs, state, now, log)
+        except Exception as e:
+            cs.pop("pend_now", None)
+            log(f"{C.chain_short(cid)}: pending fees not read: {type(e).__name__}: {str(e)[:200]}")
         return {"ok": True, "events": events, "head": head}
 
     with ThreadPoolExecutor(max_workers=len(chain_ids)) as ex:
@@ -187,6 +208,9 @@ def run(args):
         if not res["ok"]:
             status["errors"].append(f"{C.chain_short(cid)}: {res['error']}")
             continue
+        if cs.get("ts_drift"):
+            status["errors"].append(f"{C.chain_short(cid)}: the block clock is off by {cs['ts_drift']['by']:+d} s, "
+                                    f"block times read from the chain")
         if not cs.get("first_ok"):
             cs["first_ok"] = now
             first_read.add(cid)
@@ -211,6 +235,13 @@ def run(args):
     if not state["chains"][str(C.BASE_CHAIN)]["status"].get("ok"):
         raise RuntimeError("Base could not be read: " + str(results[C.BASE_CHAIN].get("error")))
 
+    # the Autopilot relays and the biggest positions: who they are and how they move
+    try:
+        B.refresh(RPC[C.BASE_CHAIN], state, cfg, now, log)
+    except Exception:
+        status["errors"].append("autopilot: " + traceback.format_exc()[-200:])
+        log(f"autopilot/top positions failed: {traceback.format_exc()[-600:]}")
+
     # 3. prices, rewards, simulation, routing
     want = {A.tkey(C.BASE_CHAIN, params["aero"])}
     want |= {A.tkey(p[1], p[3]) for p in state["fees_pending"]}
@@ -219,36 +250,114 @@ def run(args):
     targets = routing_targets(state, cfg, chains_cfg)
     for k, cid, pool, t0, t1 in targets:
         want |= {A.tkey(cid, t0), A.tkey(cid, t1)}
+    want |= A.accrual_tokens(state)
+    # cached prices that cannot be right for their asset go first, so the right one is read again in this run
+    bad_prices = M.scrub(state["prices"], state["erc20"], log)
+    want |= {k for k, _, _ in bad_prices}
     prices = M.fetch_prices(want, state["prices"], now, log, chains_cfg, state["erc20"],
                             state.setdefault("dex_slugs", {}))
-    new_inc, fresh_fees = A.settle_rewards(state, prices, now, log)
+    new_inc, _ = A.settle_rewards(state, prices, now, log)
     new_inc = list(dict.fromkeys(new_inc + new_programs))
+    # the fees each pool earned in this run, measured on its gauge (the transfers only move them, on a claim)
+    fresh_fees = A.settle_accrual(state, prices, now, log)
+    mispriced = A.repair_mispriced(state, bad_prices, prices, now, log) if bad_prices else {}
+    measured_back = []
+    if any(int(cs.get("acc_from") or 0) == now and not cs.get("acc_backfill") for cs in state["chains"].values()):
+        # the gauges are measured for the first time: their last two days too, where old state can be read
+        def old_state_rpc(cid):
+            ccfg = chains_cfg[str(cid)]
+            return Rpc(ccfg["rpc"], name=C.chain_short(cid) + " (old state)", log=log, pace=float(ccfg.get("pace_s", 0)))
+        try:
+            measured_back = A.backfill_accrual(state, old_state_rpc, prices, now, log)
+        except Exception:
+            status["errors"].append("fees backfill: " + traceback.format_exc()[-200:])
+            log(f"fees backfill failed: {traceback.format_exc()[-600:]}")
+        state["migrated_at"] = now      # the pools' fees change measure: this run's alerts stay quiet
+    # the hours of the last 48 not measured yet (a chain whose old state reached less far back): estimated from
+    # the measured fees per dollar traded, instead of the transfers that carried days of fees at once
+    for cid, (lo, th) in A.estimate_unmeasured(state, now).items():
+        log(f"{C.chain_short(int(cid))}: fees before {(now - th) / 3600:.0f} hours ago estimated from the measured ones")
 
     # hourly market snapshot (pool volumes, pair volume on every DEX, Aero share per chain), kept as history
     if not args.no_market:
         try:
             MD.discover(state, now, log)
-            MD.refresh(state, chains_cfg, now, log)
+            markets_read = MD.refresh(state, chains_cfg, now, log)
         except Exception as e:
+            markets_read = False
             status["errors"].append(f"market: {e}")
             log(f"market data failed: {traceback.format_exc()[-400:]}")
+        # tokenized stocks on Base and Robinhood Chain, once an hour
+        try:
+            S.refresh(state, cfg, rpc_for, now, log, markets_read=markets_read)
+        except Exception as e:
+            status["errors"].append(f"stocks: {e}")
+            log(f"stocks failed: {traceback.format_exc()[-400:]}")
+        # pools worth starting: where the pairs of the little-voted gauges trade on other DEXes
+        try:
+            BS.refresh(state, chains_cfg, now, log, busy=markets_read)
+        except Exception:
+            log(f"bootstrap failed: {traceback.format_exc()[-400:]}")
 
     # paper allocation of a fixed size, followed through every cooldown
-    T.RULES.clear()
-    T.RULES.update(cfg.get("strategies") or {})
+    # options loaded from the page ("Carica queste opzioni nella simulazione"): kept until the next load
+    raw_opts = (os.environ.get("OPTIONS_JSON") or "").strip()
+    if raw_opts:
+        try:
+            state["options"] = {**T.parse_options(json.loads(raw_opts)), "at": now}
+            log("options: loaded from the page: " + T.describe_options(state["options"]))
+        except Exception as e:
+            status["errors"].append(f"options: {e}")
+            log(f"options: not loaded ({str(e)[:160]})")
+    T.OPTIONS.clear()
+    T.OPTIONS.update(state.get("options") or {})
+    if T.OPTIONS:
+        log("options: " + T.describe_options(T.options()))
     size, restart = tracker_settings(state, cfg, log)
     if restart:
         state["tracker"] = T.new_tracker(size, now)
         log(f"tracker: new collection with {size:,.0f} sAERO")
     tr = state["tracker"]
+    gone = T.prune(tr)
+    if gone:
+        log("tracker: methods no longer simulated, records dropped: " + ", ".join(gone))
+    if "broken_prices_1" not in state.setdefault("repairs", []):
+        T.repair_broken_prices(tr, now, log)
+        state["repairs"].append("broken_prices_1")
     aero_key = A.tkey(C.BASE_CHAIN, params["aero"])
     T.accrue(tr, state, prices, fresh_fees, now, params["cooldown"])
+    # fees that had waited and were credited in this run: the pool history spreads them like the fee hours do
+    waited = state.pop("respread", None) or {}
+    if "held_1" not in state["repairs"]:
+        # (the three pools whose fees the old rule kept waiting for a day and more, until 13 Nov 2026 08:51 UTC)
+        waited.update({k: min(RP.HELD_1_FROM, waited.get(k, now)) for k in RP.HELD_1 if k in state["gauges"]})
+        state["repairs"].append("held_1")
+    if waited:
+        T.respread(tr, state, prices, waited, now, log)
+    if mispriced:
+        # fee hours priced with a broken price: out of the pool history, the saved forecasts and the alerts too
+        T.repair_mispriced(tr, state, prices, mispriced, now, log)
+        TR.drop_mispriced(state, mispriced)
+        state["migrated_at"] = now
+    # what every real position earns, for the page's "I tuoi sAERO"
+    try:
+        E.accrue(state, prices, fresh_fees, now, log)
+        if measured_back:
+            E.rebuild_hours(state, prices, now, log)
+        if mispriced:
+            E.take_off(state, mispriced, now, log)
+    except Exception:
+        status["errors"].append("earnings: " + traceback.format_exc()[-200:])
+        log(f"earnings failed: {traceback.format_exc()[-600:]}")
     latest_reco = T.snapshot(tr, state, prices, now, params["cooldown"], params["max_gauges"])
     tracker_report = T.summary(tr, state, now, prices.get(aero_key), params["cooldown"], latest_reco)
     log(f"tracker: size {size:,.0f}, " + ", ".join(
         f"{x['id']} {x['usd_total']:.2f} USD in {x['hours']:.1f} h, now {x['now']['pred_47h']:.2f} USD/47h on "
         f"{len(x['now']['pools'])} pools (" + " ".join(f"{c} {pc}%" for c, _, pc in x["now"]["chains"]) + ")"
         for x in tracker_report["strategies"]))
+    log("tracker: realized per day by the allocations saved every run (" + tracker_report["rank_by"] + "): " + ", ".join(
+        f"{x['id']} {x['perf']['rate_' + tracker_report['rank_by']]}" for x in
+        sorted(tracker_report["strategies"], key=lambda x: tracker_report["ranking"].index(x["id"]))))
 
     routing, routing_errors = {}, {}
     if not args.no_routing and now - state.get("last_routing", 0) >= 55 * 60:
@@ -269,6 +378,11 @@ def run(args):
     status["finished"] = int(time.time())
     status["seconds"] = round(wall_clock() - t_start, 1)
     report = R.build(state, params, prices, now, cfg, routing_errors, status)
+    try:
+        report["big"] = B.report(state, now, lambda cid: R.chain_cooldown(state, cid, params["cooldown"]),
+                                 R.cooldown_end)
+    except Exception:
+        log(f"autopilot report failed: {traceback.format_exc()[-600:]}")
     report["block"] = state["chains"][str(C.BASE_CHAIN)].get("head")
     report["page_url"] = N.page_url(cfg)
     report["repo"] = os.environ.get("GITHUB_REPOSITORY") or cfg.get("repo")
@@ -310,6 +424,23 @@ def run(args):
 
     public_report = {k: v for k, v in report.items() if k != "mine"}
     public_report["personal_alerts"] = bool(cfg["my_positions"]) and bool(N.topic_of(cfg))
+    try:
+        # fees expected in the next 48 hours by the forecast that the backtest finds most accurate (trends.py)
+        # «Best choice (probably)»: the fees and votes models, and their forecast for every pool
+        MC.refresh(state, now, log)
+        BC.update(state, now, log)
+        TR.verify(state, now, log, model=BC.annotate(state, public_report.get("pools") or [], now, log))
+        sc = TR.scores(state)
+        for p in public_report.get("pools") or []:
+            f = TR.forecast(state, p["key"], now, sc) if p.get("key") else None
+            if f:
+                p["pred48"], p["pred_by"] = round(f[0], 2), f[1]
+                if f[2]:
+                    p["pred_err"] = round(f[2], 3)
+                if f[3]:
+                    p["ap_drift"] = round(f[3], 3)     # how its votes moved in the 48 hours after past forecasts
+    except Exception:
+        log(f"forecast failed: {traceback.format_exc()[-400:]}")
     save_json(out / "latest.json", public_report)
     pos_index, pos_shards = R.positions_export(state, params, now)
     pos_dir = out / "pos"
@@ -321,6 +452,25 @@ def run(args):
         save_json(pos_dir / f"{k}.json", shard)
     save_json(out / "positions.json", pos_index)
     save_json(out / "tracker.json", tracker_report)
+    save_json(out / "poolhist.json", T.pool_history(tr, now))
+    try:
+        # fee tendencies by weekday and catalyst days, from each pool's hourly candles
+        TR.refresh(state, now, log)
+        names = {p["key"]: (p["name"], p["chain"], p.get("fpv")) for p in public_report.get("pools") or []}
+        trends_report = TR.export(state, names, now)
+        trends_report["bc"] = BC.export(state)
+        trends_report["macro"] = MC.export(state, now)
+        save_json(out / "trends.json", trends_report)
+    except Exception:
+        log(f"trends failed: {traceback.format_exc()[-400:]}")
+    try:
+        save_json(out / "bootstrap.json", BS.export(state, public_report, prices, now))
+    except Exception:
+        log(f"bootstrap export failed: {traceback.format_exc()[-400:]}")
+    try:
+        save_json(out / "stocks.json", S.export(state, now))
+    except Exception:
+        log(f"stocks export failed: {traceback.format_exc()[-400:]}")
     save_json(out / "state.json.gz", state, gz=True)
     publish_site(out)
     write_run_log(out)

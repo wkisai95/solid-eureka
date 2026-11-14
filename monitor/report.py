@@ -3,6 +3,7 @@ import statistics
 
 from . import aero as A
 from . import chain as C
+from . import earnings as E
 from . import marketdata as MD
 
 HOUR = 3600
@@ -113,7 +114,6 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
     rows = []
     mkt = state.get("market") or {}
     mkt_pools = mkt.get("pools") or {}
-    universe, new_ok = MD.new_chain_universe(state, (cfg.get("strategies") or {}).get("nuove"))
 
     def pool_row(key, ap):
         m = state["gauges"].get(key) or {}
@@ -123,6 +123,25 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
         inc_next = A.incentive_usd(state, prices, key, now, now + 48 * HOUR)
         r = {"key": key, "name": A.gauge_name(state, key), "chain": C.chain_short(cid), "cid": cid,
              "kind": m.get("kind", "?"), "pool": m.get("pool"), "ap": round(ap)}
+        # hourly fees of the last day (index 0: the current hour) and the incentives streamed in it: the page's APR
+        # over 6, 12, 18 and 24 hours and its warning when the fees come from a few hours
+        hourly = A.fee_hours(state, key)
+        h0 = now - now % HOUR
+        fh = [round(hourly.get(h0 - i * HOUR, 0.0), 2) for i in range(25)]
+        while fh and not fh[-1]:
+            fh.pop()
+        if fh:
+            r["fh"] = fh
+        inc24 = A.incentive_usd(state, prices, key, now - 24 * HOUR, now)
+        if inc24 > 0:
+            r["inc24h"] = round(inc24, 2)
+        # hourly traded volume (DexScreener, one snapshot an hour; index 0: this hour) and fees per dollar traded:
+        # fee transfers arrive in batches on some chains, the volume shows when the trading really happened
+        vh, v48 = MD.hourly_volume(state, key, now)
+        if vh and any(v for v in vh if v):
+            r["vh"] = vh
+        if v48 and fees48 > 0:
+            r["fpv"] = round(min(0.01, fees48 / v48), 7)
         mv = mkt_pools.get(key)
         if mv:
             # this pool's volume and liquidity, and the same pair on every DEX of the chain
@@ -130,15 +149,13 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             if mv[4]:
                 r["pair_vol24h"] = mv[4]
                 r["pair_share"] = round(min(1.0, mv[2] / mv[4]), 4)
-        if key in universe:
-            r["new_chain_pair"] = True
         return m, r, fees48, inc48, inc_next
 
     for key, ap in sorted(state["ap"].items(), key=lambda kv: -kv[1])[:500]:
         m, r, fees48, inc48, inc_next = pool_row(key, ap)
         past = (state.get("ap_past") or {}).get(key) or {}
         rev48 = fees48 + inc48
-        for h in (1, 6, 24):
+        for h in (1, 6, 24, 48):
             v = past.get(h) if isinstance(past, dict) else None
             if v is None:
                 v = past.get(str(h)) if isinstance(past, dict) else None
@@ -147,6 +164,10 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
         r.update({k: round(v) for k, v in pp.items() if k != "positions"})
         r["positions"] = pp.get("positions", 0)
         r["fees48h"] = round(fees48, 2)
+        dfee, prev48 = A.fee_change(state, key, now)
+        if prev48 is not None:
+            r["fees_prev48h"] = round(prev48, 2)      # the 48 hours before: the radar's fee trend and volume spikes
+            r["dfee"] = dfee
         r["inc48h"] = round(inc48, 2)
         r["inc_next48h"] = round(inc_next, 2)
         r["rev48h"] = round(rev48, 2)
@@ -172,7 +193,7 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             r["spark"] = [round(v) if v else 0 for v in spark]
         rows.append(r)
     # pools that earned revenue but have no allocation at all (the first allocator takes everything)
-    for key in set(state["fees"]) | {p["g"] for p in state["incentives"].values()}:
+    for key in set(state["fees"]) | set(state.get("acc") or {}) | {p["g"] for p in state["incentives"].values()}:
         if key in state["ap"]:
             continue
         m, r, fees48, inc48, inc_next = pool_row(key, 0)
@@ -180,6 +201,10 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             continue
         r.update({"fees48h": round(fees48, 2), "inc48h": round(inc48, 2), "inc_next48h": round(inc_next, 2),
                   "rev48h": round(fees48 + inc48, 2), "positions": 0, "unallocated": True})
+        dfee, prev48 = A.fee_change(state, key, now)
+        if prev48 is not None:
+            r["fees_prev48h"] = round(prev48, 2)
+            r["dfee"] = dfee
         if m.get("ok") is False:
             r["blocked"] = True
         rows.append(r)
@@ -202,6 +227,8 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             "inc_next48h": round(sum(r.get("inc_next48h") or 0 for r in crow), 2),
             "median_apr": round(statistics.median(aprs_c), 2) if aprs_c else None,
             "synced": bool(cs.get("synced")), "fee_hours": cs.get("fee_hours"),
+            # fees are complete from here on: the 48-hour fee change needs 96 hours after it
+            "fee_from": max(int(cs["fee_from"]), int(state.get("fee_complete_from") or 0)) if cs.get("fee_from") else None,
             "ok": st.get("ok", False), "error": st.get("error"), "checked": st.get("at"),
             "head": cs.get("head"), "cooldown_h": round(chain_cooldown(state, cid, cooldown) / HOUR, 2),
             # DefiLlama for both, so the share compares like with like; DexScreener's sum of the Aero pools aside
@@ -210,7 +237,6 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
             "share": _r4(MD.chain_share(mkt, cid)),
             "share_24h": _r4(MD.chain_share(mkt, cid, ago=24 * HOUR, now=now)),
             "share_7d": _r4(MD.chain_share(mkt, cid, ago=7 * 24 * HOUR, now=now)),
-            "new": cid in new_ok,
         })
     for cid in params.get("chains", []):
         if str(cid) not in state["chains"]:
@@ -272,28 +298,103 @@ def build(state, params, prices, now, cfg, routing_errors=None, status=None):
 
 
 SHARD = 1000
+PEER_GROUPS = (100_000, 10_000)    # positions with at least this many allocated sAERO, for the viewer's ranking
+PEER_WINDOWS = (24, 168)          # hours
+
+
+def _peers(book, alloc, last, rates, total, now, h0):
+    """{threshold: {"n": positions, window: {"m": [...], "avg": ...}}}: for every position with at least `threshold`
+    allocated sAERO, what one of its allocated votes earned per second over the window as a multiple of the market
+    (x100, rounded, best first), and the group's average weighted by votes. A position counts once it has been
+    earning, or allocated, for at least half the window; one that earned nothing counts as zero."""
+    out = {}
+    pp = book.get("p") or {}
+    for thr in PEER_GROUPS:
+        group = {t: a for t, a in alloc.items() if a >= thr}
+        g = {"n": len(group)}
+        for n in PEER_WINDOWS:
+            mk = rates.get(n, 0.0) / total if total > 0 else 0.0
+            if mk <= 0:
+                continue
+            ms, usd_s, votes = [], 0.0, 0.0
+            for t, a in group.items():
+                pe = pp.get(t)
+                if pe:
+                    usd, secs = E.windows(pe, now, h0)[n]
+                else:
+                    usd, secs = 0.0, max(0, now - max(last.get(t, now), now - n * HOUR))
+                if secs < n * HOUR / 2:
+                    continue
+                ms.append(round(usd / secs / a / mk * 100))
+                usd_s += usd / secs
+                votes += a
+            ms.sort(reverse=True)
+            g[str(n)] = {"m": ms, "avg": round(usd_s / votes / mk * 100) if votes > 0 else None}
+        out[str(thr)] = g
+    return out
 
 
 def positions_export(state, params, now):
-    """Every position on every chain with its cooldown end, so the page can show the viewer's own positions.
+    """Every position on every chain with its cooldown end and what it has earned, so the page can show the
+    viewer's own positions.
 
     Split by position number (SHARD numbers per file) so the page downloads only the files it needs.
-    Returns (index, {shard: {"names": [...], "p": {id: [[chainId, cooldown end, sAERO, active, moves,
-    [[name index, sAERO], ...]], ...]}}}).
+    Returns (index, {shard: {"names": [...], "keys": [...], "p": {id: [[chainId, cooldown end, sAERO, active,
+    moves, [[pool index, sAERO], ...], time of its last allocation], ...]}, "r": {id: earnings.summary with pool
+    indexes, plus [last allocation
+    change, USD since then, export time] when that change was in the last 4 days}}}).
     """
     cooldown = params["cooldown"]
     shards = {}
+
+    def shard(tid):
+        return shards.setdefault(int(tid) // SHARD, {"names": [], "keys": [], "idx": {}, "p": {}, "r": {}})
+
+    def pool_index(sh, g):
+        if g not in sh["idx"]:
+            sh["idx"][g] = len(sh["keys"])
+            sh["keys"].append(g)
+            sh["names"].append(A.gauge_name(state, g))
+        return sh["idx"][g]
+
+    alloc, last = {}, {}
     for cid, tid, t, size, end, active in positions(state, cooldown):
-        sh = shards.setdefault(int(tid) // SHARD, {"names": [], "idx": {}, "p": {}})
-        pools = []
-        for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])[:4]:
-            n = A.gauge_name(state, g)
-            if n not in sh["idx"]:
-                sh["idx"][n] = len(sh["names"])
-                sh["names"].append(n)
-            pools.append([sh["idx"][n], round(a)])
-        sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools])
-    index = {"v": 3, "generated": now, "cooldown_h": round(cooldown / HOUR, 2), "shard": SHARD,
-             "shards": sorted(shards),
+        alloc[tid] = alloc.get(tid, 0.0) + size
+        last[tid] = max(last.get(tid, 0), int(t.get("last") or 0))
+        sh = shard(tid)
+        pools = [[pool_index(sh, g), round(a)] for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])]
+        sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools,
+                                            int(t.get("last") or 0)])
+    book = state.get("earnings") or {}
+    keys = E.gauge_keys(book)
+    h0 = int(book.get("h0") or now - now % HOUR)
+    # the market: what an allocated sAERO earned on average over each window. Every allocated position counts, with
+    # what it earned per second over its own window (nothing if it earned nothing), against all the allocation
+    rates = {}
+    for tid in alloc:
+        pe = (book.get("p") or {}).get(tid)
+        for n, (usd, secs) in (E.windows(pe, now, h0).items() if pe else ()):
+            if secs > 0:
+                rates[n] = rates.get(n, 0.0) + usd / secs
+    total = sum(alloc.values())
+    market = {str(n): float(f"{v / total:.6g}") for n, v in rates.items()} if total > 0 else {}
+    peers = _peers(book, alloc, last, rates, total, now, h0)
+    for tid, pe in (book.get("p") or {}).items():
+        sh = shard(tid)
+        r = E.summary(pe, now, keys, h0)
+        r[7] = [[pool_index(sh, g), v] for g, v in sorted(r[7].items(), key=lambda kv: -kv[1]) if v >= 0.01]
+        # what it earned since its last allocation change, when that was in the last 4 days: [since, USD, until]
+        got = E.since(pe, last.get(tid, 0), now, h0)
+        if got is not None:
+            r.append([last[tid], round(got, 4), now])
+        sh["r"][tid] = r
+    index = {"v": 4, "generated": now, "cooldown_h": round(cooldown / HOUR, 2), "shard": SHARD,
+             "shards": sorted(shards), "earnings_from": (state.get("earnings") or {}).get("from"),
+             # USD per second earned by one allocated sAERO, by window in hours (168: 7 days)
+             "market": market, "market_alloc": round(total),
+             # positions of at least 100k and 10k allocated sAERO: what each of their allocated votes earned per window,
+             # in hundredths of the market ("m", best first), and the group's average; see _peers
+             "peers": peers,
              "chains": {cid: C.chain_short(cid) for cid in sorted({int(c) for c in state["chains"]})}}
-    return index, {k: {"generated": now, "names": v["names"], "p": v["p"]} for k, v in shards.items()}
+    return index, {k: {"generated": now, "names": v["names"], "keys": v["keys"], "p": v["p"], "r": v["r"]}
+                   for k, v in shards.items()}
