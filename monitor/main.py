@@ -172,7 +172,7 @@ def run(args):
         rpc = RPC[cid]
         ccfg = chains_cfg[str(cid)]
         try:
-            head, head_ts = A.chain_head(rpc, cid, cs, int(ccfg.get("lag", 2)), now, log)
+            head, head_ts = A.chain_head(rpc, cid, cs, A.head_lag(cs, ccfg), now, log)
             if args.max_blocks and not cs.get("last_block"):
                 cs["last_block"] = head - args.max_blocks
             lp = C.read_leaf_params(rpc)

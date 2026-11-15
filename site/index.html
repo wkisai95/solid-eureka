@@ -807,7 +807,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   <p class="note hidden-note" id="hidden-note"><span id="hidden-txt"></span> <button type="button" class="linkish" id="hidden-toggle"></button></p>
 
   <footer>
-    <span>Dati on-chain da Base, OP Mainnet, Ethereum, Arbitrum, Ink, Robinhood Chain e Arc (contratti Aero di Dromos Labs), prezzi DexScreener, quote KyberSwap e Velora. Aggiornamento ogni 15 minuti con GitHub Actions.</span>
+    <span>Dati on-chain da Base, OP Mainnet, Ethereum, Arbitrum, Ink, Robinhood Chain, Arc ed Elysium (contratti Aero di Dromos Labs), prezzi DexScreener, quote KyberSwap e Velora. Aggiornamento ogni 15 minuti con GitHub Actions.</span>
     <span>Non è una consulenza finanziaria.</span>
   </footer>
 </div>
@@ -1802,7 +1802,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   try { const o = JSON.parse(lsGet("radar-rd-x") || "null"); if (o) XS = { keys: new Set(o.keys || []), rules: o.rules || [], chainsOff: o.chainsOff || [] }; } catch (e) {}
   const saveRD = () => lsSet("radar-rd", JSON.stringify(RD));
   const saveX = () => lsSet("radar-rd-x", JSON.stringify({ keys: [...XS.keys], rules: XS.rules, chainsOff: XS.chainsOff }));
-  const RD_CHAINS = ["Base", "OP", "Ethereum", "Arbitrum", "Robinhood", "Arc", "Ink"];
+  const RD_CHAINS = ["Base", "OP", "Ethereum", "Arbitrum", "Robinhood", "Arc", "Ink", "Elysium"];
   const PER_CHAIN = 20;           // the LeafVoter takes at most 20 pools per chain from one position
   let rdShowAll = false, rdLast = null, rdRaf = 0;
   const rdSchedule = () => { cancelAnimationFrame(rdRaf); rdRaf = requestAnimationFrame(rdRender); };

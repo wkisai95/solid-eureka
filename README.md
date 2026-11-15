@@ -1,7 +1,8 @@
 # Monitor sAERO
 
 Monitor di Aero che gira da solo su GitHub Actions ogni 15 minuti, su tutte le chain dove gira Aero:
-Base, OP Mainnet, Ethereum, Arbitrum, Ink, Robinhood Chain e Arc.
+Base, OP Mainnet, Ethereum, Arbitrum, Ink, Robinhood Chain, Arc ed Elysium (la L2 di Hyperliquid, chain 99901,
+mainnet dal 9 novembre 2026; gas in HYPE, blocchi di circa 0,1–0,2 secondi).
 
 Ogni giro:
 
@@ -10,6 +11,9 @@ Ogni giro:
   risponde non blocca le altre. Su Base l'ora di ogni evento viene dal ritmo dei blocchi (uno ogni 2 secondi, uno
   ogni 200 ms dall'aggiornamento Denim del 5 novembre 2026, blocco 53.556.127), controllato a ogni giro sull'ultimo
   blocco letto: se non torna più, il monitor prende gli orari dalla chain e lo scrive nel log;
+  ogni chain si legge qualche secondo dietro la punta (6 secondi al ritmo dei suoi blocchi: 30 blocchi su Base
+  dopo Denim, 2 su Ethereum, una quarantina su Elysium), perché un nodo un po' indietro rispetto a un altro
+  risponderebbe con eventi mancanti senza segnalare errori;
 - legge l'allocazione totale di ogni pool e com'era 1, 6 e 24 ore fa;
 - una volta all'ora chiede a KyberSwap e Velora una quotazione da $1.000 e $10.000 sui pool più allocati e misura
   quanta parte passa dal pool Aero (quota di routing);
