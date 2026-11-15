@@ -27,7 +27,7 @@ STABLES = {
     "99901:0xb47c4c8f73f009cc0c0d3f92b388d13e293f0b65": 1.0,  # USDC (Elysium)
 }
 # When a chain has no market data for a well-known token, its price is taken from the same asset on Base.
-MAJORS = {"WETH": "eth", "ETH": "eth", "WBTC": "btc", "CBBTC": "btc", "USDC": "usd", "USDC.E": "usd",
+MAJORS = {"WETH": "eth", "ETH": "eth", "WBTC": "btc", "CBBTC": "btc", "UBTC": "btc", "USDC": "usd", "USDC.E": "usd",
           "USDT": "usd", "USDT0": "usd", "USD₮0": "usd", "DAI": "usd", "USDS": "usd", "USDBC": "usd"}
 REFERENCE = {"eth": "8453:0x4200000000000000000000000000000000000006",
              "btc": "8453:0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"}
