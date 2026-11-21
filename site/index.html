@@ -382,6 +382,19 @@ details.apfold { margin-top: 4px; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
 .mov { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+#rd-oth-box { display: grid; gap: 12px; }
+#rd-oth-box > .lbl { margin-top: 6px; }
+#rd-oth-box table.trd td:last-child { white-space: normal; min-width: 220px; }
+@media (max-width: 700px) {
+  table.om, table.om tbody, table.om tbody tr { display: block; }
+  table.om thead { display: none; }
+  table.om tbody tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 10px 0 9px; border-bottom: 1px solid var(--line); }
+  table.om tbody td { display: block; border: 0; padding: 0; white-space: normal; text-align: left; font-size: 13px; }
+  #rd-oth-box table.om td:last-child { min-width: 0; flex: 0 0 100%; color: var(--ink-2); }
+  table.om td:first-child { flex: 0 0 100%; font-weight: 600; font-size: 14px; }
+  table.om td[data-l]::before { content: attr(data-l) " "; color: var(--ink-2); }
+}
+.field.dim .switch { opacity: .6; }
 @media (max-width: 700px) { .mov { grid-template-columns: 1fr; } }
 .mvcol { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .mvcol ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; }
@@ -504,7 +517,9 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       <div class="field"><label for="rd-trend">Peso del trend fee: <span id="rd-trend-v">0%</span></label><input id="rd-trend" type="range" min="0" max="100" step="5"><small id="rd-trend-s">Segue la variazione delle fee di ogni pool rispetto alle 48 ore prima</small></div>
       <div class="field"><span class="flabel">Correggi per il giorno della settimana</span><label class="switch"><input id="rd-sea" type="checkbox" role="switch"><span id="rd-sea-s">Spento</span></label>
         <small id="rd-sea-info">Porta le fee della finestra scelta ai giorni delle prossime 48 ore, con le tendenze di ogni pool (sotto, «Tendenze fee»)</small></div>
-      <div class="field"><label for="rd-comp">Concorrenza attesa</label><select id="rd-comp"><option value="0">Nessuna: voti fermi</option><option value="8">Max 8× la media del mercato</option><option value="5">Max 5× la media del mercato</option><option value="3">Max 3× la media del mercato</option><option value="2">Max 2× la media del mercato</option><option value="1.5">Max 1,5× la media del mercato</option></select><small>Gli altri allocatori arrivano dove si guadagna di più</small></div>
+      <div class="field"><label for="rd-comp">Concorrenza attesa</label><select id="rd-comp"><option value="0">Nessuna: voti fermi</option><option value="8">Max 8× la media del mercato</option><option value="5">Max 5× la media del mercato</option><option value="3">Max 3× la media del mercato</option><option value="2">Max 2× la media del mercato</option><option value="1.5">Max 1,5× la media del mercato</option></select><small id="rd-comp-s">Gli altri allocatori arrivano dove si guadagna di più</small></div>
+      <div class="field"><span class="flabel">Prevedi il comportamento degli altri allocatori</span><label class="switch"><input id="rd-oth" type="checkbox" role="switch"><span id="rd-oth-s">Spento</span></label>
+        <small id="rd-oth-info">I voti che ogni pool avrà in media nelle 47 ore del tuo cooldown, posizione per posizione: chi esce dal cooldown, quanto sposta di solito, dove vanno i voti</small></div>
       <div class="field"><span class="flabel">Taglia i picchi di volume</span><label class="switch"><input id="rd-spk" type="checkbox" role="switch"><span id="rd-spk-s">Spento</span></label>
         <div class="inline"><small>Tolleranza</small><input id="rd-spkK" class="short" type="text" inputmode="decimal" autocomplete="off" aria-label="Tolleranza in percento del Δ mercato"><small>% del Δ mercato</small></div>
         <small id="rd-spk-info"></small></div>
@@ -562,6 +577,11 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       </div>
     </details>
 
+    <details class="sub-fold" data-fold="rd-oth">
+      <summary><span class="fold-t">Cosa faranno gli altri allocatori</span><span class="sub" id="rd-oth-sum"></span></summary>
+      <div class="fold-body" id="rd-oth-box"></div>
+    </details>
+
     <details class="sub-fold" data-fold="rd-pools">
       <summary><span class="fold-t">Pool del radar</span><span class="sub" id="rd-pools-sum"></span></summary>
       <div class="fold-body">
@@ -595,7 +615,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         <p><b>Minimo e massimo per pool.</b> Con un minimo del 10% ogni pool scelto riceve almeno il 10% dei voti, quindi al massimo 10 pool: il radar toglie il pool con la quota più piccola sotto il minimo e ridistribuisce, finché tutti lo rispettano. Il massimo limita la quota di ogni pool; se i pool rimasti sono troppo pochi per arrivare al 100%, sale quanto basta. Su ogni rete si votano al massimo 20 pool.</p>
         <p><b>Autodiluizione.</b> Ogni voto che aggiungi abbassa il rendimento del successivo. Il radar distribuisce la tua AP a fette dell'1%, ogni volta al pool che rende di più sulla fetta successiva.</p>
         <p><b>Simulazione.</b> «Carica queste opzioni nella simulazione» le manda al monitor: da quel giro in poi la simulazione del Radar segue massimo, minimo, reti, pool e ricerche scartati, picchi di volume, trend e concorrenza. La dimensione della simulazione resta la sua: la tua Allocation Power resta solo su questo dispositivo.</p>
-        <p><b>Cosa non sa.</b> Non vede i movimenti degli altri allocatori durante le 47 ore di cooldown, non prevede incentivi nuovi o picchi di volume, e ignora i limiti di emissione dei gauge, che limitano le ricompense AERO di un pool ma non la revenue che ricevi. Non è una consulenza finanziaria: è aritmetica su dati pubblici.</p>
+        <p><b>Altri allocatori (interruttore).</b> Le tue rewards dipendono dai voti che il pool avrà durante le 47 ore in cui i tuoi sono fermi. Il monitor tiene ogni allocazione di ogni posizione delle ultime cinque settimane, su tutte le reti, e per ogni posizione stima quando si muoverà: dopo il suo cooldown, con la fretta che ha avuto le altre volte (le «puntuali» si muovono quasi sempre entro 3 ore dalla fine del cooldown) e spostando la quota di voti che sposta di solito. Ne vengono, per ogni pool con almeno 30.000 voti, i voti che probabilmente usciranno; una regressione li mette insieme all'APR del pool rispetto al mercato (i voti arrivano dove si guadagna di più) e ai voti entrati nelle ultime 6 ore, ed è tarata su quello che è successo dopo ogni momento delle settimane passate, con più peso sui pool dall'APR più alto. Il risultato è il numero di voti che il pool avrà in media nelle 47 ore, rispetto a oggi: il radar divide le fee per quelli, e sui pool che hanno una previsione non usa più la «Concorrenza attesa». L'ultima settimana resta fuori dalla taratura e fa da verifica: se lì la previsione non batte «voti fermi», l'interruttore non cambia nulla. I tuoi voti che riallochi sono già tolti dai pool: la parte di uscita che la previsione si aspetta da loro viene rimessa.</p>
+        <p><b>Cosa non sa.</b> Con l'interruttore degli altri allocatori spento non vede i movimenti degli altri durante le 47 ore di cooldown; acceso li prevede, ma non sa dove andrà esattamente ogni voto. Non prevede incentivi nuovi o picchi di volume, e ignora i limiti di emissione dei gauge, che limitano le ricompense AERO di un pool ma non la revenue che ricevi. Non è una consulenza finanziaria: è aritmetica su dati pubblici.</p>
       </div>
     </details>
     </div>
@@ -1221,7 +1242,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
         votes[k] = (votes[k] || 0) + a;
         names[k] = `${sh.names[i]} (${chainName(e[0])})`;
       }
-      return { id, ap: oc ? oc.ap : alloc, ends: ent.reduce((m, e) => Math.max(m, e[1]), 0), votes, names };
+      return { id, ap: oc ? oc.ap : alloc, ends: ent.reduce((m, e) => Math.max(m, e[1]), 0), votes, names,
+        gone: ent.reduce((m, e) => Math.max(m, +e[7] || 0), 0) };
     });
     const sig = JSON.stringify(myPos);
     if (sig !== MY_POS_SIG) { MY_POS = myPos; MY_POS_SIG = sig; try { rdSchedule(); } catch (e) { /* the Radar is not set up yet */ } }
@@ -1795,7 +1817,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // ---------------------------------------------------------------- Radar sAERO: the old app, on the monitor's data
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-  const RD_DEF = { ap: "235000", price: "", win: "48", trend: "0", sea: false, comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", exitOff: [], minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24 };
+  const RD_DEF = { ap: "235000", price: "", win: "48", trend: "0", sea: false, comp: "3", spk: false, spkK: "75", stb: true, stbK: "2", exitOff: [], minA: "5", cap: "100", sortBy: "apr", saved: "", movH: 24, oth: false };
   let RD = { ...RD_DEF };
   try { RD = { ...RD_DEF, ...(JSON.parse(lsGet("radar-rd") || "null") || {}) }; } catch (e) {}
   let XS = { keys: new Set(), rules: [], chainsOff: [] };
@@ -1932,7 +1954,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           vh: p.vh || null, fpv: p.fpv || 0, mine: mine[p.key] || 0,
           pred: p.pred48 != null ? p.pred48 : null, perr: p.pred_err || null,
           bcf: p.bc_f != null ? p.bc_f : null, bce: p.bc_e || null, bca: p.bc_a || null,
-          d6: p.d6h || 0, d24: p.d24h || 0, fa: p.free_now_active || 0 };
+          d6: p.d6h || 0, d24: p.d24h || 0, fa: p.free_now_active || 0,
+          othf: p.oth_f || null, otho: p.oth_o || 0, othi: p.oth_i || 0, othr: p.oth_r || 0 };
         q.on = !(XS.keys.has(q.key) || ruleFor(q) || chainOff(q));
         return q;
       });
@@ -2039,6 +2062,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (apx) left.append(el("div", "apx", `🤖 ${apx.who.join(", ")}: ${fmtPct(apx.share * 100)} dei voti del pool` +
       (apx.ends ? (apx.ends > now ? `, può riallocare tra ${inT(apx.ends - now)}` : ", può riallocare in qualsiasi momento") : "")));
     if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
+    if (othOn() && p.othf) left.append(el("div", "apx", "👥 " + othLine(p, o ? o.fo : othFactor(p), A0)));
     if (r.spike && r.spike.ids.has(p.key)) left.append(el("div", "spk", "Il filtro dei picchi gli conta le fee delle 48 ore prima"));
     const b = el("button", "x", off ? "↺" : "✕");
     b.type = "button";
@@ -2046,6 +2070,18 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     b.addEventListener("click", () => { if (off) XS.keys.delete(p.key); else XS.keys.add(p.key); saveX(); rdRender(); });
     d.append(left, el("div", "pct", k > 0 ? k + "%" : ""), b);
     return d;
+  }
+
+  // what the forecast of the other allocators expects of a pool's votes over the 47 hours
+  // (relative to the typical pool: the forecast does not guess the growth of the whole market)
+  function othLine(p, f, A0) {
+    const ch = (f - 1) * 100, typ = (DATA.others && DATA.others.typ) || [0, 0], pc = x => art(fmtPct(x * 100)) + fmtPct(x * 100), why = [];
+    why.push(p.otho >= 0.005 ? `ne usciranno circa ${pc(p.otho)} con le posizioni che finiscono il cooldown (nel pool tipico ${pc(typ[0])})` : "non ne uscirà quasi nessuno");
+    if (p.othr >= 1.25) why.push(`APR ${x2c(p.othr)}× il mercato: i voti tendono ad arrivare`);
+    else if (p.othr > 0 && p.othr <= 0.6) why.push(`APR ${x2c(p.othr)}× il mercato`);
+    if (p.othi >= 0.02) why.push(`ne è entrato ${pc(p.othi)} nelle ultime 6 ore: chi arriva di solito continua`);
+    return `Altri allocatori: nelle prossime 47 ore in media ${Math.abs(ch) < 1 ? "voti come il pool tipico" : `${ch > 0 ? "+" : "−"}${fmtPct(Math.abs(ch))} di voti rispetto al pool tipico (${ch > 0 ? "+" : "−"}${fmtN(Math.abs(A0 * (f - 1)))})`}. ` +
+      why.join("; ").replace(/^./, c => c.toUpperCase()) + ".";
   }
 
   // the article before a number as it is read: l'8%, l'11%, l'1,5%, lo 0,4%, il 29%; with "di": dell', dello, del
@@ -2071,10 +2107,22 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   // average allocation over the last n hours, hour by hour
   const allocAvg = (p, n) => { let t = 0; for (let h = 0; h < n; h++) t += (allocAgo(p, h) + allocAgo(p, h + 1)) / 2; return t / n; };
 
+  // the other allocators (others.py): on, and the forecast in use
+  const othOn = () => !!(RD.oth && DATA && DATA.others && DATA.others.used);
+  // a pool's votes over the next 47 hours against today's, as forecast. The forecast also expects some of the
+  // viewer's own votes to leave; the radar already takes out the ones being reallocated, so their part goes back
+  function othFactor(p) {
+    if (!p.othf) return null;
+    const c = ((DATA.others.fit || {}).coef || [])[0] || 0, off = new Set(RD.exitOff || []);
+    let gone = 0;
+    for (const m of MY_POS) if (!off.has(m.id) && m.gone && m.votes[p.key]) gone += m.votes[p.key] * m.gone;
+    return p.alloc > 0 && gone > 0 ? p.othf * Math.exp(-c * gone / p.alloc) : p.othf;
+  }
+
   // the Radar's allocation: 1% slices to the pool that pays most on the next slice, within the options
   // (apOver: the same allocation for another number of votes, for «Pool da avviare»)
   function rdAllocate(list, apOver) {
-    const win = rdWin(), ap = Math.max(0, apOver != null ? apOver : rdNum(RD.ap, 0)), w = win < 48 ? 0 : (+RD.trend || 0) / 100, cap = +RD.cap || 100, N = +RD.comp || 0, minA = Math.max(0, +RD.minA || 0);
+    const win = rdWin(), ap = Math.max(0, apOver != null ? apOver : rdNum(RD.ap, 0)), w = win < 48 ? 0 : (+RD.trend || 0) / 100, cap = +RD.cap || 100, N = +RD.comp || 0, minA = Math.max(0, +RD.minA || 0), oth = othOn();
     let sR = 0, sA = 0;
     for (const p of list) { sR += projected(p, w); sA += Math.max(0, p.alloc); }
     const avg = sA > 0 ? sR / sA : 0;     // the whole market: the others vote on the pools you leave out too
@@ -2128,9 +2176,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const R = value(p), A0 = Math.max(0, p.alloc - p.mine);     // your moving votes leave the pool
       // best choice: the votes the pool is expected to have on average, and for choosing (Rc) the fee part cut by
       // the square root of the pool's typical error: the incentives are scheduled, the fees are a forecast
-      const best = rdBest(), Ae = best && p.bca ? A0 * p.bca : A0;
+      // with the other allocators forecast, the pool's votes over the 47 hours: they replace the competition rule
+      const best = rdBest(), fo = oth ? othFactor(p) : null, Ae = fo ? A0 * fo : best && p.bca ? A0 * p.bca : A0;
       const Rc = best ? p.inc + Math.max(0, R - p.inc) / Math.sqrt(bestErr(p)) : R;
-      return { p, R, Rc, A0, A: N && avg > 0 ? Math.max(Ae, R / (N * avg)) : Ae, k: 0 };
+      return { p, R, Rc, A0, fo, A: N && avg > 0 && !fo ? Math.max(Ae, R / (N * avg)) : Ae, k: 0 };
     });
     const slice = ap / 100;
     const earn = (o, k) => { const x = k * slice; return x <= 0 ? 0 : o.R * x / (o.A + x); };
@@ -2169,7 +2218,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     let top = null, topE = 0;
     for (const o of act) { const e = earn(o, 100); if (e > topE) { topE = e; top = o; } }
     const short = win < 48 ? list.filter(p => p.on && p.fee > 0 && winFee(p, win) == null).length : 0;     // on the 48 hours
-    return { ap, w, win, short, act, total, top, topE, earn, avg, N, spike, stab };
+    return { ap, w, win, short, act, total, top, topE, earn, avg, N, spike, stab, oth };
   }
 
   function toast(text, bad) {
@@ -2272,6 +2321,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
           `: se esce, ${exitGain(Math.min(apx.share, 0.99))}.`));
       }
       if (rc.warn) left.append(el("div", "spk", "⚠ Picco: " + rc.warn));
+      if (o.fo) left.append(el("div", "apx", "👥 " + othLine(o.p, o.fo, o.A0)));
       if (rdBest()) {
         const f = bestFee(o.p), e = bestErr(o.p), parts = [`fee previste ${r$(f)} (errore tipico ${Math.round((e - 1) * 100)}%, contate al ${Math.round(100 / Math.sqrt(e))}% nella scelta)`];
         if (o.p.inc > 0) parts.push(`incentivi programmati ${r$(o.p.inc)}, certi`);
@@ -2341,6 +2391,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     }
     $("rd-spk-s").textContent = RD.spk ? "Acceso" : "Spento";
     $("rd-sea-s").textContent = RD.sea ? "Acceso" : "Spento";
+    othInfo(r, list);
     { const nT = Object.keys(TRD_BY).length;
       $("rd-sea-info").textContent = !nT ? "Le tendenze dei pool non sono ancora state raccolte"
         : RD.sea ? `Fee della finestra portate ai giorni delle prossime 48 ore, per i ${nT} pool con almeno ${(TRD && TRD.min_days) || 14} giorni di storia (tra 0,6× e 1,6×)`
@@ -2503,6 +2554,147 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       col("Uscite di voti", L.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 8)));
   }
 
+  // ---- the other allocators: the option's line, and the window with the forecast (others.json)
+  const x2c = v => v.toFixed(2).replace(".", ",");
+  function othCheck(S) {
+    // how the forecast did on the last week, never seen by its fit
+    const f = S && S.fit;
+    if (!f || !f.real || !f.real["3"] || !f.err || !f.err.top5) return "";
+    const r3 = f.real["3"], e5 = f.err.top5;
+    return `Controllata sull'ultima settimana, mai vista dal modello (${f.test} momenti): nei 5 pool con l'APR più alto i voti delle 47 ore sono stati sbagliati del ${fmtPct(e5[1] * 100)}, assumendo voti fermi del ${fmtPct(e5[0] * 100)}; i 3 pool scelti con i voti previsti hanno reso ${x2c(r3[1])}× il pool tipico, con i voti di adesso ${x2c(r3[0])}× (meglio in ${r3[3]} momenti, peggio in ${r3[4]}).`;
+  }
+  const minV = S => ((S && S.min_votes) || 30000).toLocaleString("it-IT");
+  function othInfo(r, list) {
+    const S = DATA && DATA.others, info = $("rd-oth-info"), sw = $("rd-oth");
+    $("rd-oth-s").textContent = RD.oth ? "Acceso" : "Spento";
+    const n = list.filter(p => p.othf).length;
+    if (!S || !S.ready) {
+      const h = (S && S.history) || {}, todo = Object.keys(h).filter(k => !h[k]);
+      info.textContent = todo.length ? `In preparazione: il monitor sta leggendo la storia delle allocazioni (manca: ${todo.join(", ")}). Finché non c'è, l'opzione non cambia nulla.`
+        : "In preparazione: arriva con il prossimo aggiornamento del monitor. Finché non c'è, l'opzione non cambia nulla.";
+    } else if (!S.used) info.textContent = "Nell'ultima settimana la previsione non ha battuto «voti fermi», quindi per ora l'opzione non cambia nulla. " + othCheck(S);
+    else info.textContent = (RD.oth ? `Voti previsti per ${n} pool, quelli con almeno ${minV(S)} voti: al posto della concorrenza attesa. ` : "I voti che ogni pool avrà in media nelle 47 ore del tuo cooldown, posizione per posizione. ") + othCheck(S);
+    sw.closest(".field").classList.toggle("dim", !!(S && S.ready && !S.used));
+    const cs = $("rd-comp-s");
+    cs.textContent = r.oth ? `Con la previsione degli altri allocatori vale solo per i pool sotto ${minV(S)} voti` : "Gli altri allocatori arrivano dove si guadagna di più";
+  }
+
+  let OTH = null;
+  async function loadOthers() {
+    try {
+      const r = await dataFetch("others.json");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      OTH = await r.json();
+    } catch (e) { OTH = null; }
+    othRender();
+  }
+  function othRender() {
+    if (!DATA || waits("rd-oth", othRender)) return;
+    const box = $("rd-oth-box"), sum = $("rd-oth-sum"), now = Date.now() / 1000;
+    box.replaceChildren();
+    const h = (OTH && OTH.history) || (DATA.others && DATA.others.history) || {};
+    if (!OTH || !OTH.ready || !OTH.forecast) {
+      const done = Object.keys(h).filter(k => h[k]), todo = Object.keys(h).filter(k => !h[k]);
+      box.append(el("p", "note", todo.length ? `Il monitor sta leggendo la storia delle allocazioni delle ultime settimane, qualche finestra di blocchi a ogni giro. Già completa: ${done.join(", ") || "nessuna rete"}; manca: ${todo.join(", ")}. La previsione parte quando c'è Base.`
+        : "La previsione arriva con il prossimo aggiornamento del monitor."));
+      sum.textContent = "in preparazione";
+      return;
+    }
+    const F = OTH.forecast, mh = F.move_h || [], tot = mh.reduce((a, b) => a + b, 0), six = mh.slice(0, 6).reduce((a, b) => a + b, 0);
+    sum.textContent = `${fmtN(tot)} voti attesi in movimento in 47 ore`;
+    box.append(el("p", "note", `Chi può muoversi, quando e quanto: la previsione guarda ogni posizione, quando finisce il suo cooldown, quanto in fretta si è mossa le altre volte e quanta parte dei voti ha spostato. Poi una regressione la confronta con quello che è successo nelle settimane passate. ${othCheck(OTH.fit ? { fit: OTH.fit } : null)}` +
+      (OTH.fit && !OTH.fit.used ? " Per ora non batte «voti fermi»: l'opzione del radar non la usa." : "") +
+      (Object.keys(h).some(k => !h[k]) ? ` Manca ancora la storia di ${Object.keys(h).filter(k => !h[k]).join(", ")}: i suoi pool non hanno previsione.` : "")));
+    const kp = el("div", "stats");
+    for (const [k, v] of [["Liberi di muoversi ora", F.free[0]], ["Escono dal cooldown in 47 ore", F.free[1]], ["Attesi in movimento in 47 ore", tot], ["… di cui nelle prossime 6 ore", six]]) {
+      const st = el("div", "stat"); st.append(el("div", "k", k), el("div", "v", fmtN(v))); kp.append(st);
+    }
+    box.append(kp);
+    // votes expected to move, hour by hour
+    if (mh.length) {
+      const w = Math.max(520, Math.round(box.clientWidth || 720)), hh = 150, padL = 46, padB = 24, padT = 8, max = Math.max(1, ...mh);
+      const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); const m = max / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+      const bw = (w - padL - 4) / mh.length, y = v => hh - padB - (v / nice) * (hh - padB - padT), ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", `0 0 ${w} ${hh}`); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Voti che ci si aspetta si spostino, ora per ora, nelle prossime 47 ore");
+      const add = (name, attrs, text) => { const e = document.createElementNS(ns, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
+      for (let i = 0; i <= 2; i++) {
+        const v = nice * i / 2, yy = y(v);
+        add("line", { x1: padL, x2: w, y1: yy, y2: yy, stroke: "var(--line)", "stroke-width": 1 });
+        add("text", { x: padL - 6, y: yy + 4, "text-anchor": "end", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, fmtN(v));
+      }
+      mh.forEach((v, i) => {
+        const t0 = F.at + i * 3600;
+        if (v > 0) {
+          add("rect", { x: padL + i * bw + 1, y: y(v), width: Math.max(1, bw - 2), height: Math.max(0.5, hh - padB - y(v)), fill: "var(--accent)", rx: 1 });
+          const hit = add("rect", { x: padL + i * bw, y: padT, width: bw, height: hh - padB - padT, fill: "transparent" }), tt = document.createElementNS(ns, "title");
+          tt.textContent = `${when(t0)}: ${fmtN(v)} voti attesi in movimento`; hit.append(tt);
+        }
+        if (i % 6 === 0) add("text", { x: padL + i * bw + bw / 2, y: hh - 7, "text-anchor": "middle", "font-size": 11, fill: "var(--ink-2)", "font-family": "var(--f-num)" }, when(t0).replace("domani ", "+1 "));
+      });
+      const ch = el("div", "chart"); ch.append(svg); box.append(el("div", "lbl", "Voti attesi in movimento, ora per ora"), ch);
+    }
+    // where the votes are expected to go and where from
+    const P = Object.entries(OTH.pools || {}).map(([k, v]) => ({ k, name: v[0], chain: v[1], f: v[2], out: v[3], inn: v[4], la: v[5] }));
+    const col = (title, arr) => {
+      const c = el("div", "mvcol"); c.append(el("div", "lbl", title));
+      if (!arr.length) { c.append(el("p", "note", "Nessuno.")); return c; }
+      const ul = el("ul");
+      for (const x of arr) {
+        const li = el("li"), n = el("span", "n"), ch = (x.f - 1) * 100, cls = ch > 0 ? "v up" : "v down";
+        n.append(el("b", null, x.name), ` · ${x.chain}`);
+        const apr = x.la != null ? `APR ${x2c(Math.exp(x.la))}×` : "";
+        n.title = `Esce in media il ${fmtPct(x.out * 100)} dei voti · entrati il ${fmtPct(x.inn * 100)} nelle ultime 6 ore` + (apr ? ` · ${apr} il mercato` : "");
+        li.append(n, el("span", cls, (ch > 0 ? "+" : "−") + fmtPct(Math.abs(ch))), el("span", "v", apr));
+        ul.append(li);
+      }
+      c.append(ul);
+      return c;
+    };
+    const mv = el("div", "mov");
+    mv.append(col("Dove arriveranno più voti", P.filter(x => x.f > 1.01).sort((a, b) => b.f - a.f).slice(0, 8)),
+      col("Da dove ne usciranno di più", P.filter(x => x.f < 0.99).sort((a, b) => a.f - b.f).slice(0, 8)));
+    box.append(el("div", "lbl", "Voti medi delle prossime 47 ore rispetto a oggi, al netto del pool tipico"), mv);
+    // the positions expected to move the most
+    const M = F.movers || [];
+    if (M.length) {
+      const names = new Map();
+      for (const p of [...((DATA.big && DATA.big.top) || []), ...((DATA.big && DATA.big.autopilot) || [])]) if (p && p.id != null) names.set(p.id, whoOf(p));
+      const after = d => d == null ? "" : d < 1 ? "entro un'ora" : d < 1.5 ? "dopo circa un'ora" : d >= 48 ? `dopo circa ${Math.round(d / 24)} giorni` : `dopo circa ${Math.round(d)} ore`;
+      const habit = m => m.habit === 1 ? `puntuale: di solito ${after(m.delay) || "subito"}` : m.habit === 2 ? (m.delay != null ? `di solito ${after(m.delay)}` : "irregolare")
+        : "mai mossa dopo la prima allocazione";
+      const tb = el("table", "trd om"), thead = el("thead"), tr0 = el("tr"), tbody = el("tbody");
+      for (const t of ["Posizione", "Voti", "Cooldown", "Si muove in 47 ore", "Abitudine", "Dove sono"]) tr0.append(el("th", null, t));
+      thead.append(tr0); tb.append(thead, tbody);
+      for (const m of M.slice(0, 15)) {
+        const tr = el("tr", "orow"), nm = names.get(m.id), lab = (td, l) => { td.dataset.l = l; return td; };
+        tr.append(el("td", null, `#${m.id}` + (nm && nm !== "#" + m.id ? ` · ${nm}` : "")), lab(el("td", "num", fmtN(m.votes)), "Voti"),
+          el("td", null, m.free <= now ? "cooldown finito " + when(m.free) : "cooldown finisce tra " + inT(m.free - now)),
+          lab(el("td", null, `${fmtPct(m.p * 100)}, spostando di solito ${art(fmtPct(m.moved * 100))}${fmtPct(m.moved * 100)}`), "In 47 ore:"), el("td", null, habit(m)),
+          lab(el("td", null, m.pools.slice(0, 2).map(x => `${x[0]}${x[1] !== "Base" ? " (" + x[1] + ")" : ""} ${fmtN(x[2])}`).join(" · ") + (m.n_pools > 2 ? ` · +${m.n_pools - 2} pool` : "")), "Ora in"));
+        tbody.append(tr);
+      }
+      const wrap = el("div", "tbl"); wrap.append(tb);
+      box.append(el("div", "lbl", "Le posizioni che sposteranno più voti"), wrap);
+    }
+    // the habits behind it
+    const G = OTH.groups || [];
+    if (G.length) {
+      const tb = el("table", "trd"), thead = el("thead"), tr0 = el("tr"), tbody = el("tbody");
+      for (const t of ["Posizioni", "Abitudine", "Entro 3 ore", "Entro 24 ore", "Entro 47 ore", "Quota dei voti spostata"]) tr0.append(el("th", null, t));
+      thead.append(tr0); tb.append(thead, tbody);
+      for (const g of G) {
+        const tr = el("tr", "orow");
+        tr.append(el("td", null, g.size), el("td", null, g.habit), el("td", "num", fmtPct(g.p3 * 100)), el("td", "num", fmtPct(g.p24 * 100)),
+          el("td", "num", fmtPct(g.p47 * 100)), el("td", "num", fmtPct(g.moved * 100)));
+        tbody.append(tr);
+      }
+      const wrap = el("div", "tbl"); wrap.append(tb);
+      box.append(el("div", "lbl", "Quanto in fretta si muovono, dalla fine del cooldown"), wrap,
+        el("p", "note", "«Puntuali»: le posizioni che di solito si muovono entro 3 ore dalla fine del cooldown. «Nuove»: non si sono ancora mosse dopo la prima allocazione. Le probabilità valgono per chi non si è ancora mosso, contando dalla fine del cooldown; le stime pesano i voti, fino a 5 milioni per posizione."));
+    }
+  }
+
   // ---- your allocation: saved only with "Usa questa allocazione", on this device
   const MKEY = "radar-rd-mine";
   function loadMine() { try { const m = JSON.parse(lsGet(MKEY) || "null"); return m && Array.isArray(m.rows) ? m : null; } catch (e) { return null; } }
@@ -2635,10 +2827,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   function rdOptions() {
     return { cap: +RD.cap || 100, min: +RD.minA || 0, chains_off: XS.chainsOff.slice().sort(), excl: [...XS.keys].sort(),
       rules: XS.rules.slice(), spike: !!RD.spk, spike_k: Math.min(1000, Math.max(0, rdNum(RD.spkK, 0))), trend: +RD.trend || 0, comp: +RD.comp || 0,
-      stable: !!RD.stb, stable_k: Math.min(100, Math.max(1.1, rdNum(RD.stbK, 2))) };
+      stable: !!RD.stb, stable_k: Math.min(100, Math.max(1.1, rdNum(RD.stbK, 2))), others: !!RD.oth };
   }
   const optsKey = o => JSON.stringify([+o.cap, +o.min, (o.chains_off || []).slice().sort(), (o.excl || []).slice().sort(),
-    (o.rules || []).map(r => r.toLowerCase()).sort(), !!o.spike, +o.spike_k, +o.trend, +o.comp, !!o.stable, +(o.stable_k || 0)]);
+    (o.rules || []).map(r => r.toLowerCase()).sort(), !!o.spike, +o.spike_k, +o.trend, +o.comp, !!o.stable, +(o.stable_k || 0), !!o.others]);
   function optsText(o) {
     const parts = [+o.cap < 100 ? `massimo ${o.cap}% per pool` : "nessun massimo per pool", +o.min ? `minimo ${o.min}%` : "nessun minimo"];
     if ((o.chains_off || []).length) parts.push("senza " + o.chains_off.join(", "));
@@ -2647,6 +2839,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     if (nr) parts.push(`${nr === 1 ? "scartata la ricerca" : "scartate le ricerche"} ${o.rules.map(r => "«" + r + "»").join(", ")}`);
     if (o.spike) parts.push(`picchi di volume tagliati (tolleranza ${String(o.spike_k).replace(".", ",")}%)`);
     if (o.stable) parts.push(`APR instabili scartati (oltre ${String(o.stable_k).replace(".", ",")}× le 48 ore)`);
+    if (o.others) parts.push("voti degli altri allocatori previsti");
     return parts.join(", ");
   }
   let optsRun = false;
@@ -2671,7 +2864,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
   };
   rdBind("rd-ap", "ap"); rdBind("rd-price", "price"); rdBind("rd-win", "win", "change"); rdBind("rd-trend", "trend"); rdBind("rd-comp", "comp", "change");
   rdBind("rd-sea", "sea", "change"); rdBind("rd-spk", "spk", "change"); rdBind("rd-spkK", "spkK"); rdBind("rd-stb", "stb", "change"); rdBind("rd-stbK", "stbK"); rdBind("rd-min", "minA", "change"); rdBind("rd-cap", "cap", "change");
-  rdBind("rd-sort", "sortBy", "change");
+  rdBind("rd-sort", "sortBy", "change"); rdBind("rd-oth", "oth", "change");
   $("rd-saved").value = RD.saved || "";
   $("rd-saved").addEventListener("input", () => { RD.saved = $("rd-saved").value; saveRD(); rdCooldown(); });
   document.querySelectorAll("#rd-mov-seg button").forEach(b => b.addEventListener("click", () => { RD.movH = +b.dataset.h; saveRD(); rdRender(); }));
@@ -3589,6 +3782,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       loadSim();
       loadStocks();
       loadTrends();
+      loadOthers();
       loadBoot();
       loadWatch();
     } catch (e) {

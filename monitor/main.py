@@ -24,6 +24,7 @@ from . import chain as C
 from . import market as M
 from . import macro as MC
 from . import marketdata as MD
+from . import others as O
 from . import repair as RP
 from . import report as R
 from . import stocks as S
@@ -166,11 +167,15 @@ def run(args):
         RP.denim(state, base_rpc, now, log, A.FEE_WINDOW)
         state["migrated_at"] = now          # what the repair moves is not news: this run's alerts stay quiet
 
+    # what each chain still has to read of its allocation history (others.py), decided here: the workers only read
+    bf_jobs = {cid: O.backfill_job(state, cid) for cid in chain_ids}
+
     # 1. events of every chain, read in parallel (each worker touches only its own chain state)
     def read_chain(cid):
         cs = state["chains"][str(cid)]
         rpc = RPC[cid]
         ccfg = chains_cfg[str(cid)]
+        prev_last = int(cs.get("last_block") or 0)
         try:
             head, head_ts = A.chain_head(rpc, cid, cs, A.head_lag(cs, ccfg), now, log)
             if args.max_blocks and not cs.get("last_block"):
@@ -192,7 +197,13 @@ def run(args):
         except Exception as e:
             cs.pop("pend_now", None)
             log(f"{C.chain_short(cid)}: pending fees not read: {type(e).__name__}: {str(e)[:200]}")
-        return {"ok": True, "events": events, "head": head}
+        bf = None
+        try:
+            # older allocations, a few windows per run, until the record of the last weeks is complete
+            bf = O.backfill(rpc, cid, cs, ccfg, bf_jobs.get(cid), read_deadline, log)
+        except Exception as e:
+            log(f"{C.chain_short(cid)}: allocation history not read: {type(e).__name__}: {str(e)[:200]}")
+        return {"ok": True, "events": events, "head": head, "prev_last": prev_last, "bf": bf}
 
     with ThreadPoolExecutor(max_workers=len(chain_ids)) as ex:
         results = dict(zip(chain_ids, ex.map(read_chain, chain_ids)))
@@ -218,6 +229,8 @@ def run(args):
         try:
             cd = (cs.get("params") or {}).get("cooldown") or params["cooldown"]
             A.apply_events(state, cid, res["events"], cd)
+            O.record(state, cid, res["events"], res.get("prev_last"))
+            O.merge_backfill(state, cid, res.get("bf"), log)
             A.refresh_metadata(rpc, cid, state, log)
             A.refresh_tokens(rpc, cid, state, cfg, log)
             A.refresh_metadata(rpc, cid, state, log)   # gauges found while rebuilding positions
@@ -349,6 +362,12 @@ def run(args):
     except Exception:
         status["errors"].append("earnings: " + traceback.format_exc()[-200:])
         log(f"earnings failed: {traceback.format_exc()[-600:]}")
+    # the other allocators: what they are likely to do in the next 47 hours (the page's option, and the simulation's)
+    try:
+        O.update(state, now, log, cooldown=params["cooldown"])
+    except Exception:
+        status["errors"].append("others: " + traceback.format_exc()[-200:])
+        log(f"others failed: {traceback.format_exc()[-600:]}")
     latest_reco = T.snapshot(tr, state, prices, now, params["cooldown"], params["max_gauges"])
     tracker_report = T.summary(tr, state, now, prices.get(aero_key), params["cooldown"], latest_reco)
     log(f"tracker: size {size:,.0f}, " + ", ".join(
@@ -378,6 +397,11 @@ def run(args):
     status["finished"] = int(time.time())
     status["seconds"] = round(wall_clock() - t_start, 1)
     report = R.build(state, params, prices, now, cfg, routing_errors, status)
+    try:
+        O.annotate(state, report.get("pools") or [])
+        report["others"] = O.summary(state)
+    except Exception:
+        log(f"others report failed: {traceback.format_exc()[-400:]}")
     try:
         report["big"] = B.report(state, now, lambda cid: R.chain_cooldown(state, cid, params["cooldown"]),
                                  R.cooldown_end)
@@ -442,7 +466,7 @@ def run(args):
     except Exception:
         log(f"forecast failed: {traceback.format_exc()[-400:]}")
     save_json(out / "latest.json", public_report)
-    pos_index, pos_shards = R.positions_export(state, params, now)
+    pos_index, pos_shards = R.positions_export(state, params, now, O.expected_gone(state))
     pos_dir = out / "pos"
     pos_dir.mkdir(exist_ok=True)
     for old in pos_dir.glob("*.json"):
@@ -463,6 +487,10 @@ def run(args):
         save_json(out / "trends.json", trends_report)
     except Exception:
         log(f"trends failed: {traceback.format_exc()[-400:]}")
+    try:
+        save_json(out / "others.json", O.export(state, now))
+    except Exception:
+        log(f"others export failed: {traceback.format_exc()[-400:]}")
     try:
         save_json(out / "bootstrap.json", BS.export(state, public_report, prices, now))
     except Exception:

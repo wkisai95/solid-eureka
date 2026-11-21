@@ -37,6 +37,7 @@ diluisce ogni pool. Tutte le opzioni della vecchia app:
 | Correggi per il giorno della settimana | Porta le fee della finestra ai giorni delle prossime 48 ore con le tendenze di ogni pool (vedi «Tendenze fee»), tra 0,6× e 1,6×; spento di default |
 | Peso del trend fee | Corregge le fee delle ultime 48 ore della loro variazione rispetto alle 48 prima |
 | Concorrenza attesa | Nessun pool rende più del multiplo scelto della media del mercato (o «voti fermi») |
+| Prevedi il comportamento degli altri allocatori | Divide le fee di ogni pool con almeno 30.000 voti per i voti che avrà in media nelle 47 ore del cooldown, previsti posizione per posizione (vedi «Altri allocatori»); su quei pool sostituisce la concorrenza attesa. Non cambia nulla finché la previsione non batte «voti fermi» sull'ultima settimana |
 | Taglia i picchi di volume | Nei pool le cui fee sono salite più del mercato oltre la tolleranza conta le fee delle 48 ore prima, mosse come il mercato; gli incentivi programmati restano |
 | APR 1, 6, 12, 18, 24 ore (pool suggeriti) | APR con la tua quota, dalle fee per dollaro scambiato delle ultime 48 ore applicate al volume orario di DexScreener, più gli incentivi; avviso se un'ora fa almeno il 25% del volume delle 24 ore o le ultime 6 ore almeno il 55%. L'ora è l'ultima fotografia oraria del volume: è la finestra più rumorosa e il filtro dell'APR instabile non la usa |
 | Cerca un pool | Sopra l'allocazione suggerita: ogni pool del radar che corrisponde (token, coppia, rete o tipo) con voti e variazione in 6 ore, rewards, APR per voto a 1, 6, 12, 18, 24 e 48 ore (con la tua quota se è suggerito), se il radar lo suggerisce o perché no, la quota dell'Autopilot e i picchi; ✕ lo esclude, ↺ lo riprende |
@@ -217,6 +218,46 @@ Un'unica voce del radar («Calcola sull'APR») che mette insieme tutto quello ch
   previsione piena, non quella ridotta.
 
 Sotto la voce la pagina dice, con i numeri dell'ultima stima, quali dei due modelli sono in uso.
+
+## Altri allocatori
+
+Le tue rewards in un pool dipendono dai voti che avrà durante le 47 ore in cui i tuoi sono fermi. L'interruttore
+«Prevedi il comportamento degli altri allocatori» del radar e la finestra «Cosa faranno gli altri allocatori» li
+prevedono (`monitor/others.py`):
+
+- **Storico**: ogni allocazione di ogni posizione su ogni rete (l'evento GaugesAllocated del LeafVoter) resta 35
+  giorni. Quelle nuove arrivano a ogni giro; le più vecchie il monitor le legge una volta dalla storia di ogni rete,
+  qualche finestra di blocchi per giro, fino a completarla (la previsione parte quando c'è Base; una rete ancora
+  incompleta resta fuori). Una deallocazione è un'allocazione verso un indirizzo segnaposto
+  (`0x2e67…6902`) seguita da Deallocated: tolto il segnaposto, l'allocazione di una posizione su una rete è quella
+  del suo ultimo evento, e così lo storico ridà le allocazioni lette dal monitor per il 99,9% delle posizioni.
+  Gli eventi di una posizione entro tre ore sono una sola decisione; un'allocazione che tiene pool e pesi (entro il
+  2%) non è una decisione.
+- **Quando si muove una posizione**: dopo una decisione non può muoversi per il cooldown. La probabilità di muoversi,
+  ora per ora dalla fine del cooldown, è stimata per nove gruppi: tre taglie (sotto 10.000 voti, fino a un milione,
+  oltre) per tre abitudini (nessuna decisione dopo la prima; «puntuali», di solito entro 3 ore dalla fine del
+  cooldown; le altre), pesando i voti fino a 5 milioni per posizione. L'abitudine si ripete: chi si è mosso entro
+  3 ore lo rifà la volta dopo una volta su due, gli altri una su quattro. La quota di voti che una posizione sposta è
+  la sua media, verso quella del gruppo finché si è mossa poche volte.
+- **Previsione**: per ogni pool con almeno 30.000 voti la quota dei voti che probabilmente uscirà nelle 47 ore (media
+  delle ore), l'APR delle ultime 48 ore rispetto al mercato (sopra e sotto separati) e i voti entrati nelle ultime 6
+  ore. Una regressione robusta li trasforma nei voti medi delle 47 ore rispetto a oggi, al netto del pool tipico.
+  È tarata su quello che è successo dopo ogni momento dello storico (uno ogni sei ore, ognuno con le abitudini
+  stimate su quello che c'era prima), con peso cinque volte maggiore sui 20 pool con l'APR più alto: sono quelli
+  tra cui sceglie un'allocazione.
+- **Verifica**: l'ultima settimana resta fuori dalla taratura. Lì il monitor confronta l'errore sui voti dei 5 pool
+  con l'APR più alto e quanto hanno reso davvero i 3, 5 e 10 pool con l'APR più alto contati con i voti previsti
+  invece di quelli di oggi. L'interruttore usa la previsione solo se lì ha battuto «voti fermi». Sullo storico dal
+  22 ottobre al 21 novembre 2026: i 5 pool con l'APR più alto hanno guadagnato in media il 20% di voti nelle 47 ore
+  rispetto al pool tipico; la previsione ha ridotto l'errore sui loro voti dal 58% al 51% e i 3 pool scelti con
+  i voti previsti hanno reso 1,44 volte il pool tipico contro 1,36 (meglio in 11 momenti su 28, peggio in 6).
+- **I tuoi voti**: quelli che riallochi il radar li toglie già dai pool, quindi la parte di uscita che la previsione
+  si aspetta da loro viene rimessa (l'export delle posizioni porta per ognuna la quota di voti che si prevede
+  esca).
+- **Finestra**: voti liberi e in uscita dal cooldown, voti attesi in movimento ora per ora, pool dove ne arriveranno
+  e da dove ne usciranno di più, le posizioni che ne sposteranno di più (con abitudine e pool) e le probabilità
+  di ogni gruppo. Dati in `others.json`.
+- **Simulazione**: caricata dal radar, l'opzione vale anche per lei.
 
 ## Allocazioni monitorate
 

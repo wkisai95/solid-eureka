@@ -334,13 +334,14 @@ def _peers(book, alloc, last, rates, total, now, h0):
     return out
 
 
-def positions_export(state, params, now):
+def positions_export(state, params, now, gone=None):
     """Every position on every chain with its cooldown end and what it has earned, so the page can show the
     viewer's own positions.
 
     Split by position number (SHARD numbers per file) so the page downloads only the files it needs.
     Returns (index, {shard: {"names": [...], "keys": [...], "p": {id: [[chainId, cooldown end, sAERO, active,
-    moves, [[pool index, sAERO], ...], time of its last allocation], ...]}, "r": {id: earnings.summary with pool
+    moves, [[pool index, sAERO], ...], time of its last allocation, share of its votes expected to leave its pools over
+    the next 47 hours (others.py, averaged over the hours)], ...]}, "r": {id: earnings.summary with pool
     indexes, plus [last allocation
     change, USD since then, export time] when that change was in the last 4 days}}}).
     """
@@ -364,7 +365,7 @@ def positions_export(state, params, now):
         sh = shard(tid)
         pools = [[pool_index(sh, g), round(a)] for g, a in sorted(t["a"].items(), key=lambda kv: -kv[1])]
         sh["p"].setdefault(tid, []).append([cid, end, round(size), 1 if active else 0, t.get("n", 0), pools,
-                                            int(t.get("last") or 0)])
+                                            int(t.get("last") or 0), (gone or {}).get(int(tid), 0)])
     book = state.get("earnings") or {}
     keys = E.gauge_keys(book)
     h0 = int(book.get("h0") or now - now % HOUR)

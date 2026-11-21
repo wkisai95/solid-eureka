@@ -13,6 +13,7 @@ import re
 import statistics
 
 from . import aero as A
+from . import others as O
 from . import chain as C
 from . import marketdata as MD
 
@@ -25,7 +26,7 @@ PERF_DAYS = 30
 STRATEGIES = {"radar": "Radar"}
 OPTIONS = {}        # the page's options loaded into the simulations (state["options"]), set by main
 DEFAULT_OPTIONS = {"cap": 100, "min": 0, "chains_off": [], "excl": [], "rules": [], "spike": False, "spike_k": 75,
-                   "trend": 0, "comp": 3, "stable": False, "stable_k": 2}
+                   "trend": 0, "comp": 3, "stable": False, "stable_k": 2, "others": False}
 STABLE_WINDOWS = (6, 12, 18, 24)
 KEY_RE = re.compile(r"\d{1,7}:0x[0-9a-f]{40}")
 
@@ -74,6 +75,8 @@ def parse_options(raw):
         o["spike"] = bool(raw["spike"])
     if "stable" in raw:
         o["stable"] = bool(raw["stable"])
+    if "others" in raw:
+        o["others"] = bool(raw["others"])
     for k, limit in (("chains_off", 20), ("excl", 3000), ("rules", 100)):
         v = raw.get(k)
         if v is not None and (not isinstance(v, list) or len(v) > limit):
@@ -106,6 +109,8 @@ def describe_options(o):
         parts.append(f"unsteady APR left out (a window more than {o['stable_k']:g}x away from 48 hours, "
                      f"against the market)")
     parts.append(f"radar trend {o['trend']:g}%, competition {o['comp']:g}x")
+    if o.get("others"):
+        parts.append("votes of the other allocators forecast (others.py) where there is a forecast")
     return ", ".join(parts)
 
 
@@ -267,9 +272,14 @@ def candidates(state, prices, now, cooldown, opts=None):
             out[k] = (rev, a)
     n = float(opts.get("comp", 0))
     avg = mkt_rev / mkt_ap if mkt_ap > 0 else 0.0
+    # the other allocators' votes as forecast for the next 47 hours (others.py): they replace the competition rule
+    # on the pools that have a forecast
+    fac = O.factors(state) if opts.get("others") else {}
+    if fac:
+        out = {k: (r, a * fac.get(k, 1.0)) for k, (r, a) in out.items()}
     if out and n > 0 and avg > 0:
         # other allocators come where it pays: no pool keeps more than n times the market's yield per vote
-        out = {k: (r, max(a, r / (n * avg))) for k, (r, a) in out.items()}
+        out = {k: (r, a if k in fac else max(a, r / (n * avg))) for k, (r, a) in out.items()}
     return out
 
 
