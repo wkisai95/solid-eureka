@@ -1,0 +1,58 @@
+[12:08:42] cooldown 47.00 h, max reduction 0 s, AERO 0x3f5bf3edac59d650d8fdf9657a71f2f904a3a4ee, chains [8453, 10, 1, 42161, 57073, 4663, 5042, 99901]
+[12:08:43] OP: voter events 0 logs, blocks 159831555-159832069, 0.1s (0 allocations, 0 new gauges)
+[12:08:43] Robinhood: voter events 2 logs, blocks 119853735-119863222, 0.1s (1 allocations, 0 new gauges)
+[12:08:43] Base: voter events 16 logs, blocks 60357557-60362706, 0.4s (6 allocations, 0 new gauges)
+[12:08:43] Arbitrum: voter events 0 logs, blocks 526228341-526231824, 0.2s (0 allocations, 0 new gauges)
+[12:08:43] Robinhood: fee events 10 from 10 logs, 0.1s, history 49.0 h
+[12:08:43] Ethereum: voter events 1 logs, blocks 26463294-26463378, 0.2s (1 allocations, 0 new gauges)
+[12:08:43] Arbitrum: fee events 4 from 4 logs, 0.1s, history 49.0 h
+[12:08:43] OP: fee events 6 from 6 logs, 0.3s, history 49.0 h
+[12:08:43] Ethereum: fee events 6 from 6 logs, 0.3s, history 49.0 h
+[12:08:44] Elysium: voter events 0 logs, blocks 9190638-9194682, 0.2s (0 allocations, 0 new gauges)
+[12:08:44] Elysium: fee events 0 from 0 logs, 0.2s, history 49.0 h
+[12:08:45] Ink: voter events 0 logs, blocks 61763476-61764505, 0.6s (0 allocations, 0 new gauges)
+[12:08:45] Ink: fee events 4 from 4 logs, 0.1s, history 49.0 h
+[12:08:46] Base: fee events 52 from 52 logs, 2.8s, history 49.0 h
+[12:08:46] Arc: voter events 0 logs, blocks 32388826-32390859, 1.0s (0 allocations, 0 new gauges)
+[12:08:47] Arc: fee events 4 from 4 logs, 1.0s, history 49.0 h
+[12:10:10] Base: positions 16176, refreshed 902 cooldowns, rebuilt 2
+[12:10:12] Base: allocation 324 gauges, total 772,175,036
+[12:10:12] OP: positions 606, refreshed 22 cooldowns, rebuilt 0
+[12:10:13] OP: allocation 33 gauges, total 12,619,924
+[12:10:13] Ethereum: positions 1253, refreshed 39 cooldowns, rebuilt 0
+[12:10:14] Ethereum: allocation 63 gauges, total 104,473,118
+[12:10:14] Arbitrum: positions 647, refreshed 15 cooldowns, rebuilt 0
+[12:10:15] Arbitrum: allocation 57 gauges, total 15,825,535
+[12:10:16] Ink: positions 180, refreshed 5 cooldowns, rebuilt 0
+[12:10:19] Ink: allocation 29 gauges, total 2,436,398
+[12:10:20] Robinhood: positions 1417, refreshed 47 cooldowns, rebuilt 1
+[12:10:21] Robinhood: allocation 82 gauges, total 121,295,083
+[12:10:21] Arc: allocation history +29 events in 6 windows, 79.1s, complete
+[12:10:21] Arc: positions 223, refreshed 9 cooldowns, rebuilt 0
+[12:10:27] Arc: allocation 8 gauges, total 3,633,209
+[12:10:28] Elysium: positions 145, refreshed 6 cooldowns, rebuilt 0
+[12:10:30] Elysium: allocation 8 gauges, total 16,196,643
+[12:10:31] big: positions 25501-27000 of 27607 read, 927 with votes, 20 above 50,000, 1264 kept
+[12:10:31] big: 41 positions refreshed, 7 Autopilot relays, 0 owners checked
+[12:10:35] prices: 175 tokens priced {'10': 12, '1': 17, '42161': 7, '4663': 20, '5042': 4, '57073': 6, '8453': 103, '99901': 6}, 63 looked up, 0 failed requests
+[12:10:35] rewards: priced 86 fee transfers, 61 waiting for a price or a gauge, rejected 0; 29 incentive programs tracked
+[12:10:35] rewards: fees earned measured on 241 gauges, 2,084 USD
+[12:10:35] geckoterminal (arc): 20 biggest pools
+[12:11:33] market: 423 Aero pools; 3904 pools on every DEX from 215 token lookups and GeckoTerminal lists of Ethereum, OP, Robinhood, Arc, Base, Arbitrum, Ink, Elysium; Aero share of DEX volume (DefiLlama): Ethereum 5.7%, Base 43.9%, Robinhood 14.2%, Arbitrum 10.3%, Arc 11.6%, OP 28.1%, Elysium 17.5%, Ink 18.8%; 58s
+[12:11:33] options: no max, min 34%, radar trend 0%, competition 0x
+[12:12:13] others: 90 marks of the record measured (90 kept, 0 to go)
+[12:12:15] others: forecast of the votes fitted on 90 marks; on the last 7 days (28 marks) the 5 pools with the highest APR: votes missed by 44% (votes stay: 51%); the 3 chosen with it paid 1.39x the typical pool (with today's votes 1.31x)
+[12:12:15] others: forecast in 41.5s on 16685 positions of 8 chains
+[12:12:15] tracker: size 235,000, radar 1331.67 USD in 605.5 h, now 225.39 USD/47h on 1 pools (Ethereum 100%)
+[12:12:15] tracker: realized per day by the allocations saved every run (7d): radar 52.04
+[12:12:15] notifications: 0 delivered (NTFY_TOPIC secret not set)
+[12:12:15] trends: 278 forecasts of 48 hours ago checked against the measured fees
+[12:12:18] trends: candles of 3 pools read; 157 of 160 pools have their history
+rpc Base: {"endpoints": {"base-rpc.publicnode.com": {"ok:eth_getCode": 1, "ok:eth_call": 2, "ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getLogs": 2, "err:eth_getLogs": 1}, "mainnet.base.org": {"err:eth_getLogs": 1, "429:eth_getLogs": 1}, "base.drpc.org": {"err:eth_getLogs": 1, "ok:eth_call": 46}, "base-mainnet.public.blastapi.io": {"err:eth_getLogs": 1}, "base.gateway.tenderly.co": {"ok:eth_getLogs": 6, "err:eth_getLogs": 1}, "endpoints.omniatech.io": {"err:eth_getLogs": 1}, "developer-access-mainnet.base.org": {"err:eth_getLogs": 1}, "1rpc.io": {"err:eth_getLogs": 1}, "base.meowrpc.com": {"err:eth_getLogs": 1}}, "no_logs": {"base.drpc.org": "HTTP 400 on 900 blocks", "base-mainnet.public.blastapi.io": "HTTP 400 on 900 blocks", "1rpc.io": "{\"code\": -32602, \"message\": \"eth_getLogs is limited to 0 - 50 blocks range\"}", "base.meowrpc.com": "{\"code\": -32000, \"message\": \"The method eth_getLogs is not supported.\"}"}, "gave_up": []}
+rpc OP: {"endpoints": {"optimism-rpc.publicnode.com": {"ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getCode": 1, "ok:eth_call": 9, "ok:eth_getLogs": 1, "err:eth_getLogs": 1}, "mainnet.optimism.io": {"ok:eth_getLogs": 1, "ok:eth_call": 1}}, "no_logs": {}, "gave_up": []}
+rpc Ethereum: {"endpoints": {"ethereum-rpc.publicnode.com": {"ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getCode": 1, "ok:eth_call": 9, "ok:eth_getLogs": 1, "err:eth_getLogs": 1}, "eth.drpc.org": {"ok:eth_getLogs": 1, "ok:eth_call": 1}}, "no_logs": {}, "gave_up": []}
+rpc Arbitrum: {"endpoints": {"arbitrum-one-rpc.publicnode.com": {"ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getCode": 1, "ok:eth_call": 9, "err:eth_getLogs": 1}, "arb1.arbitrum.io": {"ok:eth_getLogs": 2, "ok:eth_call": 1}}, "no_logs": {}, "gave_up": []}
+rpc Ink: {"endpoints": {"rpc-gel.inkonchain.com": {"ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getCode": 1, "ok:eth_call": 10, "err:eth_getLogs": 1}, "rpc-qnd.inkonchain.com": {"ok:eth_getLogs": 2}}, "no_logs": {"rpc-gel.inkonchain.com": "HTTP 400 on 1030 blocks"}, "gave_up": []}
+rpc Robinhood: {"endpoints": {"rpc.mainnet.chain.robinhood.com": {"ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getCode": 1, "ok:eth_call": 12, "ok:eth_getLogs": 2}}, "no_logs": {}, "gave_up": []}
+rpc Arc: {"endpoints": {"rpc.mainnet.arc.io": {"ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getCode": 1, "ok:eth_call": 10, "ok:eth_getLogs": 2}}, "no_logs": {}, "gave_up": []}
+rpc Elysium: {"endpoints": {"rpc.elysium.kinetiq.xyz": {"ok:eth_blockNumber": 1, "ok:eth_getBlockByNumber": 1, "ok:eth_getCode": 1, "ok:eth_call": 10, "ok:eth_getLogs": 2}}, "no_logs": {}, "gave_up": []}
