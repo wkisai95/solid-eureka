@@ -135,6 +135,19 @@
         "https://rpc.drpc.mainnet.arc.io"
       ],
       "pace_s": 1.0
+    },
+    "99901": {
+      "name": "Elysium",
+      "deploy_block": 1944917,
+      "lag": 20,
+      "dexscreener": "elysium",
+      "kyber": null,
+      "velora": null,
+      "rpc": [
+        "https://rpc.elysium.kinetiq.xyz",
+        "https://elysium-rpc.publicnode.com",
+        "https://elysium.drpc.org"
+      ]
     }
   },
   "page_url": "https://wkisai95.github.io/solid-eureka/",

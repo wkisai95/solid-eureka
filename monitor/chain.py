@@ -19,9 +19,9 @@ DENIM_TS = BASE_GENESIS_TS + 2 * DENIM_BLOCK     # its timestamp, 1793901601
 ZERO = "0x0000000000000000000000000000000000000000"
 
 CHAIN_NAMES = {1: "Ethereum", 10: "OP Mainnet", 8453: "Base", 42161: "Arbitrum",
-               57073: "Ink", 4663: "Robinhood Chain", 5042: "Arc"}
+               57073: "Ink", 4663: "Robinhood Chain", 5042: "Arc", 99901: "Elysium"}
 CHAIN_SHORT = {1: "Ethereum", 10: "OP", 8453: "Base", 42161: "Arbitrum", 57073: "Ink", 4663: "Robinhood",
-               5042: "Arc"}
+               5042: "Arc", 99901: "Elysium"}
 
 
 def chain_name(cid):

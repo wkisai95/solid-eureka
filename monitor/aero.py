@@ -5,6 +5,7 @@ incentive program is "chainId:vrm:programId". Positions live per chain in state[
 because every chain has its own LeafVoter with its own allocations and cooldowns.
 """
 import bisect
+import math
 import time
 
 from eth_abi import encode
@@ -157,6 +158,24 @@ def _base_clock(rpc, cs, head, now, log):
     log(f"Base: block {head} is at {real}, the block clock says {calc} ({real - calc:+d} s): block times read "
         f"from the chain until the clock is updated")
     return False, real
+
+
+LAG_S = 6           # every chain is read this many seconds behind its head
+
+
+def head_lag(cs, ccfg):
+    """Blocks to stay behind the head of a chain: LAG_S seconds at its block time (cs["bt"]: Base's clock, or the
+    one measured on the chain), never fewer than the "lag" of its config.
+
+    The endpoints of different providers do not see the same head at the same moment, and a log range that ends
+    beyond a node's head comes back short without an error: the margin has to be time. Counted in blocks alone it
+    shrank with every cut of the block time: the 2 blocks of Base were 4 seconds before Denim and 0.4 seconds
+    since, and a chain like Elysium makes up to ten blocks a second."""
+    floor = int(ccfg.get("lag", 2))
+    bt = cs.get("bt")
+    if not bt or bt <= 0:
+        return floor
+    return max(floor, min(5000, math.ceil(float(ccfg.get("lag_s", LAG_S)) / bt)))
 
 
 def chain_head(rpc, cid, cs, lag, now, log):

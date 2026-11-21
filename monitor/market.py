@@ -24,9 +24,10 @@ STABLES = {
     "42161:0xff970a61a04b1ca14834a43f5de4533ebddb5cc8": 1.0,  # USDC.e
     "42161:0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": 1.0,  # USDT
     "5042:0x3600000000000000000000000000000000000000": 1.0,   # USDC (Arc native)
+    "99901:0xb47c4c8f73f009cc0c0d3f92b388d13e293f0b65": 1.0,  # USDC (Elysium)
 }
 # When a chain has no market data for a well-known token, its price is taken from the same asset on Base.
-MAJORS = {"WETH": "eth", "ETH": "eth", "WBTC": "btc", "CBBTC": "btc", "USDC": "usd", "USDC.E": "usd",
+MAJORS = {"WETH": "eth", "ETH": "eth", "WBTC": "btc", "CBBTC": "btc", "UBTC": "btc", "USDC": "usd", "USDC.E": "usd",
           "USDT": "usd", "USDT0": "usd", "USD₮0": "usd", "DAI": "usd", "USDS": "usd", "USDBC": "usd"}
 REFERENCE = {"eth": "8453:0x4200000000000000000000000000000000000006",
              "btc": "8453:0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"}
@@ -41,7 +42,8 @@ USD_BAND = (0.8, 1.25)        # stablecoins
 # from a spoofed pool, and the right price was then refused for being far from it).
 PEGGED = {**{s: "eth" for s in ("WSTETH", "WEETH", "CBETH", "RETH", "EZETH", "RSETH", "OSETH", "FRXETH", "SFRXETH",
                                 "METH", "SWETH", "ETHX", "ALETH", "MSETH", "WRSETH", "WEETH.BASE", "SUPEROETHB")},
-          **{s: "btc" for s in ("LBTC", "TBTC", "KBTC", "SOLVBTC", "EBTC", "UNIBTC", "CIRBTC", "FBTC", "PUMPBTC")}}
+          **{s: "btc" for s in ("LBTC", "TBTC", "KBTC", "SOLVBTC", "EBTC", "UNIBTC", "CIRBTC", "FBTC", "PUMPBTC",
+                                "UBTC")}}
 PEG_BAND = (0.7, 1.7)
 TOP_PAIRS = 5                 # a price is the median of the token's deepest pairs, when it has at least three
 AGREE = 0.10                  # ... and "confirmed" when three of them are within this of the median

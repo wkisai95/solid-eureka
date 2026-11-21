@@ -31,9 +31,10 @@ LLAMA = "https://api.llama.fi/overview/dexs"
 LLAMA_Q = "?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true&dataType=dailyVolume"
 AERO_PARENT = "parent#aero-protocol"     # DefiLlama groups Aero, Aerodrome and Velodrome under this parent
 CHAIN_ALIASES = {8453: ("base",), 10: ("optimism", "opmainnet"), 1: ("ethereum",), 42161: ("arbitrum", "arbitrumone"),
-                 57073: ("ink",), 4663: ("robinhood", "robinhoodchain"), 5042: ("arc", "arcmainnet")}
+                 57073: ("ink",), 4663: ("robinhood", "robinhoodchain"), 5042: ("arc", "arcmainnet"),
+                 99901: ("elysium",)}
 GT_NETWORKS = {8453: "base", 10: "optimism", 1: "eth", 42161: "arbitrum", 57073: "ink", 4663: "robinhood",
-               5042: "arc"}
+               5042: "arc", 99901: "elysium"}
 NATIVE = ("0x0000000000000000000000000000000000000000", "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
 GT_EVERY = HOUR          # a chain's GeckoTerminal list is refreshed when older than this (one chain per run)
 GT_MAX_AGE = 4 * HOUR    # older lists are not used
@@ -458,7 +459,7 @@ def chain_share(mk, cid, ago=0, now=None):
 # ---------------------------------------------------------------- blue chips
 
 MAJORS = {"ETH", "WETH", "WBTC", "CBBTC", "TBTC", "LBTC", "BTC", "USDC", "USDC.E", "USDT", "USDT0", "USD₮0", "DAI",
-          "USDS", "EURC", "USDG", "PYUSD", "GHO", "FRAX", "USDE"}
+          "USDS", "EURC", "USDG", "PYUSD", "GHO", "FRAX", "USDE", "HYPE", "WHYPE", "UBTC"}
 
 
 def _both_majors(state, key):
