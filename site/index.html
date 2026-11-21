@@ -384,7 +384,8 @@ details.apfold { margin-top: 4px; }
 .mov { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 #rd-oth-box { display: grid; gap: 12px; }
 #rd-oth-box > .lbl { margin-top: 6px; }
-#rd-oth-box table.trd td:last-child { white-space: normal; min-width: 220px; }
+#rd-oth-box table.trd td:last-child { white-space: normal; min-width: 200px; }
+#rd-oth-box table.om td:nth-child(4), #rd-oth-box table.om td:nth-child(5) { white-space: normal; min-width: 140px; }
 @media (max-width: 700px) {
   table.om, table.om tbody, table.om tbody tr { display: block; }
   table.om thead { display: none; }
@@ -2670,8 +2671,8 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       for (const m of M.slice(0, 15)) {
         const tr = el("tr", "orow"), nm = names.get(m.id), lab = (td, l) => { td.dataset.l = l; return td; };
         tr.append(el("td", null, `#${m.id}` + (nm && nm !== "#" + m.id ? ` · ${nm}` : "")), lab(el("td", "num", fmtN(m.votes)), "Voti"),
-          el("td", null, m.free <= now ? "cooldown finito " + when(m.free) : "cooldown finisce tra " + inT(m.free - now)),
-          lab(el("td", null, `${fmtPct(m.p * 100)}, spostando di solito ${art(fmtPct(m.moved * 100))}${fmtPct(m.moved * 100)}`), "In 47 ore:"), el("td", null, habit(m)),
+          lab(el("td", null, m.free <= now ? "finito " + when(m.free) : "finisce tra " + inT(m.free - now)), "Cooldown"),
+          lab(el("td", null, `${Math.round(m.p * 100)}% · ne sposta di solito ${art(Math.round(m.moved * 100) + "%")}${Math.round(m.moved * 100)}%`), "Si muove in 47 ore:"), el("td", null, habit(m)),
           lab(el("td", null, m.pools.slice(0, 2).map(x => `${x[0]}${x[1] !== "Base" ? " (" + x[1] + ")" : ""} ${fmtN(x[2])}`).join(" · ") + (m.n_pools > 2 ? ` · +${m.n_pools - 2} pool` : "")), "Ora in"));
         tbody.append(tr);
       }
