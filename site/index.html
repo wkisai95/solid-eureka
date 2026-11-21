@@ -2572,9 +2572,10 @@ table.rank th { white-space: normal; vertical-align: bottom; }
       const h = (S && S.history) || {}, todo = Object.keys(h).filter(k => !h[k]);
       info.textContent = todo.length ? `In preparazione: il monitor sta leggendo la storia delle allocazioni (manca: ${todo.join(", ")}). Finché non c'è, l'opzione non cambia nulla.`
         : "In preparazione: arriva con il prossimo aggiornamento del monitor. Finché non c'è, l'opzione non cambia nulla.";
-    } else if (!S.used) info.textContent = "Nell'ultima settimana la previsione non ha battuto «voti fermi», quindi per ora l'opzione non cambia nulla. " + othCheck(S);
+    } else if (!S.fit) info.textContent = "In preparazione: il monitor sta rifacendo la previsione sulle settimane passate per tararla e verificarla. Finché non ha finito, l'opzione non cambia nulla.";
+    else if (!S.used) info.textContent = "Nell'ultima settimana la previsione non ha battuto «voti fermi», quindi per ora l'opzione non cambia nulla. " + othCheck(S);
     else info.textContent = (RD.oth ? `Voti previsti per ${n} pool, quelli con almeno ${minV(S)} voti: al posto della concorrenza attesa. ` : "I voti che ogni pool avrà in media nelle 47 ore del tuo cooldown, posizione per posizione. ") + othCheck(S);
-    sw.closest(".field").classList.toggle("dim", !!(S && S.ready && !S.used));
+    sw.closest(".field").classList.toggle("dim", !(S && S.used));
     const cs = $("rd-comp-s");
     cs.textContent = r.oth ? `Con la previsione degli altri allocatori vale solo per i pool sotto ${minV(S)} voti` : "Gli altri allocatori arrivano dove si guadagna di più";
   }
@@ -2603,7 +2604,7 @@ table.rank th { white-space: normal; vertical-align: bottom; }
     const F = OTH.forecast, mh = F.move_h || [], tot = mh.reduce((a, b) => a + b, 0), six = mh.slice(0, 6).reduce((a, b) => a + b, 0);
     sum.textContent = `${fmtN(tot)} voti attesi in movimento in 47 ore`;
     box.append(el("p", "note", `Chi può muoversi, quando e quanto: la previsione guarda ogni posizione, quando finisce il suo cooldown, quanto in fretta si è mossa le altre volte e quanta parte dei voti ha spostato. Poi una regressione la confronta con quello che è successo nelle settimane passate. ${othCheck(OTH.fit ? { fit: OTH.fit } : null)}` +
-      (OTH.fit && !OTH.fit.used ? " Per ora non batte «voti fermi»: l'opzione del radar non la usa." : "") +
+      (!OTH.fit ? " La taratura sulle settimane passate non è ancora finita: per ora qui ci sono i movimenti attesi, non ancora dove andranno i voti." : !OTH.fit.used ? " Per ora non batte «voti fermi»: l'opzione del radar non la usa." : "") +
       (Object.keys(h).some(k => !h[k]) ? ` Manca ancora la storia di ${Object.keys(h).filter(k => !h[k]).join(", ")}: i suoi pool non hanno previsione.` : "")));
     const kp = el("div", "stats");
     for (const [k, v] of [["Liberi di muoversi ora", F.free[0]], ["Escono dal cooldown in 47 ore", F.free[1]], ["Attesi in movimento in 47 ore", tot], ["… di cui nelle prossime 6 ore", six]]) {
