@@ -199,8 +199,12 @@ def run(args):
             log(f"{C.chain_short(cid)}: pending fees not read: {type(e).__name__}: {str(e)[:200]}")
         bf = None
         try:
-            # older allocations, a few windows per run, until the record of the last weeks is complete
-            bf = O.backfill(rpc, cid, cs, ccfg, bf_jobs.get(cid), read_deadline, log)
+            # older allocations, a few windows per run, until the record of the last weeks is complete. A client of
+            # its own: the run's one prefers the endpoints that served the small recent ranges, often not the ones
+            # that take wide ranges of old blocks
+            if bf_jobs.get(cid):
+                hist = Rpc(ccfg["rpc"], name=C.chain_short(cid) + " (history)", log=log, pace=float(ccfg.get("pace_s", 0)))
+                bf = O.backfill(hist, cid, cs, ccfg, bf_jobs[cid], read_deadline, log)
         except Exception as e:
             log(f"{C.chain_short(cid)}: allocation history not read: {type(e).__name__}: {str(e)[:200]}")
         return {"ok": True, "events": events, "head": head, "prev_last": prev_last, "bf": bf}

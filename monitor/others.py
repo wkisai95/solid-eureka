@@ -133,7 +133,8 @@ def backfill(rpc, cid, cs, ccfg, job, deadline, log):
         nxt = A.start_block(rpc, cid, cs, ccfg, cs.get("head") or 0, cs.get("head_ts") or int(t0), log)
     to = int(job["to"])
     win = A._blocks(12 * HOUR, cs.get("bt") or 2.0, 2000, 2_000_000)
-    chunk = min(int(cs.get("leaf_chunk") or win), win)
+    # wide ranges first (old blocks are sparse): the reader halves them where an endpoint refuses
+    chunk = min(win, max(int(cs.get("leaf_chunk") or 0), 50_000))
     clock = A.ts_fn(cid, cs) if cid == C.BASE_CHAIN and not cs.get("ts_drift") else None
     found, n = [], 0
     while nxt <= to and time.time() < stop:
