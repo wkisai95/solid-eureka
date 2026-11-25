@@ -59,11 +59,11 @@ jobs:
     steps:
       # the latest code, not the one of when the run was queued: an automatic cycle waits about 15 minutes, and
       # otherwise it would publish the page and the state of before a push made in the meantime
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -120,7 +120,7 @@ jobs:
     needs: monitor
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       actions: write
     steps:
@@ -130,20 +130,41 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          wait_min=$(gh api "repos/$REPO/environments/attesa" \
-            --jq '[.protection_rules[]? | select(.type == "wait_timer") | .wait_timer] | max // 0' 2>/dev/null | head -n1 || true)
-          case "$wait_min" in ''|*[!0-9]*) wait_min=0 ;; esac
+          # GitHub's API fails now and then (an HTTP 500 stopped the cycle on 25 November 2026, for the hours its
+          # schedule takes to fire): every call is tried up to 5 times, and when the pause or the waiting runs cannot
+          # be read the next cycle is dispatched anyway (a duplicate cycle skips itself: MIN_INTERVAL_S)
+          try() {
+            local n=1 out
+            while :; do
+              if out=$("$@" 2>"$RUNNER_TEMP/err"); then printf '%s\n' "$out"; return 0; fi
+              echo "Attempt $n of 5 failed: $(tail -n1 "$RUNNER_TEMP/err")" >&2
+              [ "$n" -ge 5 ] && return 1
+              sleep $((n * 15))
+              n=$((n + 1))
+            done
+          }
+          wait_min=$(try gh api "repos/$REPO/environments/attesa" \
+            --jq '[.protection_rules[]? | select(.type == "wait_timer") | .wait_timer] | max // 0' | head -n1 || true)
+          pause="the $wait_min-minute pause"
+          case "$wait_min" in
+            ''|*[!0-9]*) echo "Could not read the pause of the 'attesa' environment: dispatching anyway"; wait_min=15; pause="the pause" ;;
+          esac
           if [ "$wait_min" -lt 5 ]; then
             echo "No wait timer on the 'attesa' environment: the next run is left to the schedule."
             exit 0
           fi
-          pending=$(gh api "repos/$REPO/actions/workflows/monitor.yml/runs?event=workflow_dispatch&per_page=30" \
+          pending=$(try gh api "repos/$REPO/actions/workflows/monitor.yml/runs?event=workflow_dispatch&per_page=30" \
             --jq "[.workflow_runs[] | select(.id != $RUN_ID and .status != \"completed\" and (.display_title | endswith(\"ciclo\")))] | length" \
-            2>/dev/null | head -n1 || true)
-          case "$pending" in ''|*[!0-9]*) echo "Could not list the runs: no new cycle"; exit 0 ;; esac
+            | head -n1 || true)
+          case "$pending" in
+            ''|*[!0-9]*) echo "Could not list the runs: dispatching anyway"; pending=0 ;;
+          esac
           if [ "$pending" -gt 0 ]; then
             echo "A cycle is already waiting."
             exit 0
           fi
-          gh workflow run monitor.yml --repo "$REPO" --ref main -f cycle=true
-          echo "Next cycle dispatched: it starts after the $wait_min-minute pause."
+          if ! try gh workflow run monitor.yml --repo "$REPO" --ref main -f cycle=true; then
+            echo "::error::Next cycle not dispatched after 5 attempts: the schedule or a manual run restarts it"
+            exit 1
+          fi
+          echo "Next cycle dispatched: it starts after $pause."
